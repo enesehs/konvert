@@ -6,6 +6,7 @@ on:
     tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -53,6 +54,8 @@ jobs:
           chmod +x packaging/build-deb.sh
           ./packaging/build-deb.sh
           sha256sum packaging/*.deb > packaging/deb.sha256
+          cp packaging/*.deb .
+          cp packaging/deb.sha256 .
 
       - name: Package Release Bundle
         run: |
@@ -86,8 +89,8 @@ jobs:
           path: |
             konvert-*.tar.gz
             konvert-*.tar.gz.sha256
-            packaging/*.deb
-            packaging/deb.sha256
+            *.deb
+            deb.sha256
 
   release:
     name: Create GitHub Release
@@ -113,4 +116,4 @@ jobs:
             deb.sha256
           generate_release_notes: true
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
