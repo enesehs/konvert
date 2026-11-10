@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.enesehs.konvert</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Konvert</name>
+  <summary>High-performance file converter and optimizer for Linux and KDE Plasma</summary>
+  <developer id="io.github.enesehs">
+    <name>enesehs</name>
+  </developer>
+
+  <description>
+    <p>
+      Konvert is an ultra-fast, lightweight, offline, and native file conversion and optimization utility crafted for Linux and KDE Plasma.
+    </p>
+    <p>Key features include:</p>
+    <ul>
+      <li>Dolphin Context Menu Integration: Convert photos, videos, audio, and documents directly from the right-click menu without opening heavy applications.</li>
+      <li>Privacy-first and 100% Offline: Zero telemetry and zero cloud dependencies; all files are converted locally using native system resources.</li>
+      <li>Multi-threaded Performance: Powered by Rust and Rayon to batch-process hundreds of files in parallel.</li>
+      <li>Smart Target Sizing: Automatically optimize videos and images for Discord (8 MB limit), email attachments (25 MB limit), and the web.</li>
+      <li>Media and Document Support: Convert between WebP, PNG, JPEG, AVIF, JXL, MP4, WebM, MKV, GIF, MP3, WAV, UDF, and PDF.</li>
+      <li>Conversion History and Savings: Track space savings, view preview thumbnails, and quickly open files in Dolphin.</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.enesehs.konvert.desktop</launchable>
+  <provides>
+    <binary>konvert</binary>
+    <binary>konvert-settings</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/enesehs/konvert</url>
+  <url type="bugtracker">https://github.com/enesehs/konvert/issues</url>
+  <url type="vcs-browser">https://github.com/enesehs/konvert</url>
+
+  <categories>
+    <category>Utility</category>
+    <category>Graphics</category>
+    <category>AudioVideo</category>
+    <category>Qt</category>
+    <category>KDE</category>
+  </categories>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.2.0" date="2026-11-10">
+      <description>
+        <p>Release 0.2.0 with KDE Plasma 6 integration, native progress notifications, smart target sizing presets, and history preview.</p>
+      </description>
+    </release>
+  </releases>
+</component>

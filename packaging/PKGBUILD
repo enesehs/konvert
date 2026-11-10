@@ -1,0 +1,39 @@
+# Maintainer: enesehs <enesehs@protonmail.com>
+pkgname=konvert
+pkgver=0.1_beta
+pkgrel=1
+pkgdesc="Fast, lightweight, native right-click file converter and optimizer for Linux & KDE Plasma"
+arch=('x86_64' 'aarch64')
+url="https://github.com/enesehs/konvert"
+license=('GPL-3.0-or-later')
+depends=('qt6-base' 'ffmpeg')
+makedepends=('cargo' 'cmake' 'ninja' 'qt6-tools')
+optdepends=(
+    'dolphin: KDE Plasma file manager context menu integration'
+    'libjxl: JPEG XL (cjxl/djxl) support'
+    'poppler: PDF page rendering to images'
+)
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    cargo build --release --locked
+    cmake -B gui/build -S gui -GNinja -DCMAKE_BUILD_TYPE=Release
+    ninja -C gui/build
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+    install -Dm755 "target/release/konvert" "$pkgdir/usr/bin/konvert"
+    install -Dm755 "gui/build/konvert-settings" "$pkgdir/usr/bin/konvert-settings"
+    install -Dm644 "io.github.enesehs.konvert.desktop" "$pkgdir/usr/share/applications/io.github.enesehs.konvert.desktop"
+    install -Dm644 "packaging/io.github.enesehs.konvert.metainfo.xml" "$pkgdir/usr/share/metainfo/io.github.enesehs.konvert.metainfo.xml"
+    install -Dm644 "assets/logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/konvert.svg"
+    install -Dm644 "assets/logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg"
+
+    # Install system-wide Dolphin servicemenus
+    mkdir -p "$pkgdir/usr/share/kio/servicemenus"
+    "target/release/konvert" --sync-menu --menu-dir "$pkgdir/usr/share/kio/servicemenus" --menu-exec "konvert"
+    chmod 644 "$pkgdir/usr/share/kio/servicemenus"/*.desktop
+}

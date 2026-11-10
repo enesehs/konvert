@@ -1,0 +1,18 @@
+[Desktop Entry]
+Name=Konvert
+Comment=Fast, lightweight, native file conversion and processing settings
+Comment[tr]=Dosya dönüştürme ve işleme ayarları
+Comment[de]=Einstellungen für Dateikonvertierung und -verarbeitung
+Comment[fr]=Paramètres de conversion et de traitement de fichiers
+Comment[es]=Ajustes de conversión y procesamiento de archivos
+Comment[it]=Impostazioni di conversione ed elaborazione dei file
+Comment[ru]=Настройки конвертации и обработки файлов
+Comment[zh_CN]=文件转换和处理设置
+Comment[ja]=ファイル変換および処理の設定
+Exec=konvert-settings
+Icon=konvert
+StartupWMClass=konvert-settings
+Terminal=false
+Type=Application
+Categories=Utility;Settings;
+Keywords=convert;donusturucu;settings;ayar;konvertieren;conversion;

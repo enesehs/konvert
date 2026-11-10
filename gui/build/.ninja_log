@@ -1,0 +1,26 @@
+# ninja log v7
+2	20	1794333634549607497	konvert-settings_autogen/timestamp	58178b66cc614697
+2	20	1794333634549607497	konvert-settings_autogen/mocs_compilation.cpp	58178b66cc614697
+2	20	1794333634549607497	/home/enesehs/Konvert/gui/build/konvert-settings_autogen/timestamp	58178b66cc614697
+2	20	1794333634549607497	/home/enesehs/Konvert/gui/build/konvert-settings_autogen/mocs_compilation.cpp	58178b66cc614697
+129	940	1794305764620740242	CMakeFiles/konvert-settings.dir/src/main.cpp.o	474ff9a4c1eaf6dc
+129	938	1794305764620607142	CMakeFiles/konvert-settings.dir/konvert-settings_autogen/mocs_compilation.cpp.o	4ae433673a165603
+20	1335	1794333634567607504	CMakeFiles/konvert-settings.dir/src/mainwindow.cpp.o	bb8327693422e9a1
+19	725	1794332809154664195	CMakeFiles/konvert-settings.dir/src/configmanager.cpp.o	3184f6aff7a41bb
+1335	1458	1794333635882608056	konvert-settings	30f1fc490e4d41bb
+134	144	1794251734525104766	konvert-settings_autogen/EWIEGA46WW/qrc_resources.cpp	f214598b6370e211
+134	144	1794251734525104766	/home/enesehs/Konvert/gui/build/konvert-settings_autogen/EWIEGA46WW/qrc_resources.cpp	f214598b6370e211
+145	157	1794251734526626336	CMakeFiles/konvert-settings.dir/konvert-settings_autogen/EWIEGA46WW/qrc_resources.cpp.o	90aabb1211f85c0e
+26	194	1794335750939474291	build.ninja	7ed5d42fba1de602
+26	194	1794335750938413725	/home/enesehs/Konvert/gui/build/cmake_install.cmake	7ed5d42fba1de602
+1	169	1794335750939474291	build.ninja	7ed5d42fba1de602
+1	169	1794335750939474291	/home/enesehs/Konvert/gui/build/cmake_install.cmake	7ed5d42fba1de602
+1	18	1794335750944413735	konvert-settings_autogen/timestamp	58178b66cc614697
+1	18	1794335750944413735	konvert-settings_autogen/mocs_compilation.cpp	58178b66cc614697
+1	18	1794335750944413735	/home/enesehs/Konvert/gui/build/konvert-settings_autogen/timestamp	58178b66cc614697
+1	18	1794335750944413735	/home/enesehs/Konvert/gui/build/konvert-settings_autogen/mocs_compilation.cpp	58178b66cc614697
+18	26	1794335750968413777	konvert-settings_autogen/EWIEGA46WW/qrc_resources.cpp	f214598b6370e211
+18	26	1794335750968413777	/home/enesehs/Konvert/gui/build/konvert-settings_autogen/EWIEGA46WW/qrc_resources.cpp	f214598b6370e211
+26	117	1794335750970330682	CMakeFiles/konvert-settings.dir/konvert-settings_autogen/EWIEGA46WW/qrc_resources.cpp.o	90aabb1211f85c0e
+26	1564	1794335750969413779	CMakeFiles/konvert-settings.dir/src/mainwindow.cpp.o	bb8327693422e9a1
+1564	1710	1794335752507416452	konvert-settings	30f1fc490e4d41bb

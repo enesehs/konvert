@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/enesehs/Konvert/gui/build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
