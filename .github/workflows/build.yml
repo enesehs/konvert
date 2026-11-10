@@ -35,7 +35,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build Rust CLI (konvert)
-        run: cargo build --release --locked
+        run: cargo build --release
 
       - name: Run Tests
         run: cargo test --release
