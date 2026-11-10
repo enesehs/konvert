@@ -90,8 +90,8 @@ else
     
     if ! command -v git >/dev/null 2>&1 || ! command -v cargo >/dev/null 2>&1; then
         echo -e "${RED}Error: Building from source requires 'git' and 'cargo' (Rust).${RESET}"
-        echo -e "Arch Linux: sudo pacman -S git rust cmake ninja qt6-base"
-        echo -e "Ubuntu/Debian: sudo apt install git cargo cmake ninja-build qt6-base-dev"
+        echo -e "Arch Linux: sudo pacman -S git rust cmake ninja qt6-base qt6-svg"
+        echo -e "Ubuntu/Debian: sudo apt install git cargo cmake ninja-build qt6-base-dev libqt6svg6-dev"
         exit 1
     fi
 
