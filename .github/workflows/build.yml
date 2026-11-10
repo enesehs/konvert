@@ -42,6 +42,7 @@ jobs:
 
       - name: Build Qt6 Settings GUI (konvert-settings)
         run: |
+          rm -rf gui/build
           cmake -B gui/build -S gui -GNinja -DCMAKE_BUILD_TYPE=Release
           ninja -C gui/build
 

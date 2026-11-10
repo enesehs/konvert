@@ -1,5 +1,0 @@
-/home/enesehs/Konvert/gui/build/CMakeFiles/konvert-settings.dir
-/home/enesehs/Konvert/gui/build/CMakeFiles/edit_cache.dir
-/home/enesehs/Konvert/gui/build/CMakeFiles/rebuild_cache.dir
-/home/enesehs/Konvert/gui/build/CMakeFiles/konvert-settings_autogen_timestamp_deps.dir
-/home/enesehs/Konvert/gui/build/CMakeFiles/konvert-settings_autogen.dir

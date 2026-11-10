@@ -1,6 +1,10 @@
 /target/
 debug/
-/gui/build
+/gui/build/
+gui/build/
+*.o
+*.a
+*.so
 /build-deb-tmp
 /build-deb-ar
 packaging/*.deb
