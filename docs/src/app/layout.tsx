@@ -1,7 +1,16 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/lib/i18n";
+
+const monaSans = localFont({
+  src: "../../public/MonaSansVF.woff2",
+  variable: "--font-mona-sans",
+  display: "swap",
+});
+
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export const metadata: Metadata = {
   title: "Konvert — Native Right-Click File Converter for Linux",
@@ -28,8 +37,8 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "enesehs" }],
   icons: {
-    icon: "/konvert.svg",
-    apple: "/konvert.svg",
+    icon: `${basePath}/konvert.svg`,
+    apple: `${basePath}/konvert.svg`,
   },
   openGraph: {
     title: "Konvert — Native Right-Click File Converter for Linux",
@@ -57,16 +66,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={monaSans.variable}>
       <head>
         <meta name="darkreader-lock" content="true" />
-        <link
-          rel="preload"
-          href="/MonaSansVF.woff2"
-          as="font"
-          type="font/woff2"
-          crossOrigin="anonymous"
-        />
       </head>
       <body
         suppressHydrationWarning
