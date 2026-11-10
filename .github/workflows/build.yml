@@ -1,0 +1,113 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build & Package (Linux x86_64)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qt6-base-dev \
+            cmake \
+            ninja-build \
+            libpoppler-cpp-dev \
+            libjxl-tools \
+            ffmpeg \
+            imagemagick
+
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Rust CLI (konvert)
+        run: cargo build --release --locked
+
+      - name: Run Tests
+        run: cargo test --release
+
+      - name: Build Qt6 Settings GUI (konvert-settings)
+        run: |
+          cmake -B gui/build -S gui -GNinja -DCMAKE_BUILD_TYPE=Release
+          ninja -C gui/build
+
+      - name: Build Debian (.deb) Package
+        run: |
+          chmod +x packaging/build-deb.sh
+          ./packaging/build-deb.sh
+          sha256sum packaging/*.deb > packaging/deb.sha256
+
+      - name: Package Release Bundle
+        run: |
+          PKG_NAME="konvert-linux-x86_64"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            PKG_NAME="konvert-${{ github.ref_name }}-linux-x86_64"
+          fi
+          mkdir -p "${PKG_NAME}"
+          cp target/release/konvert "${PKG_NAME}/"
+          cp gui/build/konvert-settings "${PKG_NAME}/"
+          cp scripts/install.sh "${PKG_NAME}/"
+          cp scripts/uninstall.sh "${PKG_NAME}/"
+          cp io.github.enesehs.konvert.desktop "${PKG_NAME}/"
+          cp assets/logo.svg "${PKG_NAME}/"
+          cp README.md "${PKG_NAME}/"
+          if [ -f LICENSE ]; then cp LICENSE "${PKG_NAME}/"; fi
+
+          tar -czvf "${PKG_NAME}.tar.gz" "${PKG_NAME}"
+          sha256sum "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256"
+          
+          # Also ensure universal 'konvert-linux-x86_64.tar.gz' is available for remote installer
+          if [ "${PKG_NAME}" != "konvert-linux-x86_64" ]; then
+            cp "${PKG_NAME}.tar.gz" "konvert-linux-x86_64.tar.gz"
+            sha256sum "konvert-linux-x86_64.tar.gz" > "konvert-linux-x86_64.tar.gz.sha256"
+          fi
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: konvert-binaries
+          path: |
+            konvert-*.tar.gz
+            konvert-*.tar.gz.sha256
+            packaging/*.deb
+            packaging/deb.sha256
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: konvert-binaries
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            konvert-*.tar.gz
+            konvert-*.tar.gz.sha256
+            *.deb
+            deb.sha256
+          generate_release_notes: true
+          draft: false
+          prerelease: false
