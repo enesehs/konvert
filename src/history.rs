@@ -1,6 +1,7 @@
 use anyhow::Result;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
 
@@ -36,8 +37,8 @@ pub fn load_history() -> Vec<HistoryEntry> {
 }
 
 pub fn add_history_entry(entry: HistoryEntry) -> Result<()> {
-    let mut history = load_history();
-    history.insert(0, entry); // En yeni işlem en üstte
+    let mut history: VecDeque<HistoryEntry> = load_history().into();
+    history.push_front(entry); // O(1) front insertion
 
     // En fazla son 100 işlemi sakla
     if history.len() > 100 {
@@ -48,7 +49,7 @@ pub fn add_history_entry(entry: HistoryEntry) -> Result<()> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let json = serde_json::to_string_pretty(&history)?;
+        let json = serde_json::to_string(&history)?;
         fs::write(path, json)?;
     }
     Ok(())

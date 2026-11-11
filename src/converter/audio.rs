@@ -27,6 +27,8 @@ pub fn convert_audio(
 
         let status = Command::new("ffmpeg")
             .arg("-y")
+            .arg("-threads")
+            .arg("0")
             .arg("-i")
             .arg(input_path)
             .arg("-filter_complex")
@@ -61,7 +63,11 @@ pub fn convert_audio(
     );
 
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-y").arg("-i").arg(input_path);
+    cmd.arg("-y")
+        .arg("-threads")
+        .arg("0")
+        .arg("-i")
+        .arg(input_path);
 
     let b_rate = bitrate.unwrap_or("320k");
     match target.as_str() {

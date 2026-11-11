@@ -98,7 +98,26 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if cli.install_all || cli.install_dolphin {
+    if cli.install_all {
+        match desktop::detector::install_all() {
+            Ok(installed) => {
+                for item in &installed {
+                    println!("Installed: {}", item);
+                }
+                notifier.success(
+                    t("notify_integ_title"),
+                    &format!("Integrations installed for {} desktop managers.", installed.len()),
+                );
+            }
+            Err(e) => {
+                eprintln!("Installation error: {}", e);
+                notifier.error(t("notify_failed"), &format!("Installation failed: {}", e));
+            }
+        }
+        return Ok(());
+    }
+
+    if cli.install_dolphin {
         match desktop::dolphin::install_dolphin_service(None) {
             Ok(path) => {
                 println!("Dolphin service menu installed: {}", path.display());
@@ -112,7 +131,26 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if cli.uninstall_all || cli.uninstall_dolphin {
+    if cli.uninstall_all {
+        match desktop::detector::uninstall_all() {
+            Ok(removed) => {
+                for item in &removed {
+                    println!("Removed: {}", item);
+                }
+                notifier.success(
+                    t("notify_integ_title"),
+                    &format!("Integrations removed for {} desktop managers.", removed.len()),
+                );
+            }
+            Err(e) => {
+                eprintln!("Removal error: {}", e);
+                notifier.error(t("notify_failed"), &format!("Removal failed: {}", e));
+            }
+        }
+        return Ok(());
+    }
+
+    if cli.uninstall_dolphin {
         match desktop::dolphin::uninstall_dolphin_service() {
             Ok(true) => {
                 println!("Dolphin service menu removed.");

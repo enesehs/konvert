@@ -1,8 +1,11 @@
 use anyhow::{bail, Context, Result};
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static TEMP_DOC_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[allow(dead_code)]
 pub fn is_supported_document_target(target: &str) -> bool {
@@ -110,7 +113,7 @@ pub fn convert_udf(
 
     let mut xml_content = String::new();
 
-    let file = File::open(input_path)?;
+    let file = BufReader::new(File::open(input_path)?);
     if let Ok(mut archive) = zip::ZipArchive::new(file) {
         if let Ok(mut zip_file) = archive.by_name("content.xml") {
             let _ = zip_file.read_to_string(&mut xml_content);
@@ -126,7 +129,8 @@ pub fn convert_udf(
     match target_format {
         "pdf" => {
             // UDF içeriğini doğrudan PDF dosyasına bas
-            let temp_txt = std::env::temp_dir().join(format!("udf_temp_{}.txt", std::process::id()));
+            let count = TEMP_DOC_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let temp_txt = std::env::temp_dir().join(format!("udf_temp_{}_{}.txt", std::process::id(), count));
             fs::write(&temp_txt, &text_content)?;
 
             let status = Command::new("magick")
@@ -199,7 +203,7 @@ pub fn convert_docx(
         custom_output_dir,
     );
 
-    let file = File::open(input_path)?;
+    let file = BufReader::new(File::open(input_path)?);
     let mut archive = zip::ZipArchive::new(file)?;
     let mut xml_content = String::new();
 
@@ -214,7 +218,7 @@ pub fn convert_docx(
 }
 
 fn extract_text_from_xml(xml: &str) -> String {
-    let mut text = String::new();
+    let mut text = String::with_capacity(xml.len() / 2);
     let mut inside_tag = false;
 
     for ch in xml.chars() {

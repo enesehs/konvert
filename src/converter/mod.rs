@@ -4,7 +4,10 @@ pub mod image;
 pub mod video;
 
 use anyhow::{bail, Result};
+use rayon::prelude::*;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 pub struct BatchResult {
     pub succeeded: Vec<PathBuf>,
@@ -180,28 +183,48 @@ pub fn merge_images_to_pdf(images: &[PathBuf], custom_output_dir: Option<&Path>)
 pub fn convert_batch_with_progress<F>(
     files: &[PathBuf],
     opts: &ConvertOptions,
-    mut progress_callback: F,
+    progress_callback: F,
 ) -> BatchResult
 where
-    F: FnMut(usize, usize, &Path, i32),
+    F: FnMut(usize, usize, &Path, i32) + Send,
 {
     let total = files.len();
-    let mut succeeded = Vec::new();
-    let mut failed = Vec::new();
-
-    for (index, file) in files.iter().enumerate() {
-        let percent = ((index as f32 / total as f32) * 100.0) as i32;
-        progress_callback(index + 1, total, file, percent);
-
-        match convert_single(file, opts) {
-            Ok(p) => succeeded.push(p),
-            Err(e) => failed.push((file.clone(), e.to_string())),
-        }
+    if total == 0 {
+        return BatchResult {
+            succeeded: Vec::new(),
+            failed: Vec::new(),
+        };
     }
 
-    let final_percent = 100;
-    if let Some(last_file) = files.last() {
-        progress_callback(total, total, last_file, final_percent);
+    let callback = Mutex::new(progress_callback);
+    let completed = AtomicUsize::new(0);
+
+    let results: Vec<Result<PathBuf, (PathBuf, String)>> = files
+        .par_iter()
+        .map(|file| {
+            let res = convert_single(file, opts);
+            let curr = completed.fetch_add(1, Ordering::SeqCst) + 1;
+            let percent = ((curr as f32 / total as f32) * 100.0) as i32;
+
+            if let Ok(mut cb) = callback.lock() {
+                cb(curr, total, file, percent);
+            }
+
+            match res {
+                Ok(p) => Ok(p),
+                Err(e) => Err((file.clone(), e.to_string())),
+            }
+        })
+        .collect();
+
+    let mut succeeded = Vec::with_capacity(total);
+    let mut failed = Vec::new();
+
+    for r in results {
+        match r {
+            Ok(p) => succeeded.push(p),
+            Err(f) => failed.push(f),
+        }
     }
 
     BatchResult { succeeded, failed }

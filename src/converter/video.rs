@@ -41,6 +41,8 @@ pub fn convert_video(
         // Maksimum 15 saniye sınırı koy (disk patlamasını ve donmayı önler)
         let status = Command::new("ffmpeg")
             .arg("-y")
+            .arg("-threads")
+            .arg("0")
             .arg("-t")
             .arg("15") // İlk 15 saniye sınırı
             .arg("-i")
@@ -65,7 +67,11 @@ pub fn convert_video(
     );
 
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-y").arg("-i").arg(input_path);
+    cmd.arg("-y")
+        .arg("-threads")
+        .arg("0")
+        .arg("-i")
+        .arg(input_path);
 
     if lossless {
         match target.as_str() {
@@ -118,6 +124,8 @@ pub fn extract_frames_to_folder(
 
     let status = Command::new("ffmpeg")
         .arg("-y")
+        .arg("-threads")
+        .arg("0")
         .arg("-i")
         .arg(input_path)
         .arg(&output_pattern)
@@ -149,6 +157,8 @@ pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     let output_path = target_dir.join(format!("{}_compressed.mp4", file_stem));
     let status = Command::new("ffmpeg")
         .arg("-y")
+        .arg("-threads")
+        .arg("0")
         .arg("-i")
         .arg(input_path)
         .arg("-c:v")
@@ -249,6 +259,8 @@ pub fn compress_video_to_size(
 
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-y")
+        .arg("-threads")
+        .arg("0")
         .arg("-i")
         .arg(input_path)
         .arg("-c:v")

@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use image::{codecs::jpeg::JpegEncoder, imageops, DynamicImage, GenericImageView, ImageFormat};
 use std::fs::{self, File};
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -98,21 +99,20 @@ pub fn convert_image(
         .unwrap_or(false);
 
     let img: DynamicImage = if is_input_jxl {
-        let temp_png = std::env::temp_dir().join(format!("konvert_jxl_{}.png", std::process::id()));
-        let status = Command::new("djxl")
+        let output = Command::new("djxl")
             .arg(input_path)
-            .arg(&temp_png)
-            .status()
+            .arg("-")
+            .arg("--output_format")
+            .arg("png")
+            .output()
             .with_context(|| "djxl komutu çalıştırılamadı")?;
 
-        if !status.success() {
+        if !output.status.success() {
             bail!("JXL görseli çözülemedi: {}", input_path.display());
         }
 
-        let loaded = image::open(&temp_png)
-            .with_context(|| "djxl çıktısı okunamadı")?;
-        let _ = fs::remove_file(temp_png);
-        loaded
+        image::load_from_memory(&output.stdout)
+            .with_context(|| "djxl çıktısı bellekten okunamadı")?
     } else {
         image::open(input_path)
             .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?
@@ -124,19 +124,29 @@ pub fn convert_image(
     match format {
         ImageFormat::Jpeg => {
             let q = quality.unwrap_or(85).clamp(1, 100);
-            let mut file = File::create(&output_path)
+            let file = File::create(&output_path)
                 .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
-            let mut encoder = JpegEncoder::new_with_quality(&mut file, q);
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            let mut encoder = JpegEncoder::new_with_quality(&mut writer, q);
             encoder.encode_image(&img)
                 .with_context(|| "JPEG kodlama hatası")?;
+            writer.flush().with_context(|| "JPEG tamponu yazılamadı")?;
         }
         ImageFormat::WebP => {
-            img.save_with_format(&output_path, ImageFormat::WebP)
+            let file = File::create(&output_path)
+                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            img.write_to(&mut writer, ImageFormat::WebP)
                 .with_context(|| "WebP kaydetme hatası")?;
+            writer.flush().with_context(|| "WebP tamponu yazılamadı")?;
         }
         _ => {
-            img.save_with_format(&output_path, format)
+            let file = File::create(&output_path)
+                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            img.write_to(&mut writer, format)
                 .with_context(|| format!("Görsel kaydedilemedi: {}", output_path.display()))?;
+            writer.flush().with_context(|| "Görsel tamponu yazılamadı")?;
         }
     }
 
@@ -186,11 +196,13 @@ pub fn compress_image(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     let img = image::open(input_path)
         .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?;
 
-    let mut file = File::create(&output_path)
+    let file = File::create(&output_path)
         .with_context(|| format!("Çıktı dosyası oluşturulamadı: {}", output_path.display()))?;
+    let mut writer = BufWriter::with_capacity(64 * 1024, file);
 
-    img.write_to(&mut file, ImageFormat::WebP)
+    img.write_to(&mut writer, ImageFormat::WebP)
         .with_context(|| "Görsel WebP olarak sıkıştırılamadı")?;
+    writer.flush().with_context(|| "WebP tamponu boşaltılamadı")?;
 
     Ok(output_path)
 }
@@ -200,7 +212,8 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     let ext = input_path
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("png");
+        .unwrap_or("png")
+        .to_lowercase();
 
     let file_stem = input_path
         .file_stem()
@@ -217,7 +230,18 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
 
     let output_path = target_dir.join(format!("{}_clean.{}", file_stem, ext));
 
-    // ImageMagick ile tüm metadata'yı strip et
+    // Native in-memory decode & write: drops EXIF/GPS automatically without external process overhead
+    if let Ok(img) = image::open(input_path) {
+        if let Ok(file) = File::create(&output_path) {
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
+            if img.write_to(&mut writer, fmt).is_ok() && writer.flush().is_ok() {
+                return Ok(output_path);
+            }
+        }
+    }
+
+    // Fallback to ImageMagick for SVG/unsupported formats
     let status = Command::new("magick")
         .arg(input_path)
         .arg("-strip")
@@ -372,6 +396,15 @@ pub fn compress_image_preset(
 
     if preset == "web_opt" || preset == "web-opt" {
         let output_path = target_dir.join(format!("{}_web.webp", file_stem));
+        if let Ok(img) = image::open(input_path) {
+            if let Ok(file) = File::create(&output_path) {
+                let mut writer = BufWriter::with_capacity(64 * 1024, file);
+                if img.write_to(&mut writer, ImageFormat::WebP).is_ok() && writer.flush().is_ok() {
+                    return Ok(output_path);
+                }
+            }
+        }
+
         let status = Command::new("magick")
             .arg(input_path)
             .arg("-auto-orient")

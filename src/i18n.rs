@@ -1,3 +1,7 @@
+use std::sync::OnceLock;
+
+static CURRENT_LANG: OnceLock<Language> = OnceLock::new();
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Language {
     En,
@@ -13,6 +17,10 @@ pub enum Language {
 
 impl Language {
     pub fn current() -> Self {
+        *CURRENT_LANG.get_or_init(Self::detect_from_env)
+    }
+
+    fn detect_from_env() -> Self {
         let lang = std::env::var("LC_ALL")
             .or_else(|_| std::env::var("LC_MESSAGES"))
             .or_else(|_| std::env::var("LANG"))
