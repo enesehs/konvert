@@ -115,14 +115,12 @@ impl Config {
     }
 
     pub fn load() -> Self {
-        if let Some(path) = Self::config_path() {
-            if path.exists() {
-                if let Ok(content) = fs::read_to_string(&path) {
-                    if let Ok(cfg) = toml::from_str(&content) {
-                        return cfg;
-                    }
-                }
-            }
+        if let Some(path) = Self::config_path()
+            && path.exists()
+            && let Ok(content) = fs::read_to_string(&path)
+            && let Ok(cfg) = toml::from_str(&content)
+        {
+            return cfg;
         }
         let default_config = Self::default();
         let _ = default_config.save();

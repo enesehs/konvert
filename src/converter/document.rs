@@ -49,6 +49,7 @@ pub fn convert_document(
         &target,
         custom_output_dir,
     );
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let content = fs::read_to_string(input_path)
         .with_context(|| format!("Belge okunamadı: {}", input_path.display()))?;
@@ -110,14 +111,15 @@ pub fn convert_udf(
         target_format,
         custom_output_dir,
     );
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let mut xml_content = String::new();
 
     let file = BufReader::new(File::open(input_path)?);
-    if let Ok(mut archive) = zip::ZipArchive::new(file) {
-        if let Ok(mut zip_file) = archive.by_name("content.xml") {
-            let _ = zip_file.read_to_string(&mut xml_content);
-        }
+    if let Ok(mut archive) = zip::ZipArchive::new(file)
+        && let Ok(mut zip_file) = archive.by_name("content.xml")
+    {
+        let _ = zip_file.read_to_string(&mut xml_content);
     }
 
     if xml_content.is_empty() {
@@ -202,6 +204,7 @@ pub fn convert_docx(
         target_format,
         custom_output_dir,
     );
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let file = BufReader::new(File::open(input_path)?);
     let mut archive = zip::ZipArchive::new(file)?;
@@ -259,6 +262,7 @@ pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Resu
     };
 
     let output_path = target_dir.join(format!("{}_compressed.pdf", file_stem));
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let gs_status = Command::new("gs")
         .arg("-sDEVICE=pdfwrite")
@@ -271,10 +275,11 @@ pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Resu
         .arg(input_path)
         .status();
 
-    if let Ok(st) = gs_status {
-        if st.success() && output_path.exists() {
-            return Ok(output_path);
-        }
+    if let Ok(st) = gs_status
+        && st.success()
+        && output_path.exists()
+    {
+        return Ok(output_path);
     }
 
     let fb_status = Command::new("magick")

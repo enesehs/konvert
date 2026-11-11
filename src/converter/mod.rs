@@ -243,3 +243,45 @@ fn is_video_ext(ext: &str) -> bool {
         "mp4" | "mkv" | "webm" | "avi" | "mov" | "flv" | "wmv" | "m4v"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_image_ext() {
+        assert!(is_image_ext("png"));
+        assert!(is_image_ext("jpg"));
+        assert!(is_image_ext("webp"));
+        assert!(is_image_ext("avif"));
+        assert!(is_image_ext("jxl"));
+        assert!(!is_image_ext("mp4"));
+        assert!(!is_image_ext("pdf"));
+    }
+
+    #[test]
+    fn test_is_video_ext() {
+        assert!(is_video_ext("mp4"));
+        assert!(is_video_ext("mkv"));
+        assert!(is_video_ext("webm"));
+        assert!(!is_video_ext("png"));
+        assert!(!is_video_ext("mp3"));
+    }
+
+    #[test]
+    fn test_batch_empty() {
+        let opts = ConvertOptions {
+            target: "webp".to_string(),
+            quality: None,
+            lossless: false,
+            crf: None,
+            preset: None,
+            bitrate: None,
+            dpi: None,
+            custom_output_dir: None,
+        };
+        let result = convert_batch_with_progress(&[], &opts, |_, _, _, _| {});
+        assert!(result.succeeded.is_empty());
+        assert!(result.failed.is_empty());
+    }
+}

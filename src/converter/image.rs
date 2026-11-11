@@ -34,6 +34,16 @@ pub fn parse_image_format(target: &str) -> Option<ImageFormat> {
     }
 }
 
+pub fn ensure_parent_dir(path: &Path) -> Result<()> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("Çıktı klasörü oluşturulamadı: {}", parent.display()))?;
+    }
+    Ok(())
+}
+
 pub fn determine_output_path(
     input_path: &Path,
     target_ext: &str,
@@ -81,10 +91,7 @@ pub fn convert_image(
     }
 
     let output_path = determine_output_path(input_path, &target_lower, custom_output_dir);
-
-    if let Some(parent) = output_path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+    ensure_parent_dir(&output_path)?;
 
     // JPEG XL (.jxl)
     if target_lower == "jxl" {
@@ -159,6 +166,7 @@ fn convert_to_jxl(
     quality: Option<u8>,
     lossless: bool,
 ) -> Result<PathBuf> {
+    ensure_parent_dir(output_path)?;
     let mut cmd = Command::new("cjxl");
     cmd.arg(input_path).arg(output_path);
 
@@ -193,6 +201,8 @@ pub fn compress_image(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     };
 
     let output_path = target_dir.join(format!("{}_compressed.webp", file_stem));
+    ensure_parent_dir(&output_path)?;
+
     let img = image::open(input_path)
         .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?;
 
@@ -229,15 +239,23 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     };
 
     let output_path = target_dir.join(format!("{}_clean.{}", file_stem, ext));
+    ensure_parent_dir(&output_path)?;
 
     // Native in-memory decode & write: drops EXIF/GPS automatically without external process overhead
-    if let Ok(img) = image::open(input_path) {
-        if let Ok(file) = File::create(&output_path) {
-            let mut writer = BufWriter::with_capacity(64 * 1024, file);
-            let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
-            if img.write_to(&mut writer, fmt).is_ok() && writer.flush().is_ok() {
-                return Ok(output_path);
+    if let Ok(img) = image::open(input_path)
+        && let Ok(file) = File::create(&output_path)
+    {
+        let mut writer = BufWriter::with_capacity(64 * 1024, file);
+        let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
+        let write_res = match fmt {
+            ImageFormat::Jpeg => {
+                let mut encoder = JpegEncoder::new_with_quality(&mut writer, 95);
+                encoder.encode_image(&img)
             }
+            _ => img.write_to(&mut writer, fmt),
+        };
+        if write_res.is_ok() && writer.flush().is_ok() {
+            return Ok(output_path);
         }
     }
 
@@ -320,6 +338,7 @@ pub fn resize_image(
     let resized = img.resize(new_w, new_h, imageops::FilterType::Lanczos3);
 
     let output_path = target_dir.join(format!("{}_{}.{}", file_stem, param, ext));
+    ensure_parent_dir(&output_path)?;
     resized.save(&output_path)
         .with_context(|| "Boyutlandırılmış görsel kaydedilemedi")?;
 
@@ -349,6 +368,7 @@ pub fn merge_images_to_pdf(
     };
 
     let output_path = target_dir.join(format!("{}_birlestirildi.pdf", first_stem));
+    ensure_parent_dir(&output_path)?;
 
     let mut cmd = Command::new("magick");
     for img in images {
@@ -396,12 +416,13 @@ pub fn compress_image_preset(
 
     if preset == "web_opt" || preset == "web-opt" {
         let output_path = target_dir.join(format!("{}_web.webp", file_stem));
-        if let Ok(img) = image::open(input_path) {
-            if let Ok(file) = File::create(&output_path) {
-                let mut writer = BufWriter::with_capacity(64 * 1024, file);
-                if img.write_to(&mut writer, ImageFormat::WebP).is_ok() && writer.flush().is_ok() {
-                    return Ok(output_path);
-                }
+        ensure_parent_dir(&output_path)?;
+        if let Ok(img) = image::open(input_path)
+            && let Ok(file) = File::create(&output_path)
+        {
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            if img.write_to(&mut writer, ImageFormat::WebP).is_ok() && writer.flush().is_ok() {
+                return Ok(output_path);
             }
         }
 
@@ -435,6 +456,7 @@ pub fn compress_image_preset(
     let ext = input_path.extension().and_then(|e| e.to_str()).unwrap_or("jpg").to_lowercase();
     let target_ext = if ext == "png" { "png" } else { "jpg" };
     let output_path = target_dir.join(format!("{}_target.{}", file_stem, target_ext));
+    ensure_parent_dir(&output_path)?;
 
     if target_bytes > 0 && current_bytes <= target_bytes {
         let status = Command::new("magick")
@@ -484,4 +506,46 @@ pub fn compress_image_preset(
     }
 
     Ok(output_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_image_format() {
+        assert_eq!(parse_image_format("png"), Some(ImageFormat::Png));
+        assert_eq!(parse_image_format("jpg"), Some(ImageFormat::Jpeg));
+        assert_eq!(parse_image_format("jpeg"), Some(ImageFormat::Jpeg));
+        assert_eq!(parse_image_format("webp"), Some(ImageFormat::WebP));
+        assert_eq!(parse_image_format("avif"), Some(ImageFormat::Avif));
+        assert_eq!(parse_image_format("unknown"), None);
+    }
+
+    #[test]
+    fn test_determine_output_path() {
+        let input = Path::new("/tmp/photos/vacation.jpg");
+        let out = determine_output_path(input, "webp", None);
+        assert_eq!(out, PathBuf::from("/tmp/photos/vacation.webp"));
+
+        let custom_dir = Path::new("/tmp/output");
+        let out_custom = determine_output_path(input, "png", Some(custom_dir));
+        assert_eq!(out_custom, PathBuf::from("/tmp/output/vacation.png"));
+    }
+
+    #[test]
+    fn test_determine_output_path_same_extension() {
+        let input = Path::new("/tmp/photos/vacation.jpg");
+        let out = determine_output_path(input, "jpg", None);
+        assert_eq!(out, PathBuf::from("/tmp/photos/vacation_konvert.jpg"));
+    }
+
+    #[test]
+    fn test_ensure_parent_dir() {
+        let unique_sub = format!("konvert_test_{}", std::process::id());
+        let test_file = std::env::temp_dir().join(unique_sub).join("subdir").join("test.png");
+        assert!(ensure_parent_dir(&test_file).is_ok());
+        assert!(test_file.parent().unwrap().exists());
+        let _ = fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
+    }
 }

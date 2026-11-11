@@ -37,6 +37,7 @@ pub fn convert_video(
             "gif",
             custom_output_dir,
         );
+        crate::converter::image::ensure_parent_dir(&output_path)?;
 
         // Maksimum 15 saniye sınırı koy (disk patlamasını ve donmayı önler)
         let status = Command::new("ffmpeg")
@@ -65,6 +66,7 @@ pub fn convert_video(
         &target,
         custom_output_dir,
     );
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-y")
@@ -155,6 +157,7 @@ pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     };
 
     let output_path = target_dir.join(format!("{}_compressed.mp4", file_stem));
+    crate::converter::image::ensure_parent_dir(&output_path)?;
     let status = Command::new("ffmpeg")
         .arg("-y")
         .arg("-threads")
@@ -256,6 +259,7 @@ pub fn compress_video_to_size(
     };
 
     let output_path = target_dir.join(format!("{}_{}.mp4", file_stem, suffix));
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-y")

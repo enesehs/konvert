@@ -43,21 +43,19 @@ fn main() -> anyhow::Result<()> {
     let notifier = Notifier::new(config.general.notification_enabled && !cli.no_notify);
 
     if cli.cancel {
-        if let Some(p) = pid_file_path() {
-            if p.exists() {
-                if let Ok(content) = fs::read_to_string(&p) {
-                    if let Ok(pid) = content.trim().parse::<i32>() {
-                        #[cfg(unix)]
-                        unsafe {
-                            libc::kill(pid, libc::SIGTERM);
-                        }
-                        let _ = fs::remove_file(&p);
-                        println!("Active Konvert process cancelled (PID: {}).", pid);
-                        notifier.success("Konvert", "Conversion process cancelled.");
-                        return Ok(());
-                    }
-                }
+        if let Some(p) = pid_file_path()
+            && p.exists()
+            && let Ok(content) = fs::read_to_string(&p)
+            && let Ok(pid) = content.trim().parse::<i32>()
+        {
+            #[cfg(unix)]
+            unsafe {
+                libc::kill(pid, libc::SIGTERM);
             }
+            let _ = fs::remove_file(&p);
+            println!("Active Konvert process cancelled (PID: {}).", pid);
+            notifier.success("Konvert", "Conversion process cancelled.");
+            return Ok(());
         }
         println!("No active conversion process found.");
         return Ok(());

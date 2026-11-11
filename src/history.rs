@@ -24,14 +24,12 @@ pub fn get_history_path() -> Option<PathBuf> {
 }
 
 pub fn load_history() -> Vec<HistoryEntry> {
-    if let Some(path) = get_history_path() {
-        if path.exists() {
-            if let Ok(content) = fs::read_to_string(&path) {
-                if let Ok(entries) = serde_json::from_str::<Vec<HistoryEntry>>(&content) {
-                    return entries;
-                }
-            }
-        }
+    if let Some(path) = get_history_path()
+        && path.exists()
+        && let Ok(content) = fs::read_to_string(&path)
+        && let Ok(entries) = serde_json::from_str::<Vec<HistoryEntry>>(&content)
+    {
+        return entries;
     }
     Vec::new()
 }
@@ -57,10 +55,10 @@ pub fn add_history_entry(entry: HistoryEntry) -> Result<()> {
 
 #[allow(dead_code)]
 pub fn clear_history() -> Result<()> {
-    if let Some(path) = get_history_path() {
-        if path.exists() {
-            fs::remove_file(path)?;
-        }
+    if let Some(path) = get_history_path()
+        && path.exists()
+    {
+        fs::remove_file(path)?;
     }
     Ok(())
 }

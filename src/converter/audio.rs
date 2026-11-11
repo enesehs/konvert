@@ -24,6 +24,7 @@ pub fn convert_audio(
             "mp4",
             custom_output_dir,
         );
+        crate::converter::image::ensure_parent_dir(&output_path)?;
 
         let status = Command::new("ffmpeg")
             .arg("-y")
@@ -61,6 +62,7 @@ pub fn convert_audio(
         &target,
         custom_output_dir,
     );
+    crate::converter::image::ensure_parent_dir(&output_path)?;
 
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-y")

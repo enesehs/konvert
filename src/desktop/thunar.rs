@@ -14,12 +14,11 @@ pub fn get_thunar_uca_path() -> Result<PathBuf> {
 
 #[allow(dead_code)]
 pub fn is_thunar_installed() -> bool {
-    if let Ok(path) = get_thunar_uca_path() {
-        if path.exists() {
-            if let Ok(content) = fs::read_to_string(&path) {
-                return content.contains("<unique-id>konvert-");
-            }
-        }
+    if let Ok(path) = get_thunar_uca_path()
+        && path.exists()
+        && let Ok(content) = fs::read_to_string(&path)
+    {
+        return content.contains("<unique-id>konvert-");
     }
     false
 }
