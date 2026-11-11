@@ -326,12 +326,12 @@ fn main() -> anyhow::Result<()> {
             }
             Err(err) => {
                 remove_pid_lock();
-                let msg = format!("Failed to convert {}:\n{}", files[0].display(), err);
+                let msg = format!("Failed to convert {}:\n{:#}", files[0].display(), err);
                 eprintln!("{}", msg);
                 notifier.error_progress(
                     &mut progress_handle,
                     t("notify_failed"),
-                    &format!("{}\n{}", file_name, err),
+                    &format!("{}\n{:#}", file_name, err),
                 );
 
                 let _ = add_history_entry(HistoryEntry {

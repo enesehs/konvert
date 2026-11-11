@@ -6,7 +6,7 @@ use std::process::Command;
 pub fn is_supported_video_target(target: &str) -> bool {
     matches!(
         target.to_lowercase().as_str(),
-        "mp4" | "mkv" | "webm" | "avi" | "mov" | "flv" | "gif" | "frames" | "png-frames" | "extract-audio" | "extract_audio" | "compress" | "discord_8mb" | "target_8mb" | "email_25mb" | "target_25mb"
+        "mp4" | "mkv" | "webm" | "avi" | "mov" | "flv"
     )
 }
 
@@ -19,59 +19,18 @@ pub fn convert_video(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     let target = target_ext.to_lowercase();
-
-    // 1. Videodan ses ayıklama
-    if target == "extract-audio" || target == "extract_audio" {
-        return crate::converter::audio::convert_audio(input_path, "mp3", Some("320k"), custom_output_dir);
-    }
-
-    // 2. Kareleri PNG klasörüne çıkarma
-    if target == "frames" || target == "png-frames" {
-        return extract_frames_to_folder(input_path, custom_output_dir);
-    }
-
-    // 3. Akıllı sınırlamalı yüksek kaliteli GIF
-    if target == "gif" {
-        let output_path = crate::converter::image::determine_output_path(
-            input_path,
-            "gif",
-            custom_output_dir,
-        );
-        crate::converter::image::ensure_parent_dir(&output_path)?;
-
-        // Maksimum 15 saniye sınırı koy (disk patlamasını ve donmayı önler)
-        let status = Command::new("ffmpeg")
-            .arg("-y")
-            .arg("-threads")
-            .arg("0")
-            .arg("-t")
-            .arg("15") // İlk 15 saniye sınırı
-            .arg("-i")
-            .arg(input_path)
-            .arg("-vf")
-            .arg("fps=15,scale=flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse")
-            .arg(&output_path)
-            .status()
-            .with_context(|| "ffmpeg çalıştırılamadı (GIF)")?;
-
-        if !status.success() {
-            bail!("GIF dönüştürme işlemi başarısız oldu");
-        }
-        return Ok(output_path);
-    }
-
-    // 4. Video -> Video dönüştürme
-    let output_path = crate::converter::image::determine_output_path(
+    let output_path = crate::converter::determine_output_path(
         input_path,
         &target,
         custom_output_dir,
     );
-    crate::converter::image::ensure_parent_dir(&output_path)?;
+    crate::converter::ensure_parent_dir(&output_path)?;
 
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-y")
+    cmd.arg("-nostdin")
+        .arg("-y")
         .arg("-threads")
-        .arg("0")
+        .arg("2")
         .arg("-i")
         .arg(input_path);
 
@@ -102,7 +61,41 @@ pub fn convert_video(
     Ok(output_path)
 }
 
-pub fn extract_frames_to_folder(
+pub fn convert_to_gif(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    let output_path = crate::converter::determine_output_path(
+        input_path,
+        "gif",
+        custom_output_dir,
+    );
+    crate::converter::ensure_parent_dir(&output_path)?;
+
+    // Maksimum 15 saniye ve 640px genişlik sınırı (aşırı büyük dosya boyutlarını önler)
+    let status = Command::new("ffmpeg")
+        .arg("-nostdin")
+        .arg("-y")
+        .arg("-threads")
+        .arg("2")
+        .arg("-t")
+        .arg("15")
+        .arg("-i")
+        .arg(input_path)
+        .arg("-vf")
+        .arg("fps=15,scale='min(640,iw)':-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse")
+        .arg(&output_path)
+        .status()
+        .with_context(|| "ffmpeg çalıştırılamadı (GIF)")?;
+
+    if !status.success() {
+        bail!("GIF dönüştürme işlemi başarısız oldu");
+    }
+
+    Ok(output_path)
+}
+
+pub fn extract_frames(
     input_path: &Path,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
@@ -111,25 +104,21 @@ pub fn extract_frames_to_folder(
         .and_then(|s| s.to_str())
         .unwrap_or("video");
 
-    let base_dir = match custom_output_dir {
-        Some(d) => d.to_path_buf(),
-        None => input_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
-    };
-
+    let base_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
     let frames_dir = base_dir.join(format!("{}_frames", file_stem));
     fs::create_dir_all(&frames_dir)?;
 
     let output_pattern = frames_dir.join("frame_%04d.png");
 
     let status = Command::new("ffmpeg")
+        .arg("-nostdin")
         .arg("-y")
         .arg("-threads")
-        .arg("0")
+        .arg("2")
         .arg("-i")
         .arg(input_path)
+        .arg("-vf")
+        .arg("fps=1")
         .arg(&output_pattern)
         .status()
         .with_context(|| "ffmpeg çalıştırılamadı (kare çıkarma)")?;
@@ -141,27 +130,28 @@ pub fn extract_frames_to_folder(
     Ok(frames_dir)
 }
 
-/// Akıllı video sıkıştırma (CRF 28, slow önayarı ve 128k AAC ses ile en küçük dosya boyutu)
+pub fn extract_audio(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    crate::converter::audio::convert_audio(input_path, "mp3", Some("256k"), custom_output_dir)
+}
+
 pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
     let file_stem = input_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("video");
 
-    let target_dir = match custom_output_dir {
-        Some(dir) => dir.to_path_buf(),
-        None => input_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
-    };
-
+    let target_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
     let output_path = target_dir.join(format!("{}_compressed.mp4", file_stem));
-    crate::converter::image::ensure_parent_dir(&output_path)?;
+    crate::converter::ensure_parent_dir(&output_path)?;
+
     let status = Command::new("ffmpeg")
+        .arg("-nostdin")
         .arg("-y")
         .arg("-threads")
-        .arg("0")
+        .arg("2")
         .arg("-i")
         .arg(input_path)
         .arg("-c:v")
@@ -185,7 +175,6 @@ pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     Ok(output_path)
 }
 
-/// ffprobe ile video süresini (saniye cinsinden) sorgula
 pub fn get_video_duration(input_path: &Path) -> Result<f64> {
     let output = Command::new("ffprobe")
         .arg("-v")
@@ -210,16 +199,15 @@ pub fn get_video_duration(input_path: &Path) -> Result<f64> {
     Ok(duration)
 }
 
-/// Hedef boyuta göre akıllı video sıkıştırması (Discord 8MB, E-Posta 25MB vb.)
-pub fn compress_video_to_size(
-    input_path: &Path,
-    target_bytes: u64,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
-    let duration = get_video_duration(input_path).unwrap_or(30.0);
-    let target_mb = (target_bytes as f64) / (1024.0 * 1024.0);
+pub fn calculate_video_bitrates(target_bytes: u64, duration: f64) -> Result<(u32, u32, &'static str)> {
+    if target_bytes == 0 {
+        bail!("Hedef dosya boyutu 0 olamaz");
+    }
+    if duration <= 0.0 {
+        bail!("Geçersiz video süresi: {}", duration);
+    }
 
-    // %5 kapsayıcı ve paketleme payı bırak
+    let target_mb = (target_bytes as f64) / (1024.0 * 1024.0);
     let available_bits = (target_bytes as f64) * 8.0 * 0.95;
     let total_kbps = ((available_bits / duration) / 1000.0) as u32;
 
@@ -237,19 +225,6 @@ pub fn compress_video_to_size(
         50
     };
 
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("video");
-
-    let target_dir = match custom_output_dir {
-        Some(dir) => dir.to_path_buf(),
-        None => input_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
-    };
-
     let suffix = if target_mb <= 8.5 {
         "discord_8mb"
     } else if target_mb <= 25.5 {
@@ -258,13 +233,31 @@ pub fn compress_video_to_size(
         "target_size"
     };
 
+    Ok((video_kbps, audio_kbps, suffix))
+}
+
+pub fn compress_video_to_size(
+    input_path: &Path,
+    target_bytes: u64,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    let duration = get_video_duration(input_path)?;
+    let (video_kbps, audio_kbps, suffix) = calculate_video_bitrates(target_bytes, duration)?;
+
+    let file_stem = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("video");
+
+    let target_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
     let output_path = target_dir.join(format!("{}_{}.mp4", file_stem, suffix));
-    crate::converter::image::ensure_parent_dir(&output_path)?;
+    crate::converter::ensure_parent_dir(&output_path)?;
 
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-y")
+    cmd.arg("-nostdin")
+        .arg("-y")
         .arg("-threads")
-        .arg("0")
+        .arg("2")
         .arg("-i")
         .arg(input_path)
         .arg("-c:v")
@@ -282,7 +275,6 @@ pub fn compress_video_to_size(
         .arg("-preset")
         .arg("medium");
 
-    // Düşük bit hızlarında çözünürlüğü makul seviyeye indir (aşırı pikselleşmeyi önler)
     if video_kbps < 400 {
         cmd.arg("-vf").arg("scale=-2:'min(ih,480)'");
     } else if video_kbps < 900 {
@@ -298,3 +290,83 @@ pub fn compress_video_to_size(
 
     Ok(output_path)
 }
+
+pub fn web_optimize_video(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    let file_stem = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("video");
+
+    let target_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
+    let output_path = target_dir.join(format!("{}_web.mp4", file_stem));
+    crate::converter::ensure_parent_dir(&output_path)?;
+
+    let mut cmd = Command::new("ffmpeg");
+    cmd.arg("-nostdin")
+        .arg("-y")
+        .arg("-threads")
+        .arg("2")
+        .arg("-i")
+        .arg(input_path)
+        .arg("-c:v")
+        .arg("libx264")
+        .arg("-crf")
+        .arg("23")
+        .arg("-preset")
+        .arg("medium")
+        .arg("-c:a")
+        .arg("aac")
+        .arg("-b:a")
+        .arg("128k")
+        .arg("-movflags")
+        .arg("+faststart")
+        .arg(&output_path);
+
+    let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı (web video optimizasyonu)")?;
+    if !status.success() {
+        bail!("Web video optimizasyonu başarısız oldu");
+    }
+
+    Ok(output_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_video_bitrates_8mb() {
+        let (video_k, audio_k, suffix) = calculate_video_bitrates(8 * 1024 * 1024, 60.0).unwrap();
+        assert_eq!(suffix, "discord_8mb");
+        assert!(video_k > 0);
+        assert!(audio_k >= 64);
+    }
+
+    #[test]
+    fn test_calculate_video_bitrates_25mb() {
+        let (video_k, audio_k, suffix) = calculate_video_bitrates(25 * 1024 * 1024, 120.0).unwrap();
+        assert_eq!(suffix, "email_25mb");
+        assert!(video_k > 0);
+        assert!(audio_k >= 96);
+    }
+
+    #[test]
+    fn test_calculate_video_bitrates_invalid() {
+        assert!(calculate_video_bitrates(0, 60.0).is_err());
+        assert!(calculate_video_bitrates(8 * 1024 * 1024, 0.0).is_err());
+        assert!(calculate_video_bitrates(8 * 1024 * 1024, -10.0).is_err());
+    }
+
+    #[test]
+    fn test_is_supported_video_target() {
+        assert!(is_supported_video_target("mp4"));
+        assert!(is_supported_video_target("mkv"));
+        assert!(is_supported_video_target("webm"));
+        assert!(!is_supported_video_target("compress"));
+        assert!(!is_supported_video_target("discord_8mb"));
+    }
+}
+
