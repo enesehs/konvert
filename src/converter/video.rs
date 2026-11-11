@@ -308,6 +308,24 @@ pub fn compress_video_to_size(
     target_bytes: u64,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
+    if target_bytes == 0 {
+        bail!("Hedef dosya boyutu 0 olamaz");
+    }
+
+    let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
+    if current_bytes == 0 {
+        bail!("Dosya boş veya boyutu okunamadı: {}", input_path.display());
+    }
+
+    if current_bytes <= target_bytes {
+        bail!(
+            "Video zaten hedef boyuttan ({}) daha küçük ({}). Hedef boyut sıkıştırması için dosyanın {}'dan büyük olması gerekir.",
+            crate::history::format_bytes(target_bytes),
+            crate::history::format_bytes(current_bytes),
+            crate::history::format_bytes(target_bytes)
+        );
+    }
+
     let duration = get_video_duration(input_path)?;
     let (video_kbps, audio_kbps, suffix) = calculate_video_bitrates(target_bytes, duration)?;
 
@@ -435,5 +453,23 @@ mod tests {
         assert!(is_supported_video_target("webm"));
         assert!(!is_supported_video_target("compress"));
         assert!(!is_supported_video_target("discord_8mb"));
+    }
+
+    #[test]
+    fn test_compress_video_to_size_size_guards() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("konvert_test_small.mp4");
+        std::fs::write(&test_file, b"fake video bytes").unwrap();
+
+        // 8MB hedef boyutu, dosya çok küçük -> hata vermeli
+        let res = compress_video_to_size(&test_file, 8 * 1024 * 1024, None);
+        assert!(res.is_err());
+        let err_msg = res.unwrap_err().to_string();
+        assert!(err_msg.contains("zaten hedef boyuttan"));
+
+        // 0 hedef boyutu -> hata vermeli
+        assert!(compress_video_to_size(&test_file, 0, None).is_err());
+
+        let _ = std::fs::remove_file(&test_file);
     }
 }

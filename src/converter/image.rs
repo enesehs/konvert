@@ -381,12 +381,25 @@ pub fn compress_image_to_size(
         bail!("Hedef dosya boyutu 0 olamaz");
     }
 
+    let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
+    if current_bytes == 0 {
+        bail!("Dosya boş veya boyutu okunamadı: {}", input_path.display());
+    }
+
+    if current_bytes <= target_bytes {
+        bail!(
+            "Görsel zaten hedef boyuttan ({}) daha küçük ({}). Hedef boyut sıkıştırması için dosyanın {}'dan büyük olması gerekir.",
+            crate::history::format_bytes(target_bytes),
+            crate::history::format_bytes(current_bytes),
+            crate::history::format_bytes(target_bytes)
+        );
+    }
+
     let ext = input_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("jpg")
         .to_lowercase();
-    let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
 
     // PNG dosyaları kayıpsız olduğu için kaliteyle küçülmez; hedef çok küçükse WebP formatına geç
     let target_ext = if ext == "png" && current_bytes > target_bytes {
@@ -397,20 +410,6 @@ pub fn compress_image_to_size(
 
     let output_path = determine_suffixed_output_path(input_path, "target", target_ext, custom_output_dir);
     ensure_parent_dir(&output_path)?;
-
-    if current_bytes > 0
-        && current_bytes <= target_bytes
-        && crate::converter::run_imagemagick(&[
-            input_path.as_os_str(),
-            std::ffi::OsStr::new("-auto-orient"),
-            std::ffi::OsStr::new("-strip"),
-            output_path.as_os_str(),
-        ]).is_ok()
-        && let Ok(meta) = fs::metadata(&output_path)
-        && meta.len() <= target_bytes
-    {
-        return Ok(output_path);
-    }
 
     // Kademeli sıkıştırma ve ölçekleme döngüsü (hedef boyutu kesin garanti altına alır)
     let qualities = ["82", "65", "50", "35"];
@@ -492,5 +491,34 @@ mod tests {
         let rgb = dyn_img.to_rgb8();
         assert_eq!(rgb.width(), 10);
         assert_eq!(rgb.height(), 10);
+    }
+
+    #[test]
+    fn test_compress_image_to_size_size_guards() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("konvert_test_small.jpg");
+        std::fs::write(&test_file, b"fake small image data").unwrap();
+
+        // 8MB hedef boyutu, dosya çok küçük -> hata vermeli
+        let res = compress_image_to_size(&test_file, 8 * 1024 * 1024, None);
+        assert!(res.is_err());
+        let err_msg = res.unwrap_err().to_string();
+        assert!(err_msg.contains("zaten hedef boyuttan"));
+
+        // 0 hedef boyutu -> hata vermeli
+        let res_zero = compress_image_to_size(&test_file, 0, None);
+        assert!(res_zero.is_err());
+
+        let _ = std::fs::remove_file(&test_file);
+
+        // Boş dosya -> hata vermeli
+        let empty_file = temp_dir.join("konvert_test_empty.jpg");
+        std::fs::write(&empty_file, b"").unwrap();
+        let res_empty = compress_image_to_size(&empty_file, 8 * 1024 * 1024, None);
+        assert!(res_empty.is_err());
+        let err_empty = res_empty.unwrap_err().to_string();
+        assert!(err_empty.contains("boş") || err_empty.contains("okunamadı"));
+
+        let _ = std::fs::remove_file(&empty_file);
     }
 }

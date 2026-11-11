@@ -375,6 +375,24 @@ pub fn compress_pdf_to_size(
     target_bytes: u64,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
+    if target_bytes == 0 {
+        bail!("Hedef dosya boyutu 0 olamaz");
+    }
+
+    let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
+    if current_bytes == 0 {
+        bail!("Dosya boş veya boyutu okunamadı: {}", input_path.display());
+    }
+
+    if current_bytes <= target_bytes {
+        bail!(
+            "PDF belgesi zaten hedef boyuttan ({}) daha küçük ({}). Hedef boyut sıkıştırması için dosyanın {}'dan büyük olması gerekir.",
+            crate::history::format_bytes(target_bytes),
+            crate::history::format_bytes(current_bytes),
+            crate::history::format_bytes(target_bytes)
+        );
+    }
+
     let output_path = crate::converter::determine_suffixed_output_path(
         input_path,
         "compressed",
@@ -504,5 +522,23 @@ mod tests {
         let xml = "<content><![CDATA[Mahkeme & Karari]]></content>";
         let text = extract_text_from_xml(xml);
         assert_eq!(text, "Mahkeme & Karari");
+    }
+
+    #[test]
+    fn test_compress_pdf_to_size_size_guards() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join("konvert_test_small.pdf");
+        std::fs::write(&test_file, b"fake pdf bytes").unwrap();
+
+        // 8MB hedef boyutu, dosya çok küçük -> hata vermeli
+        let res = compress_pdf_to_size(&test_file, 8 * 1024 * 1024, None);
+        assert!(res.is_err());
+        let err_msg = res.unwrap_err().to_string();
+        assert!(err_msg.contains("zaten hedef boyuttan"));
+
+        // 0 hedef boyutu -> hata vermeli
+        assert!(compress_pdf_to_size(&test_file, 0, None).is_err());
+
+        let _ = std::fs::remove_file(&test_file);
     }
 }
