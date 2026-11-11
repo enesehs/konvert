@@ -52,7 +52,7 @@ export const tr: Translations = {
       "XFCE (Thunar)",
     ],
     offlineBadge: "%100 Çevrimdışı",
-    openSourceBadge: "Açık Kaynak (GPLv3 / MIT)",
+    openSourceBadge: "Açık Kaynak (GPL-3.0-or-later)",
     interactiveBadge: "İnteraktif Demo — Sıkıştırmayı test etmek için format seçin",
   },
   demo: {
@@ -141,7 +141,7 @@ export const tr: Translations = {
       },
       {
         value: "Açık Kaynak",
-        label: "GPLv3 / MIT Lisansı",
+        label: "GPL-3.0-or-later Lisansı",
         desc: "Every single line is auditable and community-driven. Free from proprietary locks, telemetry, advertisements, and paywalls.",
         tag: "Bağımsız Denetlenebilir",
       },
@@ -188,6 +188,8 @@ export const tr: Translations = {
     defaultRayon: "VARSAYILAN: ÇOK ÇEKİRDEKLİ PARALEL RAYON",
     params: {
       losslessRgba: "Kayıpsız / RGBA",
+      jxlNextGen: "Yeni Nesil JPEG XL / VarDCT",
+      jxlLossless: "Matematiksel Kayıpsız Modular",
       webOptimize: "q:85 / Web Optimize",
       saving60: "q:82 / %60 Tasarruf",
       exifStrip: "RGB / EXIF Temizleme",
@@ -251,10 +253,10 @@ export const tr: Translations = {
     integrationTitle: "Masaüstü Entegrasyonunu Yenile",
     integrationDesc:
       "Yeni bir dosya yöneticisi kurduysanız bağlam menülerini tek komutla yeniden tarayın:",
-    integrationCmd: "konvert integrate --all",
+    integrationCmd: "konvert --install-all",
     viewRepo: "GitHub Deposunu Ziyaret Et",
     sourceContribTitle: "KAYNAK KOD & KATKI",
-    licenseTag: "GPLv3 / MIT",
+    licenseTag: "GPL-3.0-or-later",
     sourceContribDesc:
       "Tüm kaynak kodu, ServiceMenu .desktop dosyaları ve Rust ikilisi bağımsız olarak denetlenebilir ve derlenebilir.",
   },
@@ -291,11 +293,11 @@ export const tr: Translations = {
   },
   footer: {
     tagline: "Linux masaüstü için hafif, yerel ve çevrimdışı sağ tık dosya dönüştürücüsü.",
-    copyright: "2026 Konvert Project. GPLv3 & MIT lisansı altında özgür yazılım.",
+    copyright: "2026 Konvert Project. GPL-3.0-or-later lisansı altında özgür yazılım.",
     navTitle: "BÖLÜMLER",
     devTitle: "KAYNAK & GELİŞTİRİCİ",
     standards: "Rust Dili ile Açık Kaynak Severler için Geliştirildi <3",
-    chips: ["RUST", "ÇEVRİMDIŞI", "AÇIK KAYNAK", "GPLv3 / MIT"],
+    chips: ["RUST", "ÇEVRİMDIŞI", "AÇIK KAYNAK", "GPLv3"],
     links: [
       { href: "#neden", label: "Neden Konvert" },
       { href: "#metrikler", label: "Güven & Hız" },

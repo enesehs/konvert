@@ -36,9 +36,11 @@ export function Formats() {
     {
       id: "image",
       icon: FileImage,
-      engineTitle: "Rust image-rs & resvg",
+      engineTitle: "Rust image-rs, libjxl & resvg",
       engineDetails: t.formats.engineDetails.image,
       conversions: [
+        { from: "PNG", to: "JXL", engine: "libjxl", speed: "~24ms", param: t.formats.params.jxlNextGen },
+        { from: "JPG", to: "JXL", engine: "libjxl", speed: "~20ms", param: t.formats.params.jxlLossless },
         { from: "WEBP", to: "PNG", engine: "image-rs", speed: "~14ms", param: t.formats.params.losslessRgba },
         { from: "PNG", to: "WEBP", engine: "libwebp", speed: "~22ms", param: t.formats.params.webOptimize },
         { from: "JPG", to: "WEBP", engine: "libwebp", speed: "~18ms", param: t.formats.params.saving60 },

@@ -70,11 +70,11 @@ function ThemeToggle() {
 }
 
 function useKonvertVersion() {
-  const [version, setVersion] = React.useState("v0.1-beta");
+  const [version, setVersion] = React.useState("v0.2.0");
 
   React.useEffect(() => {
     let active = true;
-    fetch("https://raw.githubusercontent.com/enesehs/konvert/refs/heads/main/version")
+    fetch("https://raw.githubusercontent.com/enesehs/konvert/refs/heads/main/VERSION")
       .then((res) => {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();

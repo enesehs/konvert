@@ -52,7 +52,7 @@ export const de: Translations = {
       "XFCE (Thunar)",
     ],
     offlineBadge: "100% Offline",
-    openSourceBadge: "Open Source (GPLv3 / MIT)",
+    openSourceBadge: "Open Source (GPL-3.0-or-later)",
     interactiveBadge: "Interaktive Demo — Optionen anklicken, um Kompression zu testen",
   },
   demo: {
@@ -141,7 +141,7 @@ export const de: Translations = {
       },
       {
         value: "Open Source",
-        label: "GPLv3 / MIT Lizenz",
+        label: "GPL-3.0-or-later Lizenz",
         desc: "Every single line is auditable and community-driven. Free from proprietary locks, telemetry, advertisements, and paywalls.",
         tag: "Unabhängig Prüfbar",
       },
@@ -188,6 +188,8 @@ export const de: Translations = {
     defaultRayon: "STANDARD: MEHRKERN-PARALLEL RAYON",
     params: {
       losslessRgba: "Verlustfrei / RGBA",
+      jxlNextGen: "Next-Gen JPEG XL / VarDCT",
+      jxlLossless: "Mathematisch verlustfrei Modular",
       webOptimize: "q:85 / Web-optimiert",
       saving60: "q:82 / 60% Ersparnis",
       exifStrip: "RGB / EXIF bereinigen",
@@ -251,10 +253,10 @@ export const de: Translations = {
     integrationTitle: "Desktop-Integration erneuern",
     integrationDesc:
       "Neuen Dateimanager installiert? Aktualisieren Sie die Menüeinträge mit einem Befehl:",
-    integrationCmd: "konvert integrate --all",
+    integrationCmd: "konvert --install-all",
     viewRepo: "GitHub-Repository ansehen",
     sourceContribTitle: "QUELLCODE & MITWIRKEN",
-    licenseTag: "GPLv3 / MIT",
+    licenseTag: "GPL-3.0-or-later",
     sourceContribDesc:
       "Der gesamte Quellcode, die ServiceMenu .desktop-Dateien und Rust-Binaries sind unabhängig überprüfbar und kompilierbar.",
   },
@@ -291,7 +293,7 @@ export const de: Translations = {
   },
   footer: {
     tagline: "Schlanker, nativer und offline Rechtsklick-Dateikonverter für Linux-Desktops.",
-    copyright: "2026 Konvert Project. Freie Software unter GPLv3 & MIT.",
+    copyright: "2026 Konvert Project. Freie Software unter GPL-3.0-or-later.",
     navTitle: "NAVIGATION",
     devTitle: "QUELLE & ENTWICKLER",
     standards: "Mit Rust für die Open-Source-Community entwickeln <3",

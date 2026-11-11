@@ -1,6 +1,6 @@
 [package]
 name = "konvert"
-version = "0.1.0-beta"
+version = "0.2.0"
 edition = "2024"
 authors = ["enesehs <enesehs@protonmail.com>"]
 description = "Fast, lightweight, privacy-focused native right-click file converter and optimizer for Linux and KDE Plasma."

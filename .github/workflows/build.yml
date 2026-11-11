@@ -68,8 +68,10 @@ jobs:
           cp gui/build/konvert-settings "${PKG_NAME}/"
           cp scripts/install.sh "${PKG_NAME}/"
           cp scripts/uninstall.sh "${PKG_NAME}/"
+          chmod +x "${PKG_NAME}/install.sh" "${PKG_NAME}/uninstall.sh" 2>/dev/null || true
           cp io.github.enesehs.konvert.desktop "${PKG_NAME}/"
-          cp assets/logo.svg "${PKG_NAME}/"
+          cp -r assets "${PKG_NAME}/"
+          cp -r packaging "${PKG_NAME}/"
           cp README.md "${PKG_NAME}/"
           if [ -f LICENSE ]; then cp LICENSE "${PKG_NAME}/"; fi
 

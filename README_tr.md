@@ -13,7 +13,7 @@
   <br>
 
   [![Web Sitesi](https://img.shields.io/badge/Web%20Sitesi-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.1--beta-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/badge/Release-v0.2.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
   [![License](https://img.shields.io/badge/License-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
   [![Rust](https://img.shields.io/badge/Rust-2024%20Edition-e05d44?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
   [![Qt 6](https://img.shields.io/badge/Qt-6%20Widgets%20(Breeze)-41CD52?style=for-the-badge&logo=qt)](https://www.qt.io/)
@@ -198,7 +198,7 @@ konvert -s                            # Qt6 Ayarlar arayüzünü aç
 
 | Kategori | Giriş Formatları | Hedef Formatlar | Özel Fonksiyonlar |
 |---|---|---|---|
-| **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI | WebP, PNG, JPG, AVIF, JXL, BMP, ICO, TIFF, QOI | EXIF Temizleme, %50 ve 1080p Boyutlandırma, PDF Birleştirme |
+| **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Temizleme, %50 ve 1080p Boyutlandırma, PDF Birleştirme |
 | **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord (8 MB), E-Posta (25 MB), Kareleri Klasöre Aktarma, Sesi Ayıklama |
 | **Sesler** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP4 Dalga Formu (Waveform Video) Üretimi |
 | **Belgeler** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Sayfa Ayrıştırma (DPI Ayarlı), UDF Metin ve PDF Çıktısı |

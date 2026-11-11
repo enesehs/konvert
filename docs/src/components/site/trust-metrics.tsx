@@ -12,7 +12,7 @@ export function TrustMetrics() {
   const technicalSpecs = [
     "POSIX EXEC · DAEMON YOK · 0 SYSTEMD SERVICE",
     "SIFIR AĞ İSTEĞİ · SIFIR TELEMETRİ · AIR-GAP UYUMLU",
-    "GPLv3 / MIT · BAĞIMSIZ DENETLENEBİLİR DERLEME",
+    "GPL-3.0-or-later · BAĞIMSIZ DENETLENEBİLİR DERLEME",
   ];
 
   return (

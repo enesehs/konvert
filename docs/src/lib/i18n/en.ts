@@ -52,7 +52,7 @@ export const en: Translations = {
       "XFCE (Thunar)",
     ],
     offlineBadge: "100% Offline",
-    openSourceBadge: "Open Source (GPLv3 / MIT)",
+    openSourceBadge: "Open Source (GPL-3.0-or-later)",
     interactiveBadge: "Interactive Demo — Click options to test compression",
   },
   demo: {
@@ -141,7 +141,7 @@ export const en: Translations = {
       },
       {
         value: "Open Source",
-        label: "GPLv3 / MIT License",
+        label: "GPL-3.0-or-later License",
         desc: "Every single line is auditable and community-driven. Free from proprietary locks, telemetry, advertisements, and paywalls.",
         tag: "Independently Auditable",
       },
@@ -188,6 +188,8 @@ export const en: Translations = {
     defaultRayon: "DEFAULT: MULTI-CORE PARALLEL RAYON",
     params: {
       losslessRgba: "Lossless / RGBA",
+      jxlNextGen: "Next-Gen JPEG XL / VarDCT",
+      jxlLossless: "Mathematically Lossless Modular",
       webOptimize: "q:85 / Web Optimized",
       saving60: "q:82 / 60% Savings",
       exifStrip: "RGB / Strip EXIF",
@@ -251,10 +253,10 @@ export const en: Translations = {
     integrationTitle: "Refresh Desktop Integrations",
     integrationDesc:
       "Installed a new file manager? Re-scan and bind context actions with a single command:",
-    integrationCmd: "konvert integrate --all",
+    integrationCmd: "konvert --install-all",
     viewRepo: "View GitHub Repository",
     sourceContribTitle: "SOURCE CODE & CONTRIBUTE",
-    licenseTag: "GPLv3 / MIT",
+    licenseTag: "GPL-3.0-or-later",
     sourceContribDesc:
       "All source code, ServiceMenu .desktop definitions, and Rust binaries are independently auditable and buildable.",
   },
@@ -291,11 +293,11 @@ export const en: Translations = {
   },
   footer: {
     tagline: "Lightweight, native, and offline right-click file converter for Linux desktops.",
-    copyright: "2026 Konvert Project. Free software under GPLv3 & MIT.",
+    copyright: "2026 Konvert Project. Free software under GPL-3.0-or-later.",
     navTitle: "NAVIGATION",
     devTitle: "SOURCE & DEVELOPER",
     standards: "Build with Rust for Open-Source Community <3",
-    chips: ["RUST", "OFFLINE", "OPEN SOURCE", "GPLv3 / MIT"],
+    chips: ["RUST", "OFFLINE", "OPEN SOURCE", "GPLv3"],
     links: [
       { href: "#neden", label: "Why Konvert" },
       { href: "#metrikler", label: "Trust & Speed" },

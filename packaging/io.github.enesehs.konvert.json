@@ -33,7 +33,8 @@
         "install -Dm644 io.github.enesehs.konvert.desktop /app/share/applications/io.github.enesehs.konvert.desktop",
         "install -Dm644 packaging/io.github.enesehs.konvert.metainfo.xml /app/share/metainfo/io.github.enesehs.konvert.metainfo.xml",
         "install -Dm644 assets/logo.svg /app/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg",
-        "install -Dm644 assets/logo.svg /app/share/icons/hicolor/scalable/apps/konvert.svg"
+        "install -Dm644 assets/logo.svg /app/share/icons/hicolor/scalable/apps/konvert.svg",
+        "install -Dm644 assets/icons/*.svg -t /app/share/icons/hicolor/scalable/actions/"
       ],
       "sources": [
         {

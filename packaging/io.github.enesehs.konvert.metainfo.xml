@@ -45,9 +45,9 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
-    <release version="0.2.0" date="2026-11-10">
+    <release version="0.2.0" date="2026-11-11">
       <description>
-        <p>Release 0.2.0 with KDE Plasma 6 integration, native progress notifications, smart target sizing presets, and history preview.</p>
+        <p>Release 0.2.0 introducing multi-threaded Rayon parallel batch processing, LTO compiler optimizations, SVG/ICO/HEIC/BMP format conversions, native Lucide SVG action icons, live animated terminal progress bar, and comprehensive stability and security fixes.</p>
       </description>
     </release>
   </releases>
