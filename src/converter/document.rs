@@ -4,8 +4,10 @@ use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 static TEMP_DOC_COUNTER: AtomicUsize = AtomicUsize::new(0);
+static SOFFICE_MUTEX: Mutex<()> = Mutex::new(());
 
 pub fn convert_pdf_to_images(
     input_path: &Path,
@@ -25,7 +27,7 @@ pub fn convert_pdf_to_images(
     let output_prefix = pages_dir.join("sayfa");
 
     let mut cmd = Command::new("pdftoppm");
-    if img_format == "png" {
+    if img_format.eq_ignore_ascii_case("png") {
         cmd.arg("-png");
     } else {
         cmd.arg("-jpeg");
@@ -41,6 +43,76 @@ pub fn convert_pdf_to_images(
     }
 
     Ok(pages_dir)
+}
+
+pub fn convert_to_pdf_via_soffice(
+    input_path: &Path,
+    output_path: &Path,
+    target_dir: &Path,
+) -> Result<PathBuf> {
+    let count = TEMP_DOC_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let temp_profile = std::env::temp_dir().join(format!(
+        "konvert_soffice_{}_{}_{}",
+        std::process::id(),
+        chrono::Local::now().timestamp_nanos_opt().unwrap_or(0),
+        count
+    ));
+    let _ = fs::create_dir_all(&temp_profile);
+
+    // Paralel LibreOffice kilit çatışmasını önlemek için süreç içi kilit ve bağımsız profil
+    let _lock = SOFFICE_MUTEX.lock();
+    let status = Command::new("soffice")
+        .arg(format!("-env:UserInstallation=file://{}", temp_profile.display()))
+        .arg("--headless")
+        .arg("--convert-to")
+        .arg("pdf")
+        .arg("--outdir")
+        .arg(target_dir)
+        .arg(input_path)
+        .status();
+
+    let _ = fs::remove_dir_all(&temp_profile);
+
+    if let Ok(st) = status
+        && st.success()
+        && output_path.exists()
+    {
+        return Ok(output_path.to_path_buf());
+    }
+
+    bail!("LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil")
+}
+
+pub fn write_html_document(
+    title: &str,
+    header: Option<&str>,
+    text_content: &str,
+    output_path: &Path,
+) -> Result<PathBuf> {
+    let paragraphs = text_content
+        .split("\n\n")
+        .map(|p| format!("<p>{}</p>", html_escape::encode_text(p)))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let header_html = if let Some(h) = header {
+        format!("<div class=\"header\">{}</div>", html_escape::encode_text(h))
+    } else {
+        String::new()
+    };
+
+    let html = format!(
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>{}</title>\
+        <style>body{{font-family:sans-serif;padding:3rem;line-height:1.6;background:#fdfdfd;color:#222;max-width:800px;margin:auto;}}\
+        .header{{border-bottom:2px solid #ccc;padding-bottom:10px;margin-bottom:20px;font-weight:bold;}}\
+        p{{margin-bottom:1em;}}</style>\
+        </head><body>{}{}</body></html>",
+        html_escape::encode_text(title),
+        header_html,
+        paragraphs
+    );
+    fs::write(output_path, html)?;
+    Ok(output_path.to_path_buf())
 }
 
 pub fn convert_udf(
@@ -64,8 +136,10 @@ pub fn convert_udf(
         zip_file.take(50 * 1024 * 1024).read_to_string(&mut xml_content)?;
     }
 
+    // ZIP olmayan düz dosya yedeğinde DoS saldırısını önlemek için 50 MB sınır koy
     if xml_content.is_empty() {
-        xml_content = fs::read_to_string(input_path).unwrap_or_default();
+        let f = File::open(input_path)?;
+        f.take(50 * 1024 * 1024).read_to_string(&mut xml_content)?;
     }
 
     let text_content = extract_text_from_xml(&xml_content);
@@ -73,25 +147,13 @@ pub fn convert_udf(
         bail!("UDF belgesinden metin okunamadı");
     }
 
-    match target_format {
-        "html" => {
-            let paragraphs = text_content
-                .split("\n\n")
-                .map(|p| format!("<p>{}</p>", html_escape::encode_text(p)))
-                .collect::<Vec<_>>()
-                .join("\n");
-
-            let html = format!(
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>UYAP UDF Belgesi</title>\
-                <style>body{{font-family:sans-serif;padding:3rem;line-height:1.6;background:#fdfdfd;color:#222;max-width:800px;margin:auto;}}\
-                .header{{border-bottom:2px solid #ccc;padding-bottom:10px;margin-bottom:20px;font-weight:bold;}}\
-                p{{margin-bottom:1em;}}</style>\
-                </head><body><div class=\"header\">T.C. ADALET BAKANLIĞI - UYAP DOKÜMANI</div>{}</body></html>",
-                paragraphs
-            );
-            fs::write(&output_path, html)?;
-            Ok(output_path)
-        }
+    match target_format.to_lowercase().as_str() {
+        "html" => write_html_document(
+            "UYAP UDF Belgesi",
+            Some("T.C. ADALET BAKANLIĞI - UYAP DOKÜMANI"),
+            &text_content,
+            &output_path,
+        ),
         "txt" | "text" => {
             fs::write(&output_path, text_content)?;
             Ok(output_path)
@@ -106,43 +168,26 @@ pub fn convert_udf(
                 count
             ));
 
-            let paragraphs = text_content
-                .split("\n\n")
-                .map(|p| format!("<p>{}</p>", html_escape::encode_text(p)))
-                .collect::<Vec<_>>()
-                .join("\n");
+            write_html_document(
+                "UYAP UDF Belgesi",
+                Some("T.C. ADALET BAKANLIĞI - UYAP DOKÜMANI"),
+                &text_content,
+                &temp_html,
+            )?;
 
-            let html = format!(
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>UYAP UDF Belgesi</title>\
-                <style>body{{font-family:sans-serif;padding:2rem;line-height:1.5;color:#222;}}\
-                .header{{border-bottom:2px solid #ccc;padding-bottom:10px;margin-bottom:20px;font-weight:bold;}}\
-                p{{margin-bottom:1em;}}</style>\
-                </head><body><div class=\"header\">T.C. ADALET BAKANLIĞI - UYAP DOKÜMANI</div>{}</body></html>",
-                paragraphs
-            );
-            fs::write(&temp_html, html)?;
-
-            let status = Command::new("soffice")
-                .arg("--headless")
-                .arg("--convert-to")
-                .arg("pdf")
-                .arg("--outdir")
-                .arg(&target_dir)
-                .arg(&temp_html)
-                .status();
-
+            let res = convert_to_pdf_via_soffice(&temp_html, &output_path, &target_dir);
             let _ = fs::remove_file(&temp_html);
 
             let intermediate_pdf = target_dir.join(format!("{}.pdf", temp_html.file_stem().unwrap().to_string_lossy()));
-            if let Ok(st) = status
-                && st.success()
-                && intermediate_pdf.exists()
-            {
-                fs::rename(&intermediate_pdf, &output_path)?;
-                return Ok(output_path);
+            if intermediate_pdf.exists() && intermediate_pdf != output_path {
+                let _ = fs::rename(&intermediate_pdf, &output_path);
             }
 
-            bail!("UDF -> PDF dönüşümü için sisteminizde LibreOffice (soffice) kurulu olmalıdır. Belgeyi doğrudan TXT veya HTML formatına dönüştürebilirsiniz.");
+            if output_path.exists() {
+                Ok(output_path)
+            } else {
+                res.with_context(|| "UDF -> PDF dönüşümü için sisteminizde LibreOffice (soffice) kurulu olmalıdır")
+            }
         }
         _ => {
             bail!("UDF dosyası için desteklenmeyen hedef format: .{}", target_format);
@@ -162,25 +207,9 @@ pub fn convert_docx(
     );
     crate::converter::ensure_parent_dir(&output_path)?;
 
-    if target_format == "pdf" {
+    if target_format.eq_ignore_ascii_case("pdf") {
         let target_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
-        let status = Command::new("soffice")
-            .arg("--headless")
-            .arg("--convert-to")
-            .arg("pdf")
-            .arg("--outdir")
-            .arg(&target_dir)
-            .arg(input_path)
-            .status();
-
-        if let Ok(st) = status
-            && st.success()
-            && output_path.exists()
-        {
-            return Ok(output_path);
-        }
-
-        bail!("DOCX -> PDF dönüşümü için sisteminizde LibreOffice (soffice) kurulu olmalıdır");
+        return convert_to_pdf_via_soffice(input_path, &output_path, &target_dir);
     }
 
     let file = BufReader::new(File::open(input_path)?);
@@ -198,24 +227,8 @@ pub fn convert_docx(
         bail!("DOCX belgesinden metin okunamadı");
     }
 
-    match target_format {
-        "html" => {
-            let paragraphs = text_content
-                .split("\n\n")
-                .map(|p| format!("<p>{}</p>", html_escape::encode_text(p)))
-                .collect::<Vec<_>>()
-                .join("\n");
-
-            let html = format!(
-                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Doküman</title>\
-                <style>body{{font-family:sans-serif;padding:3rem;line-height:1.6;background:#fdfdfd;color:#222;max-width:800px;margin:auto;}}\
-                p{{margin-bottom:1em;}}</style>\
-                </head><body>{}</body></html>",
-                paragraphs
-            );
-            fs::write(&output_path, html)?;
-            Ok(output_path)
-        }
+    match target_format.to_lowercase().as_str() {
+        "html" => write_html_document("Doküman", None, &text_content, &output_path),
         "txt" | "text" => {
             fs::write(&output_path, text_content)?;
             Ok(output_path)
@@ -228,61 +241,57 @@ pub fn convert_docx(
 
 fn unescape_xml(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
-    let mut chars = input.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '&' {
-            let mut entity = String::with_capacity(8);
-            let mut has_semicolon = false;
-            for next_ch in chars.by_ref() {
-                if next_ch == ';' {
-                    has_semicolon = true;
+    let chars: Vec<char> = input.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        if chars[i] == '&' {
+            let mut semi_pos = None;
+            for (offset, &ch) in chars[(i + 1)..len.min(i + 10)].iter().enumerate() {
+                if ch == ';' {
+                    semi_pos = Some(i + 1 + offset);
                     break;
                 }
-                entity.push(next_ch);
-                if entity.len() > 8 || next_ch.is_whitespace() || next_ch == '<' {
+                if ch.is_whitespace() || ch == '<' || ch == '&' {
                     break;
                 }
             }
-            if has_semicolon {
-                match entity.as_str() {
-                    "amp" => out.push('&'),
-                    "lt" => out.push('<'),
-                    "gt" => out.push('>'),
-                    "quot" => out.push('"'),
-                    "apos" => out.push('\''),
-                    "nbsp" => out.push(' '),
-                    _ if entity.starts_with('#') => {
-                        if let Some(rest) = entity.strip_prefix("#x") {
-                            if let Ok(code) = u32::from_str_radix(rest, 16)
-                                && let Some(c) = char::from_u32(code)
-                            {
-                                out.push(c);
-                                continue;
-                            }
-                        } else if let Some(rest) = entity.strip_prefix('#')
-                            && let Ok(code) = rest.parse::<u32>()
+
+            if let Some(pos) = semi_pos {
+                let entity: String = chars[(i + 1)..pos].iter().collect();
+                let lower = entity.to_ascii_lowercase();
+                match lower.as_str() {
+                    "amp" => { out.push('&'); i = pos + 1; continue; }
+                    "lt" => { out.push('<'); i = pos + 1; continue; }
+                    "gt" => { out.push('>'); i = pos + 1; continue; }
+                    "quot" => { out.push('"'); i = pos + 1; continue; }
+                    "apos" => { out.push('\''); i = pos + 1; continue; }
+                    "nbsp" => { out.push(' '); i = pos + 1; continue; }
+                    _ if lower.starts_with("#x") => {
+                        if let Ok(code) = u32::from_str_radix(&lower[2..], 16)
                             && let Some(c) = char::from_u32(code)
                         {
                             out.push(c);
+                            i = pos + 1;
                             continue;
                         }
-                        out.push('&');
-                        out.push_str(&entity);
-                        out.push(';');
                     }
-                    _ => {
-                        out.push('&');
-                        out.push_str(&entity);
-                        out.push(';');
+                    _ if lower.starts_with('#') => {
+                        if let Ok(code) = lower[1..].parse::<u32>()
+                            && let Some(c) = char::from_u32(code)
+                        {
+                            out.push(c);
+                            i = pos + 1;
+                            continue;
+                        }
                     }
+                    _ => {}
                 }
-            } else {
-                out.push('&');
-                out.push_str(&entity);
             }
-        } else {
-            out.push(ch);
         }
+        out.push(chars[i]);
+        i += 1;
     }
     out
 }
@@ -330,15 +339,21 @@ pub fn extract_text_from_xml(xml: &str) -> String {
                 tag_name.push(c);
             }
 
-            let lower_tag = tag_name.to_ascii_lowercase();
-            if lower_tag.starts_with("/w:p")
-                || lower_tag.starts_with("/p")
-                || lower_tag.starts_with("w:br")
-                || lower_tag.starts_with("br")
-                || lower_tag.starts_with("/tr")
+            // Etiket sınırlarını tam eşleştir (w:pPr, w:pStyle, page, branch vb. yanlış bölmeleri engeller)
+            let is_closing = tag_name.starts_with('/');
+            let tag_clean = tag_name.trim_start_matches('/').trim();
+            let tag_token = tag_clean
+                .split(|c: char| c.is_whitespace() || c == '/' || c == '>')
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase();
+
+            if (is_closing && (tag_token == "w:p" || tag_token == "p" || tag_token == "tr" || tag_token == "w:tr"))
+                || tag_token == "br"
+                || tag_token == "w:br"
             {
                 result.push('\n');
-            } else if lower_tag.starts_with("w:tab") {
+            } else if tag_token == "w:tab" {
                 result.push('\t');
             }
         } else {
@@ -355,14 +370,53 @@ pub fn extract_text_from_xml(xml: &str) -> String {
         .join("\n\n")
 }
 
-pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("document");
+pub fn compress_pdf_to_size(
+    input_path: &Path,
+    target_bytes: u64,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    let output_path = crate::converter::determine_suffixed_output_path(
+        input_path,
+        "compressed",
+        "pdf",
+        custom_output_dir,
+    );
+    crate::converter::ensure_parent_dir(&output_path)?;
 
-    let target_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
-    let output_path = target_dir.join(format!("{}_compressed.pdf", file_stem));
+    let setting = if target_bytes < 10 * 1024 * 1024 {
+        "-dPDFSETTINGS=/screen" // 72 dpi, en yüksek sıkıştırma
+    } else {
+        "-dPDFSETTINGS=/ebook"  // 150 dpi, standart sıkıştırma
+    };
+
+    let gs_status = Command::new("gs")
+        .arg("-sDEVICE=pdfwrite")
+        .arg("-dCompatibilityLevel=1.4")
+        .arg(setting)
+        .arg("-dNOPAUSE")
+        .arg("-dQUIET")
+        .arg("-dBATCH")
+        .arg(format!("-sOutputFile={}", output_path.display()))
+        .arg(input_path)
+        .status();
+
+    if let Ok(st) = gs_status
+        && st.success()
+        && output_path.exists()
+    {
+        return Ok(output_path);
+    }
+
+    compress_pdf(input_path, custom_output_dir)
+}
+
+pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+    let output_path = crate::converter::determine_suffixed_output_path(
+        input_path,
+        "compressed",
+        "pdf",
+        custom_output_dir,
+    );
     crate::converter::ensure_parent_dir(&output_path)?;
 
     let gs_status = Command::new("gs")
@@ -426,9 +480,23 @@ mod tests {
 
     #[test]
     fn test_extract_text_from_xml() {
-        let xml = "<w:p><w:r><w:t>Hello</w:t></w:r><w:r><w:t> World</w:t></w:r></w:p><w:p><w:r><w:t>Second &amp; Line</w:t></w:r></w:p>";
+        let xml = "<w:p><w:pPr><w:pStyle w:val=\"Normal\"/></w:pPr><w:r><w:t>Hello</w:t></w:r><w:r><w:t> World</w:t></w:r></w:p><w:p><w:r><w:t>Second &amp; Line</w:t></w:r></w:p>";
         let text = extract_text_from_xml(xml);
         assert_eq!(text, "Hello World\n\nSecond & Line");
+    }
+
+    #[test]
+    fn test_extract_text_not_breaking_on_subtags() {
+        let xml = "<w:p><w:r><w:t>Text with </w:t></w:r><w:pPr><w:pBdr/></w:pPr><w:r><w:t>continuation</w:t></w:r></w:p>";
+        let text = extract_text_from_xml(xml);
+        assert_eq!(text, "Text with continuation");
+    }
+
+    #[test]
+    fn test_unescape_xml_ampersand_edge_cases() {
+        let raw = "a=1&b=2&amp;c=3&#x20;&#X41;";
+        let unescaped = unescape_xml(raw);
+        assert_eq!(unescaped, "a=1&b=2&c=3 A");
     }
 
     #[test]

@@ -71,7 +71,8 @@ pub fn convert_audio(
         .arg("-threads")
         .arg("2")
         .arg("-i")
-        .arg(input_path);
+        .arg(input_path)
+        .arg("-vn"); // Gömülü kapak resimlerini yoksay (ses codec hatalarını önler)
 
     let default_bitrate = match target.as_str() {
         "opus" | "ogg" | "aac" | "m4a" => "160k",
@@ -97,6 +98,43 @@ pub fn convert_audio(
     let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı (ses dönüştürme)")?;
     if !status.success() {
         bail!("Ses dönüştürme işlemi başarısız oldu: {}", output_path.display());
+    }
+
+    Ok(output_path)
+}
+
+pub fn strip_audio_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp3")
+        .to_lowercase();
+    let output_path = crate::converter::determine_suffixed_output_path(
+        input_path,
+        "clean",
+        &ext,
+        custom_output_dir,
+    );
+    crate::converter::ensure_parent_dir(&output_path)?;
+
+    let status = Command::new("ffmpeg")
+        .arg("-nostdin")
+        .arg("-y")
+        .arg("-threads")
+        .arg("2")
+        .arg("-i")
+        .arg(input_path)
+        .arg("-vn")
+        .arg("-map_metadata")
+        .arg("-1")
+        .arg("-c")
+        .arg("copy")
+        .arg(&output_path)
+        .status()
+        .with_context(|| "ffmpeg çalıştırılamadı (ses metadata temizleme)")?;
+
+    if !status.success() {
+        bail!("Ses metadata temizleme başarısız oldu");
     }
 
     Ok(output_path)

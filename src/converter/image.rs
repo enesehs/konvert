@@ -5,7 +5,9 @@ use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-pub use crate::converter::{determine_output_path, ensure_parent_dir, get_output_dir};
+pub use crate::converter::{
+    determine_output_path, determine_suffixed_output_path, ensure_parent_dir, get_output_dir,
+};
 
 pub fn is_supported_image_target(target: &str) -> bool {
     let t = target.to_lowercase();
@@ -26,6 +28,58 @@ pub fn parse_image_format(target: &str) -> Option<ImageFormat> {
     }
 }
 
+/// JXL, SVG ve standart görselleri açmak için birleşik resim yükleyici
+pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if ext == "jxl" {
+        let output = Command::new("djxl")
+            .arg(input_path)
+            .arg("-")
+            .arg("--output_format")
+            .arg("png")
+            .output()
+            .with_context(|| "djxl komutu çalıştırılamadı")?;
+
+        if !output.status.success() {
+            bail!("JXL görseli çözülemedi: {}", input_path.display());
+        }
+
+        image::load_from_memory(&output.stdout)
+            .with_context(|| "djxl çıktısı bellekten okunamadı")
+    } else if ext == "svg" {
+        let output = Command::new("magick")
+            .arg("-density")
+            .arg("300")
+            .arg(input_path)
+            .arg("png:-")
+            .output()
+            .or_else(|_| {
+                Command::new("convert")
+                    .arg("-density")
+                    .arg("300")
+                    .arg(input_path)
+                    .arg("png:-")
+                    .output()
+            })
+            .with_context(|| "SVG rasterleştirici (magick veya convert) çalıştırılamadı")?;
+
+        if !output.status.success() {
+            bail!("SVG görseli rasterleştirilemedi: {}", input_path.display());
+        }
+
+        image::load_from_memory(&output.stdout)
+            .with_context(|| "SVG raster çıktısı bellekten okunamadı")
+    } else {
+        image::open(input_path)
+            .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))
+    }
+}
+
 pub fn convert_image(
     input_path: &Path,
     target_ext: &str,
@@ -42,33 +96,7 @@ pub fn convert_image(
         return convert_to_jxl(input_path, &output_path, quality, lossless);
     }
 
-    // JXL okuma desteği
-    let is_input_jxl = input_path
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|s| s.eq_ignore_ascii_case("jxl"))
-        .unwrap_or(false);
-
-    let img: DynamicImage = if is_input_jxl {
-        let output = Command::new("djxl")
-            .arg(input_path)
-            .arg("-")
-            .arg("--output_format")
-            .arg("png")
-            .output()
-            .with_context(|| "djxl komutu çalıştırılamadı")?;
-
-        if !output.status.success() {
-            bail!("JXL görseli çözülemedi: {}", input_path.display());
-        }
-
-        image::load_from_memory(&output.stdout)
-            .with_context(|| "djxl çıktısı bellekten okunamadı")?
-    } else {
-        image::open(input_path)
-            .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?
-    };
-
+    let img = open_dynamic_image(input_path)?;
     let format = parse_image_format(&target_lower)
         .with_context(|| format!("Desteklenmeyen görsel formatı: {}", target_lower))?;
 
@@ -78,13 +106,13 @@ pub fn convert_image(
             let file = File::create(&output_path)
                 .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
             let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            let rgb = img.to_rgb8(); // RGBA verilerini güvenli RGB8 formatına dönüştür (çökmeyi önler)
             let mut encoder = JpegEncoder::new_with_quality(&mut writer, q);
-            encoder.encode_image(&img)
+            encoder.encode_image(&rgb)
                 .with_context(|| "JPEG kodlama hatası")?;
             writer.flush().with_context(|| "JPEG tamponu yazılamadı")?;
         }
         ImageFormat::WebP => {
-            // If lossy is preferred and quality is set, try ImageMagick for true lossy WebP
             if !lossless {
                 let q_str = quality.unwrap_or(82).to_string();
                 if crate::converter::run_imagemagick(&[
@@ -142,19 +170,18 @@ fn convert_to_jxl(
     Ok(output_path.to_path_buf())
 }
 
-/// Akıllı görsel sıkıştırma (ImageMagick lossy WebP, 82 kalite, EXIF temizleme)
-pub fn compress_image(
+pub fn encode_webp_optimized(
     input_path: &Path,
     quality: Option<u8>,
     custom_output_dir: Option<&Path>,
+    suffix: &str,
 ) -> Result<PathBuf> {
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-
-    let target_dir = get_output_dir(input_path, custom_output_dir);
-    let output_path = target_dir.join(format!("{}_compressed.webp", file_stem));
+    let output_path = determine_suffixed_output_path(
+        input_path,
+        suffix,
+        "webp",
+        custom_output_dir,
+    );
     ensure_parent_dir(&output_path)?;
 
     let q_str = quality.unwrap_or(82).to_string();
@@ -169,22 +196,31 @@ pub fn compress_image(
         return Ok(output_path);
     }
 
-    // Native Image crate fallback
-    let img = image::open(input_path)
-        .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?;
-
-    let file = File::create(&output_path)
-        .with_context(|| format!("Çıktı dosyası oluşturulamadı: {}", output_path.display()))?;
+    // Yerel WebP yedeği
+    let img = open_dynamic_image(input_path)?;
+    let file = File::create(&output_path)?;
     let mut writer = BufWriter::with_capacity(64 * 1024, file);
-
-    img.write_to(&mut writer, ImageFormat::WebP)
-        .with_context(|| "Görsel WebP olarak sıkıştırılamadı")?;
-    writer.flush().with_context(|| "WebP tamponu boşaltılamadı")?;
+    img.write_to(&mut writer, ImageFormat::WebP)?;
+    writer.flush()?;
 
     Ok(output_path)
 }
 
-/// EXIF, GPS ve gizlilik bilgilerini kaldırırken oryantasyonu (yönü) koruyarak temiz bir kopya üretir
+pub fn compress_image(
+    input_path: &Path,
+    quality: Option<u8>,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    encode_webp_optimized(input_path, quality, custom_output_dir, "compressed")
+}
+
+pub fn web_optimize_image(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    encode_webp_optimized(input_path, Some(82), custom_output_dir, "web")
+}
+
 pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
     let ext = input_path
         .extension()
@@ -192,14 +228,12 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
         .unwrap_or("png")
         .to_lowercase();
 
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-
-    let target_dir = get_output_dir(input_path, custom_output_dir);
-    let output_path = target_dir.join(format!("{}_clean.{}", file_stem, ext));
+    let output_path = determine_suffixed_output_path(input_path, "clean", &ext, custom_output_dir);
     ensure_parent_dir(&output_path)?;
+
+    if ext == "jxl" {
+        return convert_to_jxl(input_path, &output_path, None, true);
+    }
 
     // ImageMagick ile -auto-orient uygulayarak EXIF yönünü piksele göm, ardından tüm etiketleri temizle!
     if crate::converter::run_imagemagick(&[
@@ -212,15 +246,16 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     }
 
     // Yedek: Yerel bellek içi kodlama
-    if let Ok(img) = image::open(input_path)
+    if let Ok(img) = open_dynamic_image(input_path)
         && let Ok(file) = File::create(&output_path)
     {
         let mut writer = BufWriter::with_capacity(64 * 1024, file);
         let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
         let write_res = match fmt {
             ImageFormat::Jpeg => {
+                let rgb = img.to_rgb8();
                 let mut encoder = JpegEncoder::new_with_quality(&mut writer, 95);
-                encoder.encode_image(&img)
+                encoder.encode_image(&rgb)
             }
             _ => img.write_to(&mut writer, fmt),
         };
@@ -232,7 +267,6 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     bail!("Metadata temizleme işlemi başarısız oldu")
 }
 
-/// Görseli yeniden boyutlandırır (orijinalden küçükse 1080p/720p için büyütmez)
 pub fn resize_image(
     input_path: &Path,
     spec: &crate::converter::ResizeSpec,
@@ -241,20 +275,13 @@ pub fn resize_image(
     let ext = input_path
         .extension()
         .and_then(|e| e.to_str())
-        .unwrap_or("png");
+        .unwrap_or("png")
+        .to_lowercase();
 
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-
-    let target_dir = get_output_dir(input_path, custom_output_dir);
-    let output_path = target_dir.join(format!("{}_resized.{}", file_stem, ext));
+    let output_path = determine_suffixed_output_path(input_path, "resized", &ext, custom_output_dir);
     ensure_parent_dir(&output_path)?;
 
-    let img = image::open(input_path)
-        .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?;
-
+    let img = open_dynamic_image(input_path)?;
     let (w, h) = img.dimensions();
 
     let (new_w, new_h) = match spec {
@@ -288,13 +315,23 @@ pub fn resize_image(
 
     let resized = img.resize(new_w, new_h, imageops::FilterType::Lanczos3);
 
-    let fmt = parse_image_format(ext).unwrap_or(ImageFormat::Png);
+    if ext == "jxl" {
+        // Resized görseli geçici PNG yapıp cjxl ile dönüştür
+        let temp_png = std::env::temp_dir().join(format!("resize_temp_{}.png", std::process::id()));
+        resized.save_with_format(&temp_png, ImageFormat::Png)?;
+        let jxl_res = convert_to_jxl(&temp_png, &output_path, None, false);
+        let _ = fs::remove_file(temp_png);
+        return jxl_res;
+    }
+
+    let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
     let file = File::create(&output_path)?;
     let mut writer = BufWriter::with_capacity(64 * 1024, file);
     match fmt {
         ImageFormat::Jpeg => {
+            let rgb = resized.to_rgb8();
             let mut encoder = JpegEncoder::new_with_quality(&mut writer, 90);
-            encoder.encode_image(&resized)?;
+            encoder.encode_image(&rgb)?;
         }
         _ => {
             resized.write_to(&mut writer, fmt)?;
@@ -305,7 +342,6 @@ pub fn resize_image(
     Ok(output_path)
 }
 
-/// Birden fazla görseli tek bir PDF dosyasında birleştirir
 pub fn merge_images_to_pdf(
     images: &[PathBuf],
     custom_output_dir: Option<&Path>,
@@ -336,44 +372,6 @@ pub fn merge_images_to_pdf(
     Ok(output_path)
 }
 
-/// Web optimizasyonu (kayıplı WebP, 82 kalite, EXIF auto-orient ve strip)
-pub fn web_optimize_image(
-    input_path: &Path,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
-
-    let target_dir = get_output_dir(input_path, custom_output_dir);
-    let output_path = target_dir.join(format!("{}_web.webp", file_stem));
-    ensure_parent_dir(&output_path)?;
-
-    if crate::converter::run_imagemagick(&[
-        input_path.as_os_str(),
-        std::ffi::OsStr::new("-auto-orient"),
-        std::ffi::OsStr::new("-strip"),
-        std::ffi::OsStr::new("-quality"),
-        std::ffi::OsStr::new("82"),
-        output_path.as_os_str(),
-    ]).is_ok() {
-        return Ok(output_path);
-    }
-
-    // Yerel WebP yedeği
-    let img = image::open(input_path)
-        .with_context(|| "Görsel açılamadı")?;
-    let file = File::create(&output_path)?;
-    let mut writer = BufWriter::with_capacity(64 * 1024, file);
-    img.write_to(&mut writer, ImageFormat::WebP)?;
-    writer.flush()?;
-
-    Ok(output_path)
-}
-
-/// Hedef boyuta göre akıllı görsel sıkıştırması (Discord 8MB, E-Posta 25MB)
-/// Dosya boyutunu hedefin altına çekene kadar kaliteyi ve ölçeği kademeli olarak azaltır
 pub fn compress_image_to_size(
     input_path: &Path,
     target_bytes: u64,
@@ -383,22 +381,23 @@ pub fn compress_image_to_size(
         bail!("Hedef dosya boyutu 0 olamaz");
     }
 
-    let file_stem = input_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image");
     let ext = input_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("jpg")
         .to_lowercase();
-    let target_ext = if ext == "png" { "png" } else { "jpg" };
+    let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
 
-    let target_dir = get_output_dir(input_path, custom_output_dir);
-    let output_path = target_dir.join(format!("{}_target.{}", file_stem, target_ext));
+    // PNG dosyaları kayıpsız olduğu için kaliteyle küçülmez; hedef çok küçükse WebP formatına geç
+    let target_ext = if ext == "png" && current_bytes > target_bytes {
+        "webp"
+    } else {
+        &ext
+    };
+
+    let output_path = determine_suffixed_output_path(input_path, "target", target_ext, custom_output_dir);
     ensure_parent_dir(&output_path)?;
 
-    let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes > 0
         && current_bytes <= target_bytes
         && crate::converter::run_imagemagick(&[
@@ -407,6 +406,8 @@ pub fn compress_image_to_size(
             std::ffi::OsStr::new("-strip"),
             output_path.as_os_str(),
         ]).is_ok()
+        && let Ok(meta) = fs::metadata(&output_path)
+        && meta.len() <= target_bytes
     {
         return Ok(output_path);
     }
@@ -439,10 +440,18 @@ pub fn compress_image_to_size(
         }
     }
 
-    if output_path.exists() {
+    if let Ok(meta) = fs::metadata(&output_path)
+        && meta.len() <= target_bytes
+    {
         Ok(output_path)
     } else {
-        bail!("Görsel hedef boyuta sıkıştırılamadı");
+        let reached_size = fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0);
+        let _ = fs::remove_file(&output_path);
+        bail!(
+            "Görsel hedef boyuta ({:.1} MB) sıkıştırılamadı. Ulaşılan en küçük boyut: {:.1} MB",
+            target_bytes as f64 / (1024.0 * 1024.0),
+            reached_size as f64 / (1024.0 * 1024.0)
+        );
     }
 }
 
@@ -477,10 +486,11 @@ mod tests {
     }
 
     #[test]
-    fn test_ensure_parent_dir() {
-        let test_file = std::env::temp_dir().join("konvert_test_image_dir/test.txt");
-        assert!(ensure_parent_dir(&test_file).is_ok());
-        assert!(test_file.parent().unwrap().exists());
-        let _ = std::fs::remove_dir_all(std::env::temp_dir().join("konvert_test_image_dir"));
+    fn test_rgba_to_rgb_conversion_safety() {
+        let rgba = image::RgbaImage::new(10, 10);
+        let dyn_img = DynamicImage::ImageRgba8(rgba);
+        let rgb = dyn_img.to_rgb8();
+        assert_eq!(rgb.width(), 10);
+        assert_eq!(rgb.height(), 10);
     }
 }

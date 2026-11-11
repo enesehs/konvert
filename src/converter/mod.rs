@@ -8,7 +8,6 @@ use rayon::prelude::*;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,12 +61,12 @@ impl TargetAction {
 }
 
 pub fn get_output_dir(input_path: &Path, custom_output_dir: Option<&Path>) -> PathBuf {
-    match custom_output_dir {
-        Some(dir) => dir.to_path_buf(),
-        None => input_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
+    if let Some(dir) = custom_output_dir {
+        return dir.to_path_buf();
+    }
+    match input_path.parent() {
+        Some(p) if !p.as_os_str().is_empty() => p.to_path_buf(),
+        _ => PathBuf::from("."),
     }
 }
 
@@ -95,6 +94,31 @@ pub fn determine_output_path(
     let candidate = target_dir.join(format!("{}.{}", file_stem, target_ext));
     if candidate == input_path {
         target_dir.join(format!("{}_konvert.{}", file_stem, target_ext))
+    } else {
+        candidate
+    }
+}
+
+pub fn determine_suffixed_output_path(
+    input_path: &Path,
+    suffix: &str,
+    target_ext: &str,
+    custom_output_dir: Option<&Path>,
+) -> PathBuf {
+    let file_stem = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("file");
+
+    let target_dir = get_output_dir(input_path, custom_output_dir);
+    let candidate_name = if file_stem.ends_with(&format!("_{}", suffix)) {
+        format!("{}_new.{}", file_stem, target_ext)
+    } else {
+        format!("{}_{}.{}", file_stem, suffix, target_ext)
+    };
+    let candidate = target_dir.join(candidate_name);
+    if candidate == input_path {
+        target_dir.join(format!("{}_{}_konvert.{}", file_stem, suffix, target_ext))
     } else {
         candidate
     }
@@ -148,7 +172,17 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
     let out_dir = opts.custom_output_dir.as_deref();
 
     match action {
-        TargetAction::StripMetadata => image::strip_metadata(input_path, out_dir),
+        TargetAction::StripMetadata => {
+            if is_image_ext(&ext) {
+                image::strip_metadata(input_path, out_dir)
+            } else if is_video_ext(&ext) {
+                video::strip_video_metadata(input_path, out_dir)
+            } else if is_audio_ext(&ext) {
+                audio::strip_audio_metadata(input_path, out_dir)
+            } else {
+                bail!("Metadata temizleme sadece görsel, video ve ses dosyaları için desteklenir: .{}", ext)
+            }
+        }
         TargetAction::Resize(spec) => {
             if is_image_ext(&ext) {
                 image::resize_image(input_path, &spec, out_dir)
@@ -173,7 +207,7 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             } else if is_image_ext(&ext) {
                 image::compress_image_to_size(input_path, target_bytes, out_dir)
             } else if ext == "pdf" {
-                document::compress_pdf(input_path, out_dir)
+                document::compress_pdf_to_size(input_path, target_bytes, out_dir)
             } else {
                 bail!("Bu format için hedef boyut sıkıştırması desteklenmiyor: .{}", ext)
             }
@@ -216,7 +250,7 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             }
         }
         TargetAction::Convert(target_fmt) => {
-            if ext == "pdf" && (target_fmt == "png" || target_fmt == "jpg") {
+            if ext == "pdf" && (target_fmt == "png" || target_fmt == "jpg" || target_fmt == "jpeg") {
                 document::convert_pdf_to_images(input_path, &target_fmt, opts.dpi.unwrap_or(300), out_dir)
             } else if ext == "udf" {
                 document::convert_udf(input_path, &target_fmt, out_dir)
@@ -255,18 +289,18 @@ where
         };
     }
 
-    let callback = Mutex::new(progress_callback);
-    let completed = AtomicUsize::new(0);
+    let progress_state = Mutex::new((0usize, progress_callback));
 
     let results: Vec<Result<PathBuf, (PathBuf, String)>> = files
         .par_iter()
         .map(|file| {
             let res = convert_single(file, opts);
 
-            if let Ok(mut cb) = callback.lock() {
-                let curr = completed.fetch_add(1, Ordering::SeqCst) + 1;
+            if let Ok(mut lock) = progress_state.lock() {
+                lock.0 += 1;
+                let curr = lock.0;
                 let percent = ((curr as f32 / total as f32) * 100.0) as i32;
-                cb(curr, total, file, percent);
+                (lock.1)(curr, total, file, percent);
             }
 
             match res {
@@ -291,21 +325,21 @@ where
 
 pub fn is_image_ext(ext: &str) -> bool {
     matches!(
-        ext,
+        ext.to_lowercase().as_str(),
         "png" | "jpg" | "jpeg" | "webp" | "avif" | "jxl" | "bmp" | "ico" | "tiff" | "tif" | "qoi" | "svg"
     )
 }
 
 pub fn is_video_ext(ext: &str) -> bool {
     matches!(
-        ext,
+        ext.to_lowercase().as_str(),
         "mp4" | "mkv" | "webm" | "avi" | "mov" | "flv" | "wmv" | "m4v"
     )
 }
 
 pub fn is_audio_ext(ext: &str) -> bool {
     matches!(
-        ext,
+        ext.to_lowercase().as_str(),
         "mp3" | "wav" | "flac" | "ogg" | "m4a" | "aac" | "opus" | "wma" | "aiff"
     )
 }
@@ -317,7 +351,9 @@ mod tests {
     #[test]
     fn test_is_image_ext() {
         assert!(is_image_ext("png"));
+        assert!(is_image_ext("PNG"));
         assert!(is_image_ext("jpg"));
+        assert!(is_image_ext("JPG"));
         assert!(is_image_ext("webp"));
         assert!(is_image_ext("avif"));
         assert!(is_image_ext("jxl"));
@@ -328,6 +364,7 @@ mod tests {
     #[test]
     fn test_is_video_ext() {
         assert!(is_video_ext("mp4"));
+        assert!(is_video_ext("MP4"));
         assert!(is_video_ext("mkv"));
         assert!(is_video_ext("webm"));
         assert!(!is_video_ext("png"));
@@ -337,10 +374,30 @@ mod tests {
     #[test]
     fn test_is_audio_ext() {
         assert!(is_audio_ext("mp3"));
+        assert!(is_audio_ext("MP3"));
         assert!(is_audio_ext("flac"));
         assert!(is_audio_ext("wav"));
         assert!(!is_audio_ext("mp4"));
         assert!(!is_audio_ext("png"));
+    }
+
+    #[test]
+    fn test_get_output_dir_empty_parent() {
+        let path = Path::new("test.docx");
+        let dir = get_output_dir(path, None);
+        assert_eq!(dir, PathBuf::from("."));
+        assert!(!dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn test_determine_suffixed_output_path() {
+        let path = Path::new("my_photo.jpg");
+        let out = determine_suffixed_output_path(path, "clean", "jpg", None);
+        assert_eq!(out, PathBuf::from("./my_photo_clean.jpg"));
+
+        let already_clean = Path::new("my_photo_clean.jpg");
+        let out2 = determine_suffixed_output_path(already_clean, "clean", "jpg", None);
+        assert_eq!(out2, PathBuf::from("./my_photo_clean_new.jpg"));
     }
 
     #[test]
