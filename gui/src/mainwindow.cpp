@@ -23,6 +23,11 @@
 #include <QProcess>
 #include <QFileIconProvider>
 #include <QFileInfo>
+#include <QSysInfo>
+
+#ifndef KONVERT_APP_VERSION
+#define KONVERT_APP_VERSION "v0.1-beta"
+#endif
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -31,6 +36,10 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("Konvert");
     setWindowIcon(QIcon(":/logo.svg"));
     resize(700, 740);
+}
+
+QString MainWindow::currentLanguage() const {
+    return AppTranslator::getActiveLanguage(m_config.language);
 }
 
 static QString trKey(const QString &key, const QString &lang) {
@@ -126,7 +135,7 @@ void MainWindow::setupUi() {
     m_rootTabWidget = new QTabWidget(this);
     m_rootTabWidget->setStyleSheet("QTabWidget::pane { border: 1px solid palette(midlight); border-radius: 6px; }");
 
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     m_rootTabWidget->addTab(createConvertTab(), QIcon::fromTheme("document-edit-symbolic"), trKey("tab_convert", lang));
     m_rootTabWidget->addTab(createHistoryTab(), QIcon::fromTheme("view-history-symbolic"), trKey("tab_history", lang));
     m_rootTabWidget->addTab(createAboutTab(), QIcon::fromTheme("help-about-symbolic"), trKey("tab_about", lang));
@@ -136,7 +145,7 @@ void MainWindow::setupUi() {
 }
 
 QWidget* MainWindow::createConvertTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *container = new QWidget(this);
     auto *layout = new QVBoxLayout(container);
     layout->setContentsMargins(8, 8, 8, 8);
@@ -155,7 +164,7 @@ QWidget* MainWindow::createConvertTab() {
 }
 
 QWidget* MainWindow::createPhotosTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -323,7 +332,7 @@ QWidget* MainWindow::createPhotosTab() {
 
     auto *sliderRow = new QHBoxLayout();
     auto *sliderLabel = new QLabel(trKey("lbl_photo_quality", lang), qualityWidget);
-    sliderLabel->setToolTip("Target image quality percentage (1-100). 85 is recommended.");
+    sliderLabel->setToolTip(lang == "tr" ? "Hedef görsel kalitesi (1-100). 85 önerilir." : "Target image quality percentage (1-100). 85 is recommended.");
     sliderRow->addWidget(sliderLabel);
 
     m_photoQualitySlider = new QSlider(Qt::Horizontal, qualityWidget);
@@ -345,7 +354,7 @@ QWidget* MainWindow::createPhotosTab() {
     qualityLayout->addLayout(sliderRow);
 
     m_photoLosslessCheck = new QCheckBox(trKey("lbl_lossless_photo", lang), qualityWidget);
-    m_photoLosslessCheck->setToolTip("Forces mathematically lossless mode in WebP, PNG, and JXL conversions.");
+    m_photoLosslessCheck->setToolTip(lang == "tr" ? "WebP, PNG ve JXL dönüşümlerinde tam kayıpsız modu zorlar." : "Forces mathematically lossless mode in WebP, PNG, and JXL conversions.");
     m_photoLosslessCheck->setChecked(m_config.imageLossless);
     connect(m_photoLosslessCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_config.imageLossless = checked;
@@ -361,7 +370,7 @@ QWidget* MainWindow::createPhotosTab() {
 }
 
 QWidget* MainWindow::createVideosTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -457,7 +466,7 @@ QWidget* MainWindow::createVideosTab() {
 
     auto *crfRow = new QHBoxLayout();
     auto *crfLabel = new QLabel(trKey("lbl_video_crf", lang), compWidget);
-    crfLabel->setToolTip("Constant Rate Factor (0-51): 0 is lossless, 18-23 is balanced high quality, 28+ is high compression.");
+    crfLabel->setToolTip(lang == "tr" ? "Sabit Oran Faktörü (0-51): 0 kayıpsız, 18-23 dengeli yüksek kalite, 28+ yüksek sıkıştırma." : "Constant Rate Factor (0-51): 0 is lossless, 18-23 is balanced high quality, 28+ is high compression.");
     crfRow->addWidget(crfLabel);
 
     m_videoCrfSlider = new QSlider(Qt::Horizontal, compWidget);
@@ -479,7 +488,7 @@ QWidget* MainWindow::createVideosTab() {
 
     auto *presetRow = new QHBoxLayout();
     auto *presetLabel = new QLabel(trKey("lbl_video_preset", lang), compWidget);
-    presetLabel->setToolTip("Encoder speed preset: 'slow' or 'medium' offers the best compression-to-time ratio.");
+    presetLabel->setToolTip(lang == "tr" ? "Kodlayıcı hız önayarı: 'slow' veya 'medium' en iyi sıkıştırma/süre dengesini sunar." : "Encoder speed preset: 'slow' or 'medium' offers the best compression-to-time ratio.");
     presetRow->addWidget(presetLabel);
 
     m_videoPresetCombo = new QComboBox(compWidget);
@@ -493,7 +502,7 @@ QWidget* MainWindow::createVideosTab() {
     compLayout->addLayout(presetRow);
 
     m_videoLosslessCheck = new QCheckBox(trKey("lbl_video_lossless", lang), compWidget);
-    m_videoLosslessCheck->setToolTip("Encodes using x264 RGB with CRF 0 without lossy compression artifacts.");
+    m_videoLosslessCheck->setToolTip(lang == "tr" ? "CRF 0 ile x264 RGB kayıpsız kodlama yapar." : "Encodes using x264 RGB with CRF 0 without lossy compression artifacts.");
     m_videoLosslessCheck->setChecked(m_config.videoLossless);
     connect(m_videoLosslessCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_config.videoLossless = checked;
@@ -509,7 +518,7 @@ QWidget* MainWindow::createVideosTab() {
 }
 
 QWidget* MainWindow::createMusicTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -555,7 +564,7 @@ QWidget* MainWindow::createMusicTab() {
 
     auto *bitrateRow = new QHBoxLayout();
     auto *bitrateLabel = new QLabel(trKey("lbl_audio_bitrate", lang), audioWidget);
-    bitrateLabel->setToolTip("Target audio bitrate for MP3 and AAC encoding. 320k provides transparent CD quality.");
+    bitrateLabel->setToolTip(lang == "tr" ? "MP3 ve AAC kodlama için hedef ses bit hızı. 320k şeffaf stüdyo kalitesi sunar." : "Target audio bitrate for MP3 and AAC encoding. 320k provides transparent CD quality.");
     bitrateRow->addWidget(bitrateLabel);
 
     m_audioBitrateCombo = new QComboBox(audioWidget);
@@ -576,7 +585,7 @@ QWidget* MainWindow::createMusicTab() {
 }
 
 QWidget* MainWindow::createDocumentsTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -629,7 +638,7 @@ QWidget* MainWindow::createDocumentsTab() {
 
     auto *dpiRow = new QHBoxLayout();
     auto *dpiLabel = new QLabel(trKey("lbl_pdf_dpi", lang), docWidget);
-    dpiLabel->setToolTip("DPI resolution when rendering PDF pages to images. 300 DPI is standard print quality.");
+    dpiLabel->setToolTip(lang == "tr" ? "PDF sayfaları görsele aktarılırken kullanılacak DPI çözünürlüğü. 300 DPI standart baskı kalitesidir." : "DPI resolution when rendering PDF pages to images. 300 DPI is standard print quality.");
     dpiRow->addWidget(dpiLabel);
 
     m_pdfDpiSpin = new QSpinBox(docWidget);
@@ -650,7 +659,7 @@ QWidget* MainWindow::createDocumentsTab() {
 }
 
 QWidget* MainWindow::createHistoryTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *container = new QWidget(this);
     auto *layout = new QVBoxLayout(container);
     layout->setContentsMargins(12, 12, 12, 12);
@@ -765,7 +774,7 @@ QWidget* MainWindow::createHistoryTab() {
 
 void MainWindow::loadHistoryData() {
     if (!m_historyTable) return;
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
 
     QString dataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     QString historyFile = QDir(dataDir).filePath("konvert/history.json");
@@ -862,7 +871,7 @@ void MainWindow::loadHistoryData() {
 
 void MainWindow::onHistorySelectionChanged() {
     if (!m_historyTable) return;
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     int row = m_historyTable->currentRow();
     if (row < 0 || row >= m_historyTable->rowCount()) {
         m_selectedOutputPath.clear();
@@ -933,7 +942,7 @@ void MainWindow::clearHistoryData() {
 }
 
 QWidget* MainWindow::createAboutTab() {
-    const QString lang = m_config.language;
+    const QString lang = currentLanguage();
     auto *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
@@ -943,7 +952,7 @@ QWidget* MainWindow::createAboutTab() {
     layout->setContentsMargins(14, 14, 14, 14);
     layout->setSpacing(12);
 
-    // 1. Authentic KDE Header: Logo + App Name + Subtitle + Dedication Banner
+    // 1. Authentic KDE Header: Logo + App Name + Subtitle
     auto *headerWidget = new QWidget(container);
     auto *headerLayout = new QVBoxLayout(headerWidget);
     headerLayout->setAlignment(Qt::AlignCenter);
@@ -962,30 +971,13 @@ QWidget* MainWindow::createAboutTab() {
         QString(
             "<div style='text-align: center;'>"
             "<span style='font-size: 22px; font-weight: bold;'>Konvert</span> "
-            "<span style='font-size: 13px; opacity: 0.7;'>v0.1-beta</span><br>"
-            "<span style='font-size: 12px;'>%1</span></div>"
-        ).arg(lang == "tr" ? "Linux ve KDE Plasma için yerel dosya dönüştürücü" : "Native file converter for Linux and KDE Plasma"),
+            "<span style='font-size: 13px; opacity: 0.7;'>%1</span><br>"
+            "<span style='font-size: 12px;'>%2</span></div>"
+        ).arg(KONVERT_APP_VERSION, lang == "tr" ? "Linux ve KDE Plasma için yerel dosya dönüştürücü" : "Native file converter for Linux and KDE Plasma"),
         headerWidget
     );
     titleLabel->setAlignment(Qt::AlignCenter);
     headerLayout->addWidget(titleLabel);
-
-    // Dedication Banner for Open Source Community (Sleek, Clean, No Emojis)
-    auto *bannerFrame = new QFrame(headerWidget);
-    bannerFrame->setFrameShape(QFrame::StyledPanel);
-    bannerFrame->setStyleSheet("QFrame { border: 1px solid palette(midlight); border-radius: 6px; background-color: palette(base); padding: 8px 12px; margin-top: 4px; }");
-    auto *bannerLayout = new QVBoxLayout(bannerFrame);
-    bannerLayout->setContentsMargins(8, 8, 8, 8);
-    bannerLayout->setSpacing(4);
-
-    auto *lblBannerTitle = new QLabel(QString("<b>%1</b>").arg(trKey("dedication_title", lang)), bannerFrame);
-    lblBannerTitle->setAlignment(Qt::AlignCenter);
-    auto *lblBannerDesc = new QLabel(trKey("dedication_desc", lang), bannerFrame);
-    lblBannerDesc->setWordWrap(true);
-    lblBannerDesc->setAlignment(Qt::AlignCenter);
-    bannerLayout->addWidget(lblBannerTitle);
-    bannerLayout->addWidget(lblBannerDesc);
-    headerLayout->addWidget(bannerFrame);
 
     layout->addWidget(createCard("", headerWidget));
 
@@ -1023,10 +1015,13 @@ QWidget* MainWindow::createAboutTab() {
         specGrid->addWidget(lblV, row, 1);
     };
 
-    addSpecRow(0, lang == "tr" ? "Sürüm:" : "Version:", "v0.1-beta (x86_64-linux)");
+    QString archStr = QSysInfo::buildCpuArchitecture();
+    if (archStr.isEmpty()) archStr = "x86_64";
+
+    addSpecRow(0, lang == "tr" ? "Sürüm:" : "Version:", QString("%1 (%2-linux)").arg(KONVERT_APP_VERSION, archStr));
     addSpecRow(1, lang == "tr" ? "Masaüstü Ortamı:" : "Desktop Environment:", desktopEnv);
-    addSpecRow(2, lang == "tr" ? "Grafik Arayüzü:" : "GUI Framework:", "Qt 6 (KDE Breeze Uyumlu)");
-    addSpecRow(3, lang == "tr" ? "Çekirdek Motor:" : "Core Engine:", "Rust 2024 & Rayon Çok Çekirdekli Motor");
+    addSpecRow(2, lang == "tr" ? "Grafik Arayüzü:" : "GUI Framework:", lang == "tr" ? "Qt 6 (KDE Breeze Uyumlu)" : "Qt 6 (KDE Breeze Compliant)");
+    addSpecRow(3, lang == "tr" ? "Çekirdek Motor:" : "Core Engine:", lang == "tr" ? "Rust 2024 & Rayon Çok Çekirdekli Motor" : "Rust 2024 & Rayon Multi-Core Engine");
     addSpecRow(4, lang == "tr" ? "Web Sitesi:" : "Homepage:", "<a href='https://github.com/enesehs/konvert'>github.com/enesehs/konvert</a>");
     addSpecRow(5, lang == "tr" ? "Hata Bildirimi:" : "Bug Tracker:", "<a href='https://github.com/enesehs/konvert/issues'>github.com/enesehs/konvert/issues</a>");
 

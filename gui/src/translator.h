@@ -217,22 +217,6 @@ public:
             return "License";
         }
 
-        // --- DEDICATION & COMMUNITY TEXT ---
-        if (key == "dedication_title") {
-            if (lang == "tr") return "Açık Kaynak Topluluğuna İthafen";
-            if (lang == "de") return "Für die Open-Source-Community";
-            if (lang == "fr") return "Pour la communauté Open Source";
-            if (lang == "es") return "Dedicado a la comunidad de código abierto";
-            return "Dedicated to the Open Source Community";
-        }
-        if (key == "dedication_desc") {
-            if (lang == "tr") return "Konvert; Linux ve KDE Plasma ekosistemi için geliştirilmiş bağımsız, yerel ve tam gizlilik odaklı bir özgür yazılımdır.";
-            if (lang == "de") return "Konvert ist ein unabhängiges, natives und datenschutzorientiertes Open-Source-Dienstprogramm für Linux und KDE Plasma.";
-            if (lang == "fr") return "Konvert est un utilitaire libre, natif et respectueux de la vie privée conçu pour Linux et KDE Plasma.";
-            if (lang == "es") return "Konvert es una utilidad de software libre, nativa e independiente para Linux y KDE Plasma.";
-            return "Konvert is an independent, native, and privacy-first free software utility designed for Linux and KDE Plasma.";
-        }
-
         return key;
     }
 };

@@ -29,6 +29,7 @@ private slots:
 
 private:
     void setupUi();
+    QString currentLanguage() const;
     QWidget* createConvertTab();
     QWidget* createPhotosTab();
     QWidget* createVideosTab();
