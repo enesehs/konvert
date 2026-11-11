@@ -8,7 +8,8 @@
 
 ConfigManager::ConfigManager() {
     enabledActions = {
-        "compress_photo", "to_webp", "to_png", "to_jpg", "to_avif", "to_jxl", "to_jxl_lossless",
+        "compress_photo", "to_webp", "to_png", "to_jpg", "to_svg", "to_ico", "to_heic", "to_bmp",
+        "to_avif", "to_jxl", "to_jxl_lossless",
         "merge_to_pdf", "strip_metadata", "resize_50", "resize_1080p",
         "web_opt", "discord_8mb_photo", "email_25mb_photo",
         "compress_video", "to_mp4", "to_mkv", "to_webm", "to_gif", "extract_frames", "extract_audio",

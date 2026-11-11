@@ -79,7 +79,27 @@ QCheckBox* MainWindow::createActionCheckBox(
 ) {
     auto *cb = new QCheckBox(label, parent);
     if (!iconName.isEmpty()) {
-        cb->setIcon(QIcon::fromTheme(iconName));
+        QIcon ic = QIcon::fromTheme(iconName);
+        if (ic.isNull()) {
+            QString fallback = iconName;
+            fallback.remove("-symbolic");
+            if (fallback.startsWith("konvert-")) {
+                if (fallback == "konvert-image") fallback = "image-x-generic";
+                else if (fallback == "konvert-video") fallback = "video-x-generic";
+                else if (fallback == "konvert-audio") fallback = "audio-x-generic";
+                else if (fallback == "konvert-document") fallback = "x-office-document";
+                else if (fallback == "konvert-compress") fallback = "transform-scale";
+                else if (fallback == "konvert-shield") fallback = "security-high";
+                else if (fallback == "konvert-monitor") fallback = "video-display";
+                else if (fallback == "konvert-globe") fallback = "network-workgroup";
+                else if (fallback == "konvert-mail") fallback = "mail-attachment";
+                else if (fallback == "konvert-folder") fallback = "folder-pictures";
+                else if (fallback == "konvert-layers") fallback = "x-office-document";
+                else if (fallback == "konvert-scaling") fallback = "transform-scale";
+            }
+            ic = QIcon::fromTheme(fallback);
+        }
+        cb->setIcon(ic);
     }
     if (!tooltip.isEmpty()) {
         cb->setToolTip(tooltip);
@@ -154,7 +174,7 @@ QWidget* MainWindow::createPhotosTab() {
         "compress_photo",
         lang == "tr" ? "Görseli Sıkıştır" : "Compress Image",
         lang == "tr" ? "Görseli insan gözünün fark edemeyeceği maksimum görsel kalite ve en küçük dosya boyutu dengesiyle WebP formatında sıkıştırır." : "Compresses image to WebP with optimal balance of maximum visual quality and minimum file size.",
-        "transform-scale-symbolic",
+        "konvert-compress",
         actionsWidget
     ), 0, 0, 1, 2);
 
@@ -162,7 +182,7 @@ QWidget* MainWindow::createPhotosTab() {
         "to_webp",
         lang == "tr" ? "WebP'ye Dönüştür" : "Convert to WebP",
         lang == "tr" ? "Modern WebP formatına dönüştürür. JPEG ve PNG'ye kıyasla yüksek oranda boyut tasarrufu sağlar." : "Converts to modern WebP format, providing significant size reduction compared to JPEG and PNG.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
     ), 1, 0);
 
@@ -170,7 +190,7 @@ QWidget* MainWindow::createPhotosTab() {
         "to_png",
         lang == "tr" ? "PNG'ye Dönüştür" : "Convert to PNG",
         lang == "tr" ? "Kayıpsız ve şeffaflık (alpha) kanalını destekleyen standart PNG formatına dönüştürür." : "Converts to lossless standard PNG with transparency support.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
     ), 1, 1);
 
@@ -178,89 +198,121 @@ QWidget* MainWindow::createPhotosTab() {
         "to_jpg",
         lang == "tr" ? "JPG'ye Dönüştür" : "Convert to JPG",
         lang == "tr" ? "Evrensel uyumluluğa sahip standart JPEG formatına dönüştürür." : "Converts to universal standard JPEG image.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
     ), 2, 0);
+
+    actionsGrid->addWidget(createActionCheckBox(
+        "to_svg",
+        lang == "tr" ? "SVG'ye Dönüştür" : "Convert to SVG",
+        lang == "tr" ? "Görseli ölçeklenebilir vektör grafiği formatına dönüştürür." : "Converts image to scalable vector graphic format.",
+        "konvert-image",
+        actionsWidget
+    ), 2, 1);
+
+    actionsGrid->addWidget(createActionCheckBox(
+        "to_ico",
+        lang == "tr" ? "ICO'ya Dönüştür" : "Convert to ICO",
+        lang == "tr" ? "Web sitesi favicon veya uygulama simgesi olarak kullanılan ICO formatına dönüştürür." : "Converts to standard Windows and favicon ICO format.",
+        "konvert-image",
+        actionsWidget
+    ), 3, 0);
+
+    actionsGrid->addWidget(createActionCheckBox(
+        "to_heic",
+        lang == "tr" ? "HEIC'e Dönüştür" : "Convert to HEIC",
+        lang == "tr" ? "Apple ve modern cihazlarda kullanılan yüksek verimli HEIC formatına dönüştürür." : "Converts to high-efficiency HEIC format.",
+        "konvert-image",
+        actionsWidget
+    ), 3, 1);
+
+    actionsGrid->addWidget(createActionCheckBox(
+        "to_bmp",
+        lang == "tr" ? "BMP'ye Dönüştür" : "Convert to BMP",
+        lang == "tr" ? "Sıkıştırmasız standart Windows Bitmap formatına dönüştürür." : "Converts to uncompressed standard Windows Bitmap format.",
+        "konvert-image",
+        actionsWidget
+    ), 4, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_avif",
         lang == "tr" ? "AVIF'e Dönüştür" : "Convert to AVIF",
         lang == "tr" ? "AV1 video kodlayıcı tabanlı, yüksek sıkıştırma verimliliği sunan yeni nesil görsel formatı." : "Next-generation image format based on AV1, providing superior compression.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
-    ), 2, 1);
+    ), 4, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_jxl",
         lang == "tr" ? "JXL'e Dönüştür" : "Convert to JXL",
         lang == "tr" ? "Yeni nesil JPEG XL formatına dönüştürür. Geniş renk gamutu ve üstün sıkıştırma oranı sunar." : "Converts to next-generation JPEG XL format with wide color gamut and high compression.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
-    ), 3, 0);
+    ), 5, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_jxl_lossless",
         lang == "tr" ? "Kayıpsız JXL'e Dönüştür" : "Convert to JXL (Lossless)",
         lang == "tr" ? "Piksel kaybı olmaksızın matematiksel olarak tam kayıpsız JPEG XL sıkıştırması uygular." : "Mathematically lossless JPEG XL compression without pixel loss.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
-    ), 3, 1);
+    ), 5, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "merge_to_pdf",
         lang == "tr" ? "Tek PDF Olarak Birleştir" : "Merge to Single PDF",
         lang == "tr" ? "Seçilen tüm görselleri tek bir PDF belgesi içerisinde sayfalar halinde birleştirir." : "Merges all selected images into a single multi-page PDF document.",
-        "x-office-document-symbolic",
+        "konvert-layers",
         actionsWidget
-    ), 4, 0);
+    ), 6, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "strip_metadata",
         lang == "tr" ? "EXIF ve Metadata Temizle" : "Strip Metadata & EXIF",
         lang == "tr" ? "Görseldeki GPS konumu, çekim tarihi, kamera modeli ve etiketleri temizleyerek gizliliği korur." : "Cleans GPS coordinates, camera model, shooting date, and personal tags for privacy.",
-        "security-high-symbolic",
+        "konvert-shield",
         actionsWidget
-    ), 4, 1);
+    ), 6, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "resize_50",
         lang == "tr" ? "Görseli %50 Küçült" : "Resize by 50%",
         lang == "tr" ? "Görselin genişlik ve yükseklik çözünürlüğünü yarıya indirerek dosya boyutunu büyük oranda azaltır." : "Reduces image dimensions by half (50%) to shrink file size.",
-        "transform-scale-symbolic",
+        "konvert-scaling",
         actionsWidget
-    ), 5, 0);
+    ), 7, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "resize_1080p",
         lang == "tr" ? "Full HD'ye Ölçekle" : "Resize to Full HD",
         lang == "tr" ? "Görselin en-boy oranını koruyarak 1920x1080 Full HD sınırlarına sığacak şekilde ölçekler." : "Scales image proportionally to fit within 1920x1080 Full HD bounds.",
-        "video-display-symbolic",
+        "konvert-monitor",
         actionsWidget
-    ), 5, 1);
+    ), 7, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "web_opt",
         lang == "tr" ? "Web İçin Optimize Et (WebP)" : "Optimize for Web (WebP)",
         lang == "tr" ? "WebP formatında %82 kalite ve sıfır EXIF ile web için ideal boyuta getirir." : "Converts to WebP with 82% quality and stripped EXIF for fast web delivery.",
-        "network-workgroup-symbolic",
+        "konvert-globe",
         actionsWidget
-    ), 6, 0);
+    ), 8, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "discord_8mb_photo",
         lang == "tr" ? "Discord İçin Sıkıştır (8 MB)" : "Compress for Discord (8 MB)",
         lang == "tr" ? "Görseli 8 MB sınırına sığacak şekilde optimize eder." : "Optimizes image to guarantee size under 8 MB.",
-        "mail-attachment-symbolic",
+        "konvert-mail",
         actionsWidget
-    ), 6, 1);
+    ), 8, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "email_25mb_photo",
         lang == "tr" ? "E-Posta İçin Sıkıştır (25 MB)" : "Compress for Email (25 MB)",
         lang == "tr" ? "Görseli 25 MB e-posta ek sınırına uyacak şekilde optimize eder." : "Optimizes image to fit standard 25 MB email attachment limits.",
-        "mail-attachment-symbolic",
+        "konvert-mail",
         actionsWidget
-    ), 7, 0, 1, 2);
+    ), 9, 0, 1, 2);
 
     layout->addWidget(createCard(trKey("card_actions", lang), actionsWidget));
 
@@ -328,7 +380,7 @@ QWidget* MainWindow::createVideosTab() {
         "compress_video",
         lang == "tr" ? "Videoyu Sıkıştır" : "Compress Video",
         lang == "tr" ? "Videoyu H.264 CRF 28 ve slow kodlama önayarı ile görsel kalitesini koruyarak %80'e varan oranda sıkıştırır." : "Compresses video with H.264 CRF 28 and slow preset preserving visual quality.",
-        "video-x-generic-symbolic",
+        "konvert-compress",
         actionsWidget
     ), 0, 0, 1, 2);
 
@@ -336,7 +388,7 @@ QWidget* MainWindow::createVideosTab() {
         "to_mp4",
         lang == "tr" ? "MP4'e Dönüştür" : "Convert to MP4",
         lang == "tr" ? "Evrensel cihaz ve tarayıcı uyumluluğu için standart H.264/AAC MP4 formatına dönüştürür." : "Converts to standard H.264/AAC MP4 for universal device and browser compatibility.",
-        "video-x-generic-symbolic",
+        "konvert-video",
         actionsWidget
     ), 1, 0);
 
@@ -344,7 +396,7 @@ QWidget* MainWindow::createVideosTab() {
         "to_mkv",
         lang == "tr" ? "MKV'ye Dönüştür" : "Convert to MKV",
         lang == "tr" ? "Çoklu ses ve altyazı izlerini destekleyen esnek Matroska video kapsayıcısına dönüştürür." : "Converts to versatile Matroska video container supporting multiple audio and subtitle streams.",
-        "video-x-generic-symbolic",
+        "konvert-video",
         actionsWidget
     ), 1, 1);
 
@@ -352,7 +404,7 @@ QWidget* MainWindow::createVideosTab() {
         "to_webm",
         lang == "tr" ? "WebM'ye Dönüştür" : "Convert to WebM",
         lang == "tr" ? "Web ve HTML5 uyumlu açık kaynaklı VP9 video formatına dönüştürür." : "Converts to open-source VP9 WebM format for web and HTML5 streaming.",
-        "video-x-generic-symbolic",
+        "konvert-video",
         actionsWidget
     ), 2, 0);
 
@@ -360,7 +412,7 @@ QWidget* MainWindow::createVideosTab() {
         "to_gif",
         lang == "tr" ? "GIF'e Dönüştür" : "Convert to GIF",
         lang == "tr" ? "İki geçişli renk paleti analiziyle videonun ilk 15 saniyesini yüksek kaliteli animasyonlu GIF'e dönüştürür." : "Converts the first 15 seconds of video to a high-quality animated GIF using two-pass palette optimization.",
-        "video-x-generic-symbolic",
+        "konvert-video",
         actionsWidget
     ), 2, 1);
 
@@ -368,7 +420,7 @@ QWidget* MainWindow::createVideosTab() {
         "extract_frames",
         lang == "tr" ? "Kareleri Klasöre Aktar" : "Export Frames to Folder",
         lang == "tr" ? "Videonun her video karesini PNG resimleri olarak yeni bir klasöre döker." : "Exports all video frames as individual PNG images to a dedicated folder.",
-        "folder-pictures-symbolic",
+        "konvert-folder",
         actionsWidget
     ), 3, 0);
 
@@ -376,7 +428,7 @@ QWidget* MainWindow::createVideosTab() {
         "extract_audio",
         lang == "tr" ? "Videodan Sesi Ayıkla" : "Extract Audio",
         lang == "tr" ? "Videonun ses izini doğrudan ayrı bir MP3 ses dosyası olarak dışa aktarır." : "Demuxes and extracts the audio stream directly into an MP3 file.",
-        "audio-x-generic-symbolic",
+        "konvert-audio",
         actionsWidget
     ), 3, 1);
 
@@ -384,7 +436,7 @@ QWidget* MainWindow::createVideosTab() {
         "discord_8mb_video",
         lang == "tr" ? "Discord İçin Sıkıştır (8 MB)" : "Compress for Discord (8 MB)",
         lang == "tr" ? "Videonun süresine göre bit hızını otomatik ayarlayarak 8 MB boyutuna sığdırır." : "Automatically computes video bitrate according to length to fit within 8 MB.",
-        "mail-attachment-symbolic",
+        "konvert-mail",
         actionsWidget
     ), 4, 0);
 
@@ -392,7 +444,7 @@ QWidget* MainWindow::createVideosTab() {
         "email_25mb_video",
         lang == "tr" ? "E-Posta İçin Sıkıştır (25 MB)" : "Compress for Email (25 MB)",
         lang == "tr" ? "Videonun süresine göre bit hızını otomatik ayarlayarak 25 MB e-posta ek sınırına sığdırır." : "Automatically calculates bitrate to fit within 25 MB email attachment limit.",
-        "mail-attachment-symbolic",
+        "konvert-mail",
         actionsWidget
     ), 4, 1);
 
@@ -476,21 +528,21 @@ QWidget* MainWindow::createMusicTab() {
         "to_mp3",
         lang == "tr" ? "MP3'e Dönüştür" : "Convert to MP3",
         lang == "tr" ? "En yaygın evrensel ses formatı olan MP3'e dönüştürür." : "Converts to universal standard MP3 audio.",
-        "audio-x-generic-symbolic",
+        "konvert-audio",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "to_wav",
         lang == "tr" ? "WAV'a Dönüştür" : "Convert to WAV",
         lang == "tr" ? "Stüdyo kalitesinde, tam kayıpsız ve sıkıştırmasız PCM WAV ses dosyası üretir." : "Converts to uncompressed studio-quality PCM WAV audio.",
-        "audio-x-generic-symbolic",
+        "konvert-audio",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "audio_to_video",
         lang == "tr" ? "Videoya Dönüştür" : "Convert to Video",
         lang == "tr" ? "Ses dosyası için arka planda KDE mavisi ses dalga formu üreterek paylaşılabilir bir MP4 videosu oluşturur." : "Generates an aesthetic KDE-blue waveform visualization video in MP4 format from audio.",
-        "video-x-generic-symbolic",
+        "konvert-video",
         actionsWidget
     ));
 
@@ -543,28 +595,28 @@ QWidget* MainWindow::createDocumentsTab() {
         "compress_doc",
         lang == "tr" ? "PDF Sıkıştır" : "Compress PDF",
         lang == "tr" ? "PDF belgesinin içerisindeki yüksek çözünürlüklü görselleri ve veri akışlarını sıkıştırarak dosya boyutunu düşürür." : "Compresses high-resolution embedded images and streams in PDF files to minimize file size.",
-        "x-office-document-symbolic",
+        "konvert-compress",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "udf_to_pdf",
         lang == "tr" ? "UDF'i PDF'e Dönüştür" : "Convert UDF to PDF",
         lang == "tr" ? "Ulusal Yargı Ağı Bilişim Sistemi (.udf) belgelerini doğrudan görüntülenebilir PDF belgesine dönüştürür." : "Converts Turkish National Judicial Network (.udf) legal documents directly into standard PDF.",
-        "x-office-document-symbolic",
+        "konvert-document",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "udf_to_txt",
         lang == "tr" ? "UDF'i Metne Dönüştür" : "Convert UDF to Text",
         lang == "tr" ? "UYAP .udf belgesinin içindeki saf metin içeriğini ayrıştırarak .txt dosyası olarak kaydeder." : "Extracts clean text content from .udf documents into a standard text file.",
-        "x-office-document-symbolic",
+        "konvert-document",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "pdf_to_images",
         lang == "tr" ? "PDF Sayfalarını PNG'ye Çıkar" : "Extract PDF Pages to PNG",
         lang == "tr" ? "PDF belgesinin her bir sayfasını yüksek çözünürlüklü PNG resimleri olarak ayrı ayrı klasöre aktarır." : "Renders all pages of a PDF document into high-resolution PNG image files.",
-        "image-x-generic-symbolic",
+        "konvert-image",
         actionsWidget
     ));
 

@@ -31,6 +31,7 @@ package() {
     install -Dm644 "packaging/io.github.enesehs.konvert.metainfo.xml" "$pkgdir/usr/share/metainfo/io.github.enesehs.konvert.metainfo.xml"
     install -Dm644 "assets/logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/konvert.svg"
     install -Dm644 "assets/logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg"
+    install -Dm644 assets/icons/*.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/actions/"
 
     # Install system-wide Dolphin servicemenus
     mkdir -p "$pkgdir/usr/share/kio/servicemenus"

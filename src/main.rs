@@ -185,10 +185,42 @@ fn main() -> anyhow::Result<()> {
         let mut progress_handle = notifier.start_progress(
             "Konvert: Merging PDF...",
             &format!("Scanning {} images...", cli.files.len()),
-            20,
+            15,
         );
 
-        match converter::merge_images_to_pdf(&cli.files, custom_output_dir.as_deref()) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let merge_files = cli.files.clone();
+        let merge_out_dir = custom_output_dir.clone();
+        std::thread::spawn(move || {
+            let res = converter::merge_images_to_pdf(&merge_files, merge_out_dir.as_deref());
+            let _ = tx.send(res);
+        });
+
+        let mut progress_val = 20;
+        let progress_title = "Konvert: PDF Birleştiriliyor...".to_string();
+        let progress_body = format!("{} görsel birleştiriliyor...", cli.files.len());
+
+        let merge_res = loop {
+            match rx.recv_timeout(std::time::Duration::from_millis(300)) {
+                Ok(res) => break res,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if progress_val < 90 {
+                        progress_val += 5;
+                        notifier.update_progress(
+                            &mut progress_handle,
+                            &progress_title,
+                            &progress_body,
+                            progress_val,
+                        );
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    break Err(anyhow::anyhow!("PDF birleştirme işlemi beklenmeyen şekilde sonlandı"));
+                }
+            }
+        };
+
+        match merge_res {
             Ok(out_pdf) => {
                 remove_pid_lock();
                 let out_bytes = out_pdf.metadata().map(|m| m.len()).unwrap_or(0);
@@ -305,10 +337,42 @@ fn main() -> anyhow::Result<()> {
         let mut progress_handle = notifier.start_progress(
             "Konvert: Converting...",
             &format!("{} ➔ {}", file_name, target_display),
-            20,
+            15,
         );
 
-        match converter::convert_single(&files[0], &opts) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let target_file = files[0].clone();
+        let convert_opts = opts.clone();
+        std::thread::spawn(move || {
+            let res = converter::convert_single(&target_file, &convert_opts);
+            let _ = tx.send(res);
+        });
+
+        let mut progress_val = 20;
+        let progress_title = format!("Konvert: {}", target_display);
+        let progress_body = format!("İşleniyor: {}", file_name);
+
+        let convert_res = loop {
+            match rx.recv_timeout(std::time::Duration::from_millis(300)) {
+                Ok(res) => break res,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    if progress_val < 90 {
+                        progress_val += 5;
+                        notifier.update_progress(
+                            &mut progress_handle,
+                            &progress_title,
+                            &progress_body,
+                            progress_val,
+                        );
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    break Err(anyhow::anyhow!("Dönüştürme işlemi beklenmeyen şekilde sonlandı"));
+                }
+            }
+        };
+
+        match convert_res {
             Ok(output) => {
                 remove_pid_lock();
                 let out_bytes = output.metadata().map(|m| m.len()).unwrap_or(0);

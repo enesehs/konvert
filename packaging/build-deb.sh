@@ -58,6 +58,12 @@ chmod 644 "${BUILD_DIR}/usr/share/kio/servicemenus"/*.desktop
 cp "${ROOT_DIR}/assets/logo.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/konvert.svg"
 cp "${ROOT_DIR}/assets/logo.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg"
 
+mkdir -p "${BUILD_DIR}/usr/share/icons/hicolor/scalable/actions"
+if [ -d "${ROOT_DIR}/assets/icons" ]; then
+    cp -f "${ROOT_DIR}/assets/icons/"*.svg "${BUILD_DIR}/usr/share/icons/hicolor/scalable/actions/"
+    chmod 644 "${BUILD_DIR}/usr/share/icons/hicolor/scalable/actions/"*.svg
+fi
+
 for SIZE in 16 24 32 48 64 128 256; do
     DIR="${BUILD_DIR}/usr/share/icons/hicolor/${SIZE}x${SIZE}/apps"
     mkdir -p "${DIR}"

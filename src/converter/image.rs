@@ -11,7 +11,7 @@ pub use crate::converter::{
 
 pub fn is_supported_image_target(target: &str) -> bool {
     let t = target.to_lowercase();
-    t == "jxl" || parse_image_format(&t).is_some()
+    t == "jxl" || t == "svg" || t == "heic" || t == "heif" || parse_image_format(&t).is_some()
 }
 
 pub fn parse_image_format(target: &str) -> Option<ImageFormat> {
@@ -74,6 +74,25 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
 
         image::load_from_memory(&output.stdout)
             .with_context(|| "SVG raster çıktısı bellekten okunamadı")
+    } else if ext == "heic" || ext == "heif" {
+        let output = Command::new("magick")
+            .arg(input_path)
+            .arg("png:-")
+            .output()
+            .or_else(|_| {
+                Command::new("convert")
+                    .arg(input_path)
+                    .arg("png:-")
+                    .output()
+            })
+            .with_context(|| "HEIC/HEIF okuyucu (magick veya convert) çalıştırılamadı")?;
+
+        if !output.status.success() {
+            bail!("HEIC/HEIF görseli çözülemedi: {}", input_path.display());
+        }
+
+        image::load_from_memory(&output.stdout)
+            .with_context(|| "HEIC/HEIF çıktısı bellekten okunamadı")
     } else {
         image::open(input_path)
             .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))
@@ -94,6 +113,33 @@ pub fn convert_image(
     // JPEG XL (.jxl)
     if target_lower == "jxl" {
         return convert_to_jxl(input_path, &output_path, quality, lossless);
+    }
+
+    // SVG (.svg)
+    if target_lower == "svg" {
+        let status = crate::converter::run_imagemagick(&[
+            input_path.as_os_str(),
+            output_path.as_os_str(),
+        ]);
+        if status.is_ok() && output_path.exists() {
+            return Ok(output_path);
+        }
+        bail!("SVG formatına dönüştürülemedi: {}", input_path.display());
+    }
+
+    // HEIC / HEIF (.heic, .heif)
+    if target_lower == "heic" || target_lower == "heif" {
+        let q_str = quality.unwrap_or(85).to_string();
+        let status = crate::converter::run_imagemagick(&[
+            input_path.as_os_str(),
+            std::ffi::OsStr::new("-quality"),
+            std::ffi::OsStr::new(&q_str),
+            output_path.as_os_str(),
+        ]);
+        if status.is_ok() && output_path.exists() {
+            return Ok(output_path);
+        }
+        bail!("HEIC formatına dönüştürülemedi: {}", input_path.display());
     }
 
     let img = open_dynamic_image(input_path)?;
@@ -131,6 +177,41 @@ pub fn convert_image(
             img.write_to(&mut writer, ImageFormat::WebP)
                 .with_context(|| "WebP kaydetme hatası")?;
             writer.flush().with_context(|| "WebP tamponu yazılamadı")?;
+        }
+        ImageFormat::Ico => {
+            if crate::converter::run_imagemagick(&[
+                input_path.as_os_str(),
+                std::ffi::OsStr::new("-resize"),
+                std::ffi::OsStr::new("256x256>"),
+                output_path.as_os_str(),
+            ]).is_ok() && output_path.exists() {
+                return Ok(output_path);
+            }
+            let resized = if img.width() > 256 || img.height() > 256 {
+                img.resize(256, 256, image::imageops::FilterType::Lanczos3)
+            } else {
+                img
+            };
+            let file = File::create(&output_path)
+                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            resized.write_to(&mut writer, ImageFormat::Ico)
+                .with_context(|| format!("ICO formatında kaydedilemedi: {}", output_path.display()))?;
+            writer.flush().with_context(|| "ICO tamponu yazılamadı")?;
+        }
+        ImageFormat::Bmp => {
+            if crate::converter::run_imagemagick(&[
+                input_path.as_os_str(),
+                output_path.as_os_str(),
+            ]).is_ok() && output_path.exists() {
+                return Ok(output_path);
+            }
+            let file = File::create(&output_path)
+                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
+            let mut writer = BufWriter::with_capacity(64 * 1024, file);
+            img.write_to(&mut writer, ImageFormat::Bmp)
+                .with_context(|| format!("BMP formatında kaydedilemedi: {}", output_path.display()))?;
+            writer.flush().with_context(|| "BMP tamponu yazılamadı")?;
         }
         _ => {
             let file = File::create(&output_path)
@@ -463,7 +544,22 @@ mod tests {
         assert_eq!(parse_image_format("png"), Some(ImageFormat::Png));
         assert_eq!(parse_image_format("jpg"), Some(ImageFormat::Jpeg));
         assert_eq!(parse_image_format("webp"), Some(ImageFormat::WebP));
+        assert_eq!(parse_image_format("bmp"), Some(ImageFormat::Bmp));
+        assert_eq!(parse_image_format("ico"), Some(ImageFormat::Ico));
         assert_eq!(parse_image_format("unknown"), None);
+    }
+
+    #[test]
+    fn test_is_supported_image_target() {
+        assert!(is_supported_image_target("png"));
+        assert!(is_supported_image_target("webp"));
+        assert!(is_supported_image_target("jxl"));
+        assert!(is_supported_image_target("svg"));
+        assert!(is_supported_image_target("ico"));
+        assert!(is_supported_image_target("heic"));
+        assert!(is_supported_image_target("bmp"));
+        assert!(!is_supported_image_target("mp4"));
+        assert!(!is_supported_image_target("pdf"));
     }
 
     #[test]

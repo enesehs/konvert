@@ -28,7 +28,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Bild komprimieren",
         name_fr: "Compresser l'image",
         name_es: "Comprimir imagen",
-        icon: "transform-scale-symbolic",
+        icon: "konvert-compress",
         cmd_args: "-t compress %F",
     },
     ActionDef {
@@ -40,7 +40,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In WebP umwandeln",
         name_fr: "Convertir en WebP",
         name_es: "Convertir a WebP",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t webp %F",
     },
     ActionDef {
@@ -52,7 +52,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In PNG umwandeln",
         name_fr: "Convertir en PNG",
         name_es: "Convertir a PNG",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t png %F",
     },
     ActionDef {
@@ -64,8 +64,56 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In JPG umwandeln",
         name_fr: "Convertir en JPG",
         name_es: "Convertir a JPG",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t jpg %F",
+    },
+    ActionDef {
+        id: "to_svg",
+        action_key: "toSVG",
+        category: "photos",
+        name_en: "Convert to SVG",
+        name_tr: "SVG'ye Dönüştür",
+        name_de: "In SVG umwandeln",
+        name_fr: "Convertir en SVG",
+        name_es: "Convertir a SVG",
+        icon: "konvert-image",
+        cmd_args: "-t svg %F",
+    },
+    ActionDef {
+        id: "to_ico",
+        action_key: "toICO",
+        category: "photos",
+        name_en: "Convert to ICO",
+        name_tr: "ICO'ya Dönüştür",
+        name_de: "In ICO umwandeln",
+        name_fr: "Convertir en ICO",
+        name_es: "Convertir a ICO",
+        icon: "konvert-image",
+        cmd_args: "-t ico %F",
+    },
+    ActionDef {
+        id: "to_heic",
+        action_key: "toHEIC",
+        category: "photos",
+        name_en: "Convert to HEIC",
+        name_tr: "HEIC'e Dönüştür",
+        name_de: "In HEIC umwandeln",
+        name_fr: "Convertir en HEIC",
+        name_es: "Convertir a HEIC",
+        icon: "konvert-image",
+        cmd_args: "-t heic %F",
+    },
+    ActionDef {
+        id: "to_bmp",
+        action_key: "toBMP",
+        category: "photos",
+        name_en: "Convert to BMP",
+        name_tr: "BMP'ye Dönüştür",
+        name_de: "In BMP umwandeln",
+        name_fr: "Convertir en BMP",
+        name_es: "Convertir a BMP",
+        icon: "konvert-image",
+        cmd_args: "-t bmp %F",
     },
     ActionDef {
         id: "to_avif",
@@ -76,7 +124,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In AVIF umwandeln",
         name_fr: "Convertir en AVIF",
         name_es: "Convertir a AVIF",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t avif %F",
     },
     ActionDef {
@@ -88,7 +136,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In JXL umwandeln",
         name_fr: "Convertir en JXL",
         name_es: "Convertir a JXL",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t jxl %F",
     },
     ActionDef {
@@ -100,7 +148,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In JXL umwandeln (Verlustfrei)",
         name_fr: "Convertir en JXL (Sans perte)",
         name_es: "Convertir a JXL (Sin pérdidas)",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t jxl --lossless %F",
     },
     ActionDef {
@@ -112,7 +160,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Bilder in ein PDF zusammenführen",
         name_fr: "Fusionner les images en un seul PDF",
         name_es: "Combinar imágenes en un solo PDF",
-        icon: "x-office-document-symbolic",
+        icon: "konvert-layers",
         cmd_args: "--merge-pdf %F",
     },
     ActionDef {
@@ -124,7 +172,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Metadaten & EXIF entfernen",
         name_fr: "Supprimer les métadonnées et EXIF",
         name_es: "Eliminar metadatos y EXIF",
-        icon: "security-high-symbolic",
+        icon: "konvert-shield",
         cmd_args: "-t strip-metadata %F",
     },
     ActionDef {
@@ -136,7 +184,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Bild um 50 % verkleinern",
         name_fr: "Redimensionner l'image de 50 %",
         name_es: "Redimensionar imagen al 50%",
-        icon: "transform-scale-symbolic",
+        icon: "konvert-scaling",
         cmd_args: "-t resize_50 %F",
     },
     ActionDef {
@@ -148,7 +196,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Auf Full HD skalieren",
         name_fr: "Redimensionner en Full HD",
         name_es: "Escalar a Full HD",
-        icon: "video-display-symbolic",
+        icon: "konvert-monitor",
         cmd_args: "-t resize_1080p %F",
     },
     ActionDef {
@@ -160,7 +208,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Für Web optimieren (WebP + EXIF bereinigt)",
         name_fr: "Optimiser pour le Web (WebP + sans EXIF)",
         name_es: "Optimizar para la Web (WebP + sin EXIF)",
-        icon: "network-workgroup-symbolic",
+        icon: "konvert-globe",
         cmd_args: "-t web_opt %F",
     },
     ActionDef {
@@ -172,7 +220,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Für Discord komprimieren (8 MB)",
         name_fr: "Compresser pour Discord (8 Mo)",
         name_es: "Comprimir para Discord (8 MB)",
-        icon: "mail-attachment-symbolic",
+        icon: "konvert-mail",
         cmd_args: "-t discord_8mb %F",
     },
     ActionDef {
@@ -184,7 +232,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Für E-Mail komprimieren (25 MB)",
         name_fr: "Compresser pour e-mail (25 Mo)",
         name_es: "Comprimir para correo (25 MB)",
-        icon: "mail-attachment-symbolic",
+        icon: "konvert-mail",
         cmd_args: "-t email_25mb %F",
     },
 
@@ -198,7 +246,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Video komprimieren",
         name_fr: "Compresser la vidéo",
         name_es: "Comprimir video",
-        icon: "video-x-generic-symbolic",
+        icon: "konvert-compress",
         cmd_args: "-t compress %F",
     },
     ActionDef {
@@ -210,7 +258,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In MP4 umwandeln",
         name_fr: "Convertir en MP4",
         name_es: "Convertir a MP4",
-        icon: "video-x-generic-symbolic",
+        icon: "konvert-video",
         cmd_args: "-t mp4 %F",
     },
     ActionDef {
@@ -222,7 +270,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In MKV umwandeln",
         name_fr: "Convertir en MKV",
         name_es: "Convertir a MKV",
-        icon: "video-x-generic-symbolic",
+        icon: "konvert-video",
         cmd_args: "-t mkv %F",
     },
     ActionDef {
@@ -234,7 +282,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In WebM umwandeln",
         name_fr: "Convertir en WebM",
         name_es: "Convertir a WebM",
-        icon: "video-x-generic-symbolic",
+        icon: "konvert-video",
         cmd_args: "-t webm %F",
     },
     ActionDef {
@@ -246,7 +294,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In GIF umwandeln",
         name_fr: "Convertir en GIF",
         name_es: "Convertir a GIF",
-        icon: "video-x-generic-symbolic",
+        icon: "konvert-video",
         cmd_args: "-t gif %F",
     },
     ActionDef {
@@ -258,7 +306,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Frames in Ordner exportieren",
         name_fr: "Exporter les images vers un dossier",
         name_es: "Exportar fotogramas a carpeta",
-        icon: "folder-pictures-symbolic",
+        icon: "konvert-folder",
         cmd_args: "--extract-frames %F",
     },
     ActionDef {
@@ -270,7 +318,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Audio extrahieren",
         name_fr: "Extraire l'audio",
         name_es: "Extraer audio",
-        icon: "audio-x-generic-symbolic",
+        icon: "konvert-audio",
         cmd_args: "-t extract-audio %F",
     },
     ActionDef {
@@ -282,7 +330,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Für Discord komprimieren (8 MB)",
         name_fr: "Compresser pour Discord (8 Mo)",
         name_es: "Comprimir para Discord (8 MB)",
-        icon: "mail-attachment-symbolic",
+        icon: "konvert-mail",
         cmd_args: "-t discord_8mb %F",
     },
     ActionDef {
@@ -294,7 +342,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "Für E-Mail komprimieren (25 MB)",
         name_fr: "Compresser pour e-mail (25 Mo)",
         name_es: "Comprimir para correo (25 MB)",
-        icon: "mail-attachment-symbolic",
+        icon: "konvert-mail",
         cmd_args: "-t email_25mb %F",
     },
 
@@ -308,7 +356,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In MP3 umwandeln",
         name_fr: "Convertir en MP3",
         name_es: "Convertir a MP3",
-        icon: "audio-x-generic-symbolic",
+        icon: "konvert-audio",
         cmd_args: "-t mp3 %F",
     },
     ActionDef {
@@ -320,7 +368,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In WAV umwandeln",
         name_fr: "Convertir en WAV",
         name_es: "Convertir a WAV",
-        icon: "audio-x-generic-symbolic",
+        icon: "konvert-audio",
         cmd_args: "-t wav %F",
     },
     ActionDef {
@@ -332,7 +380,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "In Video umwandeln",
         name_fr: "Convertir en vidéo",
         name_es: "Convertir a video",
-        icon: "video-x-generic-symbolic",
+        icon: "konvert-video",
         cmd_args: "-t audio-to-video %F",
     },
 
@@ -346,7 +394,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "PDF komprimieren",
         name_fr: "Compresser le PDF",
         name_es: "Comprimir PDF",
-        icon: "x-office-document-symbolic",
+        icon: "konvert-compress",
         cmd_args: "-t compress %F",
     },
     ActionDef {
@@ -358,7 +406,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "UDF in PDF umwandeln",
         name_fr: "Convertir UDF en PDF",
         name_es: "Convertir UDF a PDF",
-        icon: "x-office-document-symbolic",
+        icon: "konvert-document",
         cmd_args: "-t pdf %F",
     },
     ActionDef {
@@ -370,7 +418,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "UDF in Text umwandeln",
         name_fr: "Convertir UDF en Texte",
         name_es: "Convertir UDF a Texto",
-        icon: "x-office-document-symbolic",
+        icon: "konvert-document",
         cmd_args: "-t txt %F",
     },
     ActionDef {
@@ -382,7 +430,7 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         name_de: "PDF-Seiten als PNG extrahieren",
         name_fr: "Extraire les pages PDF en PNG",
         name_es: "Extraer páginas PDF a PNG",
-        icon: "image-x-generic-symbolic",
+        icon: "konvert-image",
         cmd_args: "-t png %F",
     },
 ];
@@ -407,26 +455,26 @@ const CATEGORIES: &[CategoryInfo] = &[
     CategoryInfo {
         key: "photos",
         file_name: "konvert_photos.desktop",
-        mime_types: "image/png;image/jpeg;image/webp;image/bmp;image/svg+xml;image/x-icon;image/tiff;image/avif;image/jxl;image/qoi;",
-        default_icon: "image-x-generic-symbolic",
+        mime_types: "image/png;image/jpeg;image/webp;image/bmp;image/svg+xml;image/x-icon;image/tiff;image/avif;image/jxl;image/qoi;image/heic;image/heif;",
+        default_icon: "konvert-image",
     },
     CategoryInfo {
         key: "videos",
         file_name: "konvert_videos.desktop",
         mime_types: "video/mp4;video/webm;video/x-matroska;video/avi;video/quicktime;video/x-msvideo;video/x-flv;video/x-matroska;",
-        default_icon: "video-x-generic-symbolic",
+        default_icon: "konvert-video",
     },
     CategoryInfo {
         key: "music",
         file_name: "konvert_music.desktop",
         mime_types: "audio/mpeg;audio/x-wav;audio/flac;audio/ogg;audio/opus;audio/mp4;audio/aac;audio/x-m4a;",
-        default_icon: "audio-x-generic-symbolic",
+        default_icon: "konvert-audio",
     },
     CategoryInfo {
         key: "documents",
         file_name: "konvert_documents.desktop",
         mime_types: "application/pdf;application/x-udf;application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/msword;text/plain;text/html;",
-        default_icon: "x-office-document-symbolic",
+        default_icon: "konvert-document",
     },
 ];
 

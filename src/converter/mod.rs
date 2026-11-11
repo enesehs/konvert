@@ -348,7 +348,7 @@ where
 pub fn is_image_ext(ext: &str) -> bool {
     matches!(
         ext.to_lowercase().as_str(),
-        "png" | "jpg" | "jpeg" | "webp" | "avif" | "jxl" | "bmp" | "ico" | "tiff" | "tif" | "qoi" | "svg"
+        "png" | "jpg" | "jpeg" | "webp" | "avif" | "jxl" | "bmp" | "ico" | "tiff" | "tif" | "qoi" | "svg" | "heic" | "heif"
     )
 }
 
@@ -379,6 +379,11 @@ mod tests {
         assert!(is_image_ext("webp"));
         assert!(is_image_ext("avif"));
         assert!(is_image_ext("jxl"));
+        assert!(is_image_ext("heic"));
+        assert!(is_image_ext("heif"));
+        assert!(is_image_ext("bmp"));
+        assert!(is_image_ext("ico"));
+        assert!(is_image_ext("svg"));
         assert!(!is_image_ext("mp4"));
         assert!(!is_image_ext("pdf"));
     }

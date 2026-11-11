@@ -15,7 +15,21 @@ RED="\033[31m"
 RESET="\033[0m"
 
 REPO="enesehs/konvert"
-INSTALL_DIR="${HOME}/.local/bin"
+
+# Detect execution context (root / sudo vs standard user)
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    REAL_USER="${SUDO_USER}"
+    REAL_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+else
+    REAL_USER="$(id -un)"
+    REAL_HOME="${HOME}"
+fi
+
+INSTALL_DIR="${REAL_HOME}/.local/bin"
+ICON_DIR="${REAL_HOME}/.local/share/icons/hicolor"
+DESKTOP_DIR="${REAL_HOME}/.local/share/applications"
+METAINFO_DIR="${REAL_HOME}/.local/share/metainfo"
+SERVICEMENU_DIR="${REAL_HOME}/.local/share/kio/servicemenus"
 TEMP_DIR="$(mktemp -d)"
 
 cleanup() {
@@ -50,9 +64,11 @@ fi
 
 echo -e "==> 1. Checking system directories..."
 mkdir -p "${INSTALL_DIR}"
-mkdir -p "${HOME}/.local/share/applications"
-mkdir -p "${HOME}/.local/share/metainfo"
-mkdir -p "${HOME}/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "${DESKTOP_DIR}"
+mkdir -p "${METAINFO_DIR}"
+mkdir -p "${ICON_DIR}/scalable/apps"
+mkdir -p "${ICON_DIR}/scalable/actions"
+mkdir -p "${SERVICEMENU_DIR}"
 
 # PATH check
 if [[ ":$PATH:" != *":${INSTALL_DIR}:"* ]]; then
@@ -80,11 +96,13 @@ if [ "${DOWNLOAD_SUCCESS}" = true ]; then
     echo -e "${GREEN}✓ Release package downloaded successfully.${RESET}"
     tar -xzf "${TEMP_DIR}/konvert.tar.gz" -C "${TEMP_DIR}"
     
-    find "${TEMP_DIR}" -type f -name "konvert" -exec cp {} "${INSTALL_DIR}/konvert" \;
-    find "${TEMP_DIR}" -type f -name "konvert-settings" -exec cp {} "${INSTALL_DIR}/konvert-settings" \;
-    find "${TEMP_DIR}" -type f -name "io.github.enesehs.konvert.desktop" -exec cp {} "${HOME}/.local/share/applications/" \;
-    find "${TEMP_DIR}" -type f -name "io.github.enesehs.konvert.metainfo.xml" -exec cp {} "${HOME}/.local/share/metainfo/" \;
-    find "${TEMP_DIR}" -type f -name "logo.svg" -exec cp {} "${HOME}/.local/share/icons/hicolor/scalable/apps/konvert.svg" \;
+    rm -f "${INSTALL_DIR}/konvert" "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
+    find "${TEMP_DIR}" -type f -name "konvert" -exec cp -f {} "${INSTALL_DIR}/konvert" \;
+    find "${TEMP_DIR}" -type f -name "konvert-settings" -exec cp -f {} "${INSTALL_DIR}/konvert-settings" \;
+    find "${TEMP_DIR}" -type f -name "io.github.enesehs.konvert.desktop" -exec cp -f {} "${DESKTOP_DIR}/" \;
+    find "${TEMP_DIR}" -type f -name "io.github.enesehs.konvert.metainfo.xml" -exec cp -f {} "${METAINFO_DIR}/" \;
+    find "${TEMP_DIR}" -type f -name "logo.svg" -exec cp -f {} "${ICON_DIR}/scalable/apps/konvert.svg" \;
+    find "${TEMP_DIR}" -type f -path "*/icons/*.svg" -exec cp -f {} "${ICON_DIR}/scalable/actions/" \; 2>/dev/null || true
 else
     echo -e "${YELLOW}Notice: Precompiled release not found, building quickly from source...${RESET}"
     
@@ -97,24 +115,34 @@ else
 
     git clone --depth 1 "https://github.com/${REPO}.git" "${TEMP_DIR}/source"
     cd "${TEMP_DIR}/source"
-    ./scripts/install.sh
+    chmod +x ./scripts/install.sh 2>/dev/null || true
+    bash ./scripts/install.sh
     exit 0
 fi
 
-chmod 755 "${INSTALL_DIR}/konvert"
-chmod 755 "${INSTALL_DIR}/konvert-settings"
-chmod 755 "${HOME}/.local/share/applications/io.github.enesehs.konvert.desktop"
+chmod 755 "${INSTALL_DIR}/konvert" 2>/dev/null || true
+chmod 755 "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
+chmod 755 "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" 2>/dev/null || true
 
 # 3. Synchronize Dolphin Context Menus
 echo -e "==> 3. Integrating Dolphin KIO right-click menus..."
-"${INSTALL_DIR}/konvert" --sync-menu >/dev/null 2>&1 || true
+"${INSTALL_DIR}/konvert" --sync-menu --menu-dir "${SERVICEMENU_DIR}" >/dev/null 2>&1 || true
 
 # Update desktop & icon caches
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
-    gtk-update-icon-cache -f -t "${HOME}/.local/share/icons/hicolor" >/dev/null 2>&1 || true
+    gtk-update-icon-cache -f -t "${ICON_DIR}" >/dev/null 2>&1 || true
 fi
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+fi
+
+# Fix ownership if run with sudo
+if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    chown -R "${REAL_USER}:" "${INSTALL_DIR}/konvert" 2>/dev/null || true
+    [ -f "${INSTALL_DIR}/konvert-settings" ] && chown -R "${REAL_USER}:" "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
+    chown -R "${REAL_USER}:" "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" "${METAINFO_DIR}/io.github.enesehs.konvert.metainfo.xml" 2>/dev/null || true
+    chown -R "${REAL_USER}:" "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
+    chown -R "${REAL_USER}:" "${ICON_DIR}" 2>/dev/null || true
 fi
 
 echo -e "\n${GREEN}${BOLD}✨ Konvert installed successfully!${RESET}"
