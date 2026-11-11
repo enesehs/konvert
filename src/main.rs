@@ -214,16 +214,27 @@ fn main() -> anyhow::Result<()> {
                     original_size_bytes: orig_bytes,
                     output_size_bytes: out_bytes,
                     savings_percent: 0.0,
-                    status: "Başarılı".into(),
+                    status: "Success".into(),
                     output_path: Some(out_pdf.to_string_lossy().to_string()),
                 });
                 return Ok(());
             }
             Err(err) => {
                 remove_pid_lock();
-                let msg = format!("PDF birleştirme başarısız: {}", err);
+                let msg = format!("Failed to merge PDF:\n{:#}", err);
                 eprintln!("{}", msg);
-                notifier.error_progress(&mut progress_handle, "PDF Birleştirme Başarısız", &msg);
+                notifier.error_progress(&mut progress_handle, "PDF Merge Failed", &msg);
+
+                let _ = add_history_entry(HistoryEntry {
+                    timestamp: history::current_timestamp(),
+                    target: "merge-pdf".into(),
+                    file_count: cli.files.len(),
+                    original_size_bytes: orig_bytes,
+                    output_size_bytes: 0,
+                    savings_percent: 0.0,
+                    status: "Failed".into(),
+                    output_path: None,
+                });
                 std::process::exit(1);
             }
         }

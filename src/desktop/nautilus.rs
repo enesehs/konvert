@@ -43,7 +43,12 @@ pub fn install_nautilus_scripts(custom_exec: Option<&str>) -> Result<PathBuf> {
         let script_path = dir.join(name);
         let content = format!(
             r#"#!/usr/bin/env bash
-{exec} -t {format} "$@"
+if [ $# -gt 0 ]; then
+    "{exec}" -t {format} "$@"
+elif [ -n "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS" ]; then
+    mapfile -t files <<< "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS"
+    "{exec}" -t {format} "${{files[@]}}"
+fi
 "#,
             exec = exec,
             format = format

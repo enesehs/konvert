@@ -55,8 +55,27 @@ impl TargetAction {
                     _ => bail!("Geçersiz boyutlandırma parametresi: {}", spec),
                 }
             }
+            _ if t.starts_with("target_") || t.ends_with("mb") => {
+                let s = t.trim_start_matches("target_").trim_end_matches("mb").trim();
+                if let Ok(mb) = s.parse::<u64>()
+                    && mb > 0
+                {
+                    Ok(TargetAction::TargetSize(mb * 1024 * 1024))
+                } else {
+                    Ok(TargetAction::Convert(t))
+                }
+            }
             _ => Ok(TargetAction::Convert(t)),
         }
+    }
+}
+
+pub fn sanitize_cli_path(path: &Path) -> PathBuf {
+    let s = path.as_os_str().to_string_lossy();
+    if s.starts_with('-') {
+        PathBuf::from(format!("./{}", s))
+    } else {
+        path.to_path_buf()
     }
 }
 
@@ -159,6 +178,9 @@ pub struct ConvertOptions {
 }
 
 pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBuf> {
+    let sanitized_input = sanitize_cli_path(input_path);
+    let input_path = &sanitized_input;
+
     if !input_path.exists() {
         bail!("Girdi dosyası mevcut değil: {}", input_path.display());
     }
@@ -401,12 +423,23 @@ mod tests {
     }
 
     #[test]
+    fn test_sanitize_cli_path() {
+        let normal = Path::new("file.jpg");
+        assert_eq!(sanitize_cli_path(normal), PathBuf::from("file.jpg"));
+
+        let dash = Path::new("-dash_file.mp4");
+        assert_eq!(sanitize_cli_path(dash), PathBuf::from("./-dash_file.mp4"));
+    }
+
+    #[test]
     fn test_target_action_parse() {
         assert_eq!(TargetAction::parse("compress").unwrap(), TargetAction::Compress);
         assert_eq!(TargetAction::parse("web_opt").unwrap(), TargetAction::WebOpt);
         assert_eq!(TargetAction::parse("web-opt").unwrap(), TargetAction::WebOpt);
         assert_eq!(TargetAction::parse("discord_8mb").unwrap(), TargetAction::TargetSize(8 * 1024 * 1024));
         assert_eq!(TargetAction::parse("email_25mb").unwrap(), TargetAction::TargetSize(25 * 1024 * 1024));
+        assert_eq!(TargetAction::parse("50mb").unwrap(), TargetAction::TargetSize(50 * 1024 * 1024));
+        assert_eq!(TargetAction::parse("target_100mb").unwrap(), TargetAction::TargetSize(100 * 1024 * 1024));
         assert_eq!(TargetAction::parse("strip-metadata").unwrap(), TargetAction::StripMetadata);
         assert_eq!(TargetAction::parse("resize_50%").unwrap(), TargetAction::Resize(ResizeSpec::Percent(50)));
         assert_eq!(TargetAction::parse("resize_1080p").unwrap(), TargetAction::Resize(ResizeSpec::Fit1080p));

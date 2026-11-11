@@ -5,7 +5,7 @@ use std::path::PathBuf;
 #[command(
     name = "konvert",
     author = "enesehs <enesehs@protonmail.com>",
-    version = "0.1-beta",
+    version,
     about = "Fast, lightweight, native right-click file converter and optimizer for Linux and KDE Plasma"
 )]
 pub struct Cli {
