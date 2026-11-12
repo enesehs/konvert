@@ -345,15 +345,184 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("version_title", Language::Ja) => "Konvert バージョン",
         ("version_title", _) => "Konvert Version",
 
-        ("version_sub", Language::Tr) => "0.1.0 (Rust Yerel Derleme)",
-        ("version_sub", Language::De) => "0.1.0 (Rust Native Build)",
-        ("version_sub", Language::Fr) => "0.1.0 (Compilation native Rust)",
-        ("version_sub", Language::Es) => "0.1.0 (Compilación nativa Rust)",
-        ("version_sub", Language::It) => "0.1.0 (Compilazione nativa Rust)",
-        ("version_sub", Language::Ru) => "0.1.0 (Нативная сборка на Rust)",
-        ("version_sub", Language::Zh) => "0.1.0 (Rust 原生编译)",
-        ("version_sub", Language::Ja) => "0.1.0 (Rust ネイティブビルド)",
-        ("version_sub", _) => "0.1.0 (Rust Native Build)",
+        ("version_sub", Language::Tr) => {
+            concat!(env!("CARGO_PKG_VERSION"), " (Rust Yerel Derleme)")
+        }
+        ("version_sub", Language::De) => concat!(env!("CARGO_PKG_VERSION"), " (Rust Native Build)"),
+        ("version_sub", Language::Fr) => {
+            concat!(env!("CARGO_PKG_VERSION"), " (Compilation native Rust)")
+        }
+        ("version_sub", Language::Es) => {
+            concat!(env!("CARGO_PKG_VERSION"), " (Compilación nativa Rust)")
+        }
+        ("version_sub", Language::It) => {
+            concat!(env!("CARGO_PKG_VERSION"), " (Compilazione nativa Rust)")
+        }
+        ("version_sub", Language::Ru) => {
+            concat!(env!("CARGO_PKG_VERSION"), " (Нативная сборка на Rust)")
+        }
+        ("version_sub", Language::Zh) => concat!(env!("CARGO_PKG_VERSION"), " (Rust 原生编译)"),
+        ("version_sub", Language::Ja) => {
+            concat!(env!("CARGO_PKG_VERSION"), " (Rust ネイティブビルド)")
+        }
+        ("version_sub", _) => concat!(env!("CARGO_PKG_VERSION"), " (Rust Native Build)"),
+
+        // CLI & Common Status / Actions
+        ("status_ok", Language::Zh) => "正常",
+        ("status_ok", _) => "OK",
+
+        ("status_missing", Language::Tr) => "EKSİK",
+        ("status_missing", Language::De) => "FEHLT",
+        ("status_missing", Language::Fr) => "MANQUANT",
+        ("status_missing", Language::Es) => "FALTANTE",
+        ("status_missing", Language::It) => "MANCANTE",
+        ("status_missing", Language::Ru) => "ОТСУТСТВУЕТ",
+        ("status_missing", Language::Zh) => "缺失",
+        ("status_missing", Language::Ja) => "未検出",
+        ("status_missing", _) => "MISSING",
+
+        ("status_required", Language::Tr) => "gerekli",
+        ("status_required", Language::De) => "erforderlich",
+        ("status_required", Language::Fr) => "requis",
+        ("status_required", Language::Es) => "requerido",
+        ("status_required", Language::It) => "richiesto",
+        ("status_required", Language::Ru) => "обязательно",
+        ("status_required", Language::Zh) => "必需",
+        ("status_required", Language::Ja) => "必須",
+        ("status_required", _) => "required",
+
+        ("status_optional", Language::Tr) => "opsiyonel",
+        ("status_optional", Language::De) => "optional",
+        ("status_optional", Language::Fr) => "optionnel",
+        ("status_optional", Language::Es) => "opcional",
+        ("status_optional", Language::It) => "opzionale",
+        ("status_optional", Language::Ru) => "опционально",
+        ("status_optional", Language::Zh) => "可选",
+        ("status_optional", Language::Ja) => "任意",
+        ("status_optional", _) => "optional",
+
+        ("err_missing_deps", Language::Tr) => {
+            "Zorunlu bağımlılıklar eksik; video/ses dönüşümleri çalışmaz."
+        }
+        ("err_missing_deps", Language::De) => {
+            "Erforderliche Abhängigkeiten fehlen; Konvertierungen können nicht fortgesetzt werden."
+        }
+        ("err_missing_deps", Language::Fr) => {
+            "Dépendances requises manquantes; les conversions ne peuvent pas continuer."
+        }
+        ("err_missing_deps", Language::Es) => {
+            "Faltan dependencias requeridas; no se pueden realizar las conversiones."
+        }
+        ("err_missing_deps", Language::It) => {
+            "Dipendenze necessarie mancanti; le conversioni non possono procedere."
+        }
+        ("err_missing_deps", Language::Ru) => {
+            "Необходимые зависимости отсутствуют; конвертация невозможна."
+        }
+        ("err_missing_deps", Language::Zh) => "缺少必需的依赖项；无法继续转换。",
+        ("err_missing_deps", Language::Ja) => {
+            "必要な依存関係が見つかりません。変換を続行できません。"
+        }
+        ("err_missing_deps", _) => "Required dependencies are missing; conversions cannot proceed.",
+
+        ("err_no_integrations_installed", Language::Tr) => {
+            "Hiçbir masaüstü entegrasyonu kurulamadı."
+        }
+        ("err_no_integrations_installed", Language::De) => {
+            "Es konnte keine Desktop-Integration installiert werden."
+        }
+        ("err_no_integrations_installed", Language::Fr) => {
+            "Aucune intégration de bureau n'a pu être installée."
+        }
+        ("err_no_integrations_installed", Language::Es) => {
+            "No se pudo instalar ninguna integración de escritorio."
+        }
+        ("err_no_integrations_installed", Language::It) => {
+            "Nessuna integrazione desktop installata."
+        }
+        ("err_no_integrations_installed", Language::Ru) => {
+            "Не удалось установить интеграции рабочего стола."
+        }
+        ("err_no_integrations_installed", Language::Zh) => "未能安装任何桌面集成。",
+        ("err_no_integrations_installed", Language::Ja) => {
+            "デスクトップ統合をインストールできませんでした。"
+        }
+        ("err_no_integrations_installed", _) => "No desktop integration could be installed.",
+
+        ("action_compress", Language::Tr) => "Sıkıştırma",
+        ("action_compress", Language::De) => "Komprimieren",
+        ("action_compress", Language::Fr) => "Compresser",
+        ("action_compress", Language::Es) => "Comprimir",
+        ("action_compress", Language::It) => "Comprimi",
+        ("action_compress", Language::Ru) => "Сжатие",
+        ("action_compress", Language::Zh) => "压缩",
+        ("action_compress", Language::Ja) => "圧縮",
+        ("action_compress", _) => "Compress",
+
+        ("action_resize", Language::Tr) => "Boyutlandırma",
+        ("action_resize", Language::De) => "Größe ändern",
+        ("action_resize", Language::Fr) => "Redimensionner",
+        ("action_resize", Language::Es) => "Redimensionar",
+        ("action_resize", Language::It) => "Ridimensiona",
+        ("action_resize", Language::Ru) => "Изменение размера",
+        ("action_resize", Language::Zh) => "缩放",
+        ("action_resize", Language::Ja) => "リサイズ",
+        ("action_resize", _) => "Resize",
+
+        ("action_strip_metadata", Language::Tr) => "Metadata Temizleme",
+        ("action_strip_metadata", Language::De) => "Metadaten entfernen",
+        ("action_strip_metadata", Language::Fr) => "Supprimer les métadonnées",
+        ("action_strip_metadata", Language::Es) => "Eliminar metadatos",
+        ("action_strip_metadata", Language::It) => "Rimuovi metadati",
+        ("action_strip_metadata", Language::Ru) => "Очистить метаданные",
+        ("action_strip_metadata", Language::Zh) => "清除元数据",
+        ("action_strip_metadata", Language::Ja) => "メタデータ削除",
+        ("action_strip_metadata", _) => "Strip Metadata",
+
+        ("action_target_size", Language::Tr) => "Hedef Boyut",
+        ("action_target_size", Language::De) => "Zielgröße",
+        ("action_target_size", Language::Fr) => "Taille cible",
+        ("action_target_size", Language::Es) => "Tamaño objetivo",
+        ("action_target_size", Language::It) => "Dimensione target",
+        ("action_target_size", Language::Ru) => "Целевой размер",
+        ("action_target_size", Language::Zh) => "目标大小",
+        ("action_target_size", Language::Ja) => "目標サイズ",
+        ("action_target_size", _) => "Target Size",
+
+        ("action_web_opt", Language::De) => "Web-Optimierung",
+        ("action_web_opt", Language::Fr) => "Optimisation Web",
+        ("action_web_opt", Language::Es) => "Optimizar para Web",
+        ("action_web_opt", Language::It) => "Ottimizzazione Web",
+        ("action_web_opt", Language::Ru) => "Оптимизация для Web",
+        ("action_web_opt", Language::Zh) => "网页优化",
+        ("action_web_opt", Language::Ja) => "ウェブ最適化",
+        ("action_web_opt", _) => "Web Optimize",
+
+        ("progress_processing", Language::Tr) => "İşleniyor",
+        ("progress_processing", Language::De) => "Verarbeitung",
+        ("progress_processing", Language::Fr) => "Traitement",
+        ("progress_processing", Language::Es) => "Procesando",
+        ("progress_processing", Language::It) => "Elaborazione",
+        ("progress_processing", Language::Ru) => "Обработка",
+        ("progress_processing", Language::Zh) => "正在处理",
+        ("progress_processing", Language::Ja) => "処理中",
+        ("progress_processing", _) => "Processing",
+
+        ("err_unexpected_exit", Language::Tr) => "Dönüştürme işlemi beklenmeyen şekilde sonlandı",
+        ("err_unexpected_exit", Language::De) => "Konvertierungsprozess unerwartet beendet",
+        ("err_unexpected_exit", Language::Fr) => {
+            "Le processus de conversion s'est terminé de manière inattendue"
+        }
+        ("err_unexpected_exit", Language::Es) => {
+            "El proceso de conversión finalizó inesperadamente"
+        }
+        ("err_unexpected_exit", Language::It) => {
+            "Processo di conversione terminato in modo imprevisto"
+        }
+        ("err_unexpected_exit", Language::Ru) => "Процесс конвертации неожиданно завершился",
+        ("err_unexpected_exit", Language::Zh) => "转换进程意外终止",
+        ("err_unexpected_exit", Language::Ja) => "変換処理が予期せず終了しました",
+        ("err_unexpected_exit", _) => "Conversion process terminated unexpectedly",
 
         // Notifications
         ("notify_done_single", Language::Tr) => "Dönüştürme Tamamlandı",
@@ -495,5 +664,22 @@ mod tests {
         assert_eq!(Language::from_code("en_US"), Some(Language::En));
         assert_eq!(Language::from_code("xx_YY"), None);
         assert_eq!(Language::from_code(""), None);
+    }
+
+    #[test]
+    fn test_t_lang_translations() {
+        assert_eq!(t_lang("status_ok", Language::En), "OK");
+        assert_eq!(t_lang("status_missing", Language::Tr), "EKSİK");
+        assert_eq!(t_lang("status_missing", Language::En), "MISSING");
+        assert_eq!(t_lang("action_compress", Language::Tr), "Sıkıştırma");
+        assert_eq!(t_lang("action_compress", Language::En), "Compress");
+        assert_eq!(
+            t_lang("action_to_svg", Language::Tr),
+            "SVG Olarak Vektörleştir"
+        );
+        assert_eq!(
+            t_lang("action_to_svg", Language::En),
+            "Trace to SVG (Vectorize)"
+        );
     }
 }

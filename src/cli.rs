@@ -116,6 +116,10 @@ pub struct Cli {
     #[arg(long = "check-deps")]
     pub check_deps: bool,
 
+    /// Override interface language (en, tr, de, fr, es, it, ru, zh, ja)
+    #[arg(long = "lang", value_name = "CODE")]
+    pub lang: Option<String>,
+
     /// Open Qt6 Settings GUI
     #[arg(short = 's', long = "settings")]
     pub settings: bool,

@@ -128,7 +128,8 @@ fn main() -> anyhow::Result<()> {
 
     logger::init(cli.verbose);
     let config = Config::load();
-    i18n::init(config.general.language.as_deref());
+    let chosen_lang = cli.lang.as_deref().or(config.general.language.as_deref());
+    i18n::init(chosen_lang);
 
     let notifier = Notifier::new(config.general.notification_enabled && !cli.no_notify);
 
@@ -173,15 +174,23 @@ fn main() -> anyhow::Result<()> {
     if cli.check_deps {
         let mut missing_required = false;
         for (tool, found, required, purpose) in deps::check() {
-            let status = if found { "OK" } else { "EKSİK" };
-            let role = if required { "gerekli" } else { "opsiyonel" };
+            let status = if found {
+                t("status_ok")
+            } else {
+                t("status_missing")
+            };
+            let role = if required {
+                t("status_required")
+            } else {
+                t("status_optional")
+            };
             println!("{:<10} {:<8} ({}) - {}", tool, status, role, purpose);
             if !found && required {
                 missing_required = true;
             }
         }
         if missing_required {
-            bail!("Zorunlu bağımlılıklar eksik; video/ses dönüşümleri çalışmaz.");
+            bail!("{}", t("err_missing_deps"));
         }
         return Ok(());
     }
@@ -225,12 +234,10 @@ fn main() -> anyhow::Result<()> {
             eprintln!("Installation failed ({}): {}", name, err);
         }
         if report.affected.is_empty() {
-            notifier.error(
-                t("notify_failed"),
-                "No desktop integration could be installed.",
-            );
+            notifier.error(t("notify_failed"), t("err_no_integrations_installed"));
             bail!(
-                "Hiçbir masaüstü entegrasyonu kurulamadı ({} hata)",
+                "{} ({} errors)",
+                t("err_no_integrations_installed"),
                 report.failed.len()
             );
         }
@@ -584,19 +591,23 @@ fn main() -> anyhow::Result<()> {
             .and_then(|s| s.to_str())
             .unwrap_or("dosya");
         let target_display = if target == "compress" {
-            "Sıkıştırma".to_string()
+            t("action_compress").to_string()
         } else if target == "discord_8mb" {
             "Discord (8 MB)".to_string()
         } else if target == "email_25mb" {
             "E-Posta (25 MB)".to_string()
         } else if target == "web_opt" {
-            "Web Optimize".to_string()
+            t("action_web_opt").to_string()
         } else if target.starts_with("resize_") {
-            format!("Boyutlandırma ({})", target.trim_start_matches("resize_"))
+            format!(
+                "{} ({})",
+                t("action_resize"),
+                target.trim_start_matches("resize_")
+            )
         } else if let Some(raw_size) = target.strip_prefix("target_") {
-            format!("Hedef Boyut ({})", raw_size.to_uppercase())
+            format!("{} ({})", t("action_target_size"), raw_size.to_uppercase())
         } else if target == "strip-metadata" {
-            "Metadata Temizleme".to_string()
+            t("action_strip_metadata").to_string()
         } else {
             target.to_uppercase()
         };
@@ -617,7 +628,7 @@ fn main() -> anyhow::Result<()> {
 
         let mut progress_val = 20;
         let progress_title = format!("Konvert: {}", target_display);
-        let progress_body = format!("İşleniyor: {}", file_name);
+        let progress_body = format!("{}: {}", t("progress_processing"), file_name);
 
         let convert_res = loop {
             match rx.recv_timeout(std::time::Duration::from_millis(300)) {
@@ -634,9 +645,7 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    break Err(anyhow::anyhow!(
-                        "Dönüştürme işlemi beklenmeyen şekilde sonlandı"
-                    ));
+                    break Err(anyhow::anyhow!("{}", t("err_unexpected_exit")));
                 }
             }
         };
