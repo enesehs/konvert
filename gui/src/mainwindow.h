@@ -9,6 +9,7 @@
 #include <QSpinBox>
 #include <QLabel>
 #include <QPushButton>
+#include <QLineEdit>
 #include <QTableWidget>
 #include <QHeaderView>
 #include "configmanager.h"
@@ -42,10 +43,12 @@ private:
     QWidget* createMusicTab();
     QWidget* createDocumentsTab();
     QWidget* createHistoryTab();
+    QWidget* createSettingsTab();
     QWidget* createAboutTab();
 
     void loadHistoryData();
     void clearHistoryData();
+    void updateProcessMonitor();
 
     QWidget* createCard(const QString &title, QWidget *contentWidget);
     QCheckBox* createActionCheckBox(const QString &id, const QString &label, const QString &tooltip, const QString &iconName, QWidget *parent);
@@ -82,9 +85,14 @@ private:
     QPushButton *m_previewDolphinBtn = nullptr;
     QString m_selectedOutputPath;
 
-    // General
+    // General & Settings
     QCheckBox *m_notifyCheck = nullptr;
     QComboBox *m_langCombo = nullptr;
+    QLineEdit *m_outputDirEdit = nullptr;
+    QLabel *m_processStatusLabel = nullptr;
+    QPushButton *m_cancelProcessBtn = nullptr;
+    QLabel *m_depsStatusLabel = nullptr;
+    QTimer *m_processMonitorTimer = nullptr;
     QTabWidget *m_rootTabWidget = nullptr;
     QTimer *m_saveTimer = nullptr;
 };

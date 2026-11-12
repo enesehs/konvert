@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 38'i tam, 9'u kısmi (~%63). P0 %100, P1 ~%78, P2 9/13, P3 11/15, P4 6,5/12, P5 1/12. Birim test sayısı 28 → 50. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-10/11/14, P5.
+> **İlerleme (2026-11-12):** 67 maddeden 42'si tam, 7'si kısmi (~%68). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 1/12. Birim test sayısı 28 → 50. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-13/14, P5.
 
 ---
 
@@ -317,9 +317,9 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P3-6 ✅ | ~~Önizleme tam boy çözülüyor~~ | `QImageReader` + `setScaledSize(72,72)` ve `setAutoTransform`; UI thread'i küçük görsel okuyor (2026-11-11) | S |
 | P3-7 ✅ | ~~Combo'lar config değerini yutuyor~~ | Preset ve bitrate değerleri listede yoksa eklenip seçiliyor (2026-11-11) | S |
 | P3-8 ✅ | ~~`QFile` include yok~~ | `<QFile>` ve `<QMessageBox>` eklendi (2026-11-11) | S |
-| P3-9 `[~]` | ~~Senkron `konvert`'i PATH'ten çağırıyor~~ | `applicationDirPath()` yanındaki binary tercih ediliyor, başarısızlık `qWarning` ile raporlanıyor (2026-11-11). **Kalan:** entegrasyon kur/kaldır UI'si + durum/bağımlılık paneli | M |
-| P3-10 | Genel ayarlar "Hakkında" sekmesinde gömülü | Ayrı "Ayarlar" sekmesi; çıktı klasörü seçici, dil, bildirim | S |
-| P3-11 | Çalışan işi izleme/iptal yok | PID + `history` durumundan "çalışıyor" göstergesi; `--cancel` butonu; 30 sn'de bir yenile | M |
+| P3-9 ✅ | ~~Senkron `konvert`'i PATH'ten çağırıyor~~ | Binary arama iyileştirildi; masaüstü entegrasyonu kur/kaldır UI'si ve bağımlılık kontrol paneli eklendi (2026-11-12) | M |
+| P3-10 ✅ | ~~Genel ayarlar "Hakkında" sekmesinde gömülü~~ | Ayrı "Ayarlar" sekmesi eklendi; çıktı klasörü seçici (gözat/sıfırla), dil, bildirim ve süreç izleme taşındı (2026-11-12) | S |
+| P3-11 ✅ | ~~Çalışan işi izleme/iptal yok~~ | `running.pid` ve süreç durumunu izleyen monitör eklendi; çalışan görevi `--cancel` ile sonlandırma butonu bağlandı (2026-11-12) | M |
 | P3-12 ✅ | ~~Kaydetme hataları sessiz~~ | `save()` dönüşü kontrol edilip `QMessageBox` ile bildiriliyor (2026-11-11); `QSaveFile` hâlâ yapılabilir | S |
 | P3-13 `[~]` | ~~Aynı anda iki GUI config'i eziyor~~ | `QLockFile` ile tek örnek (`konvert-settings.lock`) eklendi; **kalan:** `QFileSystemWatcher` ile dış değişiklikleri yeniden yükleme (2026-11-11) | M |
 | P3-14 | Erişilebilirlik ve çeviri: 106 satır içi `lang == "tr" ?` ternary; `lbl_video_crf` yalnız TR/EN | Tüm metinleri `translator.h` anahtarlarına taşı; `setBuddy`, sekme sırası, kısayollar, `F1` | M |
@@ -339,7 +339,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P4-4 | aarch64 vaat ediliyor ama CI yalnız x86_64 üretiyor (installer aarch64 URL'i 404) | `ubuntu-24.04-arm` runner veya `cross` ile matris; tarball adları `konvert-linux-<arch>` | M |
 | P4-5 ✅ | ~~Metainfo'da screenshot yok~~ | 3 ekran görüntüsü (bağlam menüsü, geçmiş, ayarlar) eklendi (2026-11-11) | S |
 | P4-6 `[~]` | ~~Flatpak `branch: main`~~ | `tag: v0.2.0` ile sabitlendi; **kalan:** CI'da Flatpak derleme işi + sandbox notu (2026-11-11) | M |
-| P4-7 | Repo'da izlenen eski `.deb` (`packaging/konvert_0.1-beta_amd64.deb`) | `git rm --cached`; yalnız release artefaktı | S |
+| P4-7 ✅ | ~~Repo'da izlenen eski `.deb` (`packaging/konvert_0.1-beta_amd64.deb`)~~ | `git rm` ile depodan kaldırıldı; release artefaktları git dışında tutuluyor (2026-11-12) | S |
 | P4-8 ✅ | ~~docs build hatası yutuluyor~~ | `next build && (cp … || true)` ile yalnız kopyalama hataları yutuluyor (2026-11-11) | S |
 | P4-9 | Uzak installer checksum doğrulamıyor (sha256 yayınlanıyor ama kullanılmıyor) ([docs/public/install.sh:80-105](docs/public/install.sh#L80-L105)) | İndirme sonrası `sha256sum -c`; imza doğrulama (minisign/cosign) opsiyonu | M |
 | P4-10 | İki ayrı installer (`scripts/install.sh` + `docs/public/install.sh`) sapıyor | Tek kaynak + build sırasında kopyalama; ortak `lib.sh` | M |

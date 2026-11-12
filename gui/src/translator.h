@@ -41,6 +41,13 @@ public:
             if (lang == "es") return "Acerca de";
             return "About";
         }
+        if (key == "tab_settings") {
+            if (lang == "tr") return "Ayarlar";
+            if (lang == "de") return "Einstellungen";
+            if (lang == "fr") return "Paramètres";
+            if (lang == "es") return "Configuración";
+            return "Settings";
+        }
 
         // --- CATEGORIES ---
         if (key == "cat_photos") {
@@ -108,6 +115,27 @@ public:
             if (lang == "es") return "Procesamiento de documentos";
             return "Document Processing";
         }
+        if (key == "card_general_settings") {
+            if (lang == "tr") return "Genel Tercihler";
+            if (lang == "de") return "Allgemeine Einstellungen";
+            if (lang == "fr") return "Préférences générales";
+            if (lang == "es") return "Preferencias generales";
+            return "General Preferences";
+        }
+        if (key == "card_process_monitor") {
+            if (lang == "tr") return "Aktif Görev İzleyici";
+            if (lang == "de") return "Aktive Prozessüberwachung";
+            if (lang == "fr") return "Surveillance des tâches";
+            if (lang == "es") return "Monitor de tareas activas";
+            return "Active Task Monitor";
+        }
+        if (key == "card_desktop_integration") {
+            if (lang == "tr") return "Masaüstü Entegrasyonları & Sistem Sağlığı";
+            if (lang == "de") return "Desktop-Integrationen & Systemstatus";
+            if (lang == "fr") return "Intégrations de bureau & Santé du système";
+            if (lang == "es") return "Integraciones de escritorio y estado";
+            return "Desktop Integrations & System Health";
+        }
 
         // --- COMMON LABELS & CONTROLS ---
         if (key == "lbl_photo_quality") {
@@ -126,6 +154,9 @@ public:
         }
         if (key == "lbl_video_crf") {
             if (lang == "tr") return "CRF Kalitesi:";
+            if (lang == "de") return "CRF-Qualität:";
+            if (lang == "fr") return "Qualité CRF :";
+            if (lang == "es") return "Calidad CRF:";
             return "CRF Quality:";
         }
         if (key == "lbl_video_preset") {
@@ -156,6 +187,34 @@ public:
             if (lang == "es") return "Resolución de renderizado PDF (DPI):";
             return "PDF Render Resolution (DPI):";
         }
+        if (key == "lbl_output_dir") {
+            if (lang == "tr") return "Varsayılan Çıktı Klasörü:";
+            if (lang == "de") return "Standard-Ausgabeverzeichnis:";
+            if (lang == "fr") return "Dossier de sortie par défaut :";
+            if (lang == "es") return "Carpeta de salida predeterminada:";
+            return "Default Output Directory:";
+        }
+        if (key == "lbl_output_dir_default") {
+            if (lang == "tr") return "Varsayılan (Girdi dosyasının bulunduğu klasör)";
+            if (lang == "de") return "Standard (Ordner der Eingabedatei)";
+            if (lang == "fr") return "Par défaut (Dossier du fichier source)";
+            if (lang == "es") return "Predeterminado (Carpeta del archivo origen)";
+            return "Default (Same directory as input file)";
+        }
+        if (key == "lbl_process_idle") {
+            if (lang == "tr") return "Durum: Boşta (Aktif işlem yok)";
+            if (lang == "de") return "Status: Leerlauf (Keine aktive Konvertierung)";
+            if (lang == "fr") return "État : Inactif (Aucune conversion en cours)";
+            if (lang == "es") return "Estado: Inactivo (Sin tareas en curso)";
+            return "Status: Idle (No active conversion)";
+        }
+        if (key == "lbl_process_running") {
+            if (lang == "tr") return "Durum: Dönüştürme çalışıyor (PID: %1)";
+            if (lang == "de") return "Status: Konvertierung läuft (PID: %1)";
+            if (lang == "fr") return "État : Conversion en cours (PID : %1)";
+            if (lang == "es") return "Estado: Conversión en curso (PID: %1)";
+            return "Status: Conversion in progress (PID: %1)";
+        }
         if (key == "lbl_notifications") {
             if (lang == "tr") return "Sistem Bildirimlerini Göster";
             if (lang == "de") return "Systembenachrichtigungen anzeigen";
@@ -172,6 +231,48 @@ public:
         }
 
         // --- BUTTONS ---
+        if (key == "btn_browse") {
+            if (lang == "tr") return "Gözat...";
+            if (lang == "de") return "Durchsuchen...";
+            if (lang == "fr") return "Parcourir...";
+            if (lang == "es") return "Examinar...";
+            return "Browse...";
+        }
+        if (key == "btn_reset") {
+            if (lang == "tr") return "Sıfırla";
+            if (lang == "de") return "Zurücksetzen";
+            if (lang == "fr") return "Réinitialiser";
+            if (lang == "es") return "Restablecer";
+            return "Reset";
+        }
+        if (key == "btn_cancel_process") {
+            if (lang == "tr") return "Görevi İptal Et";
+            if (lang == "de") return "Aufgabe abbrechen";
+            if (lang == "fr") return "Annuler la tâche";
+            if (lang == "es") return "Cancelar tarea";
+            return "Cancel Task";
+        }
+        if (key == "btn_install_integration") {
+            if (lang == "tr") return "Entegrasyonları Kur";
+            if (lang == "de") return "Integrationen installieren";
+            if (lang == "fr") return "Installer les intégrations";
+            if (lang == "es") return "Instalar integraciones";
+            return "Install Integrations";
+        }
+        if (key == "btn_uninstall_integration") {
+            if (lang == "tr") return "Entegrasyonları Kaldır";
+            if (lang == "de") return "Integrationen entfernen";
+            if (lang == "fr") return "Désinstaller les intégrations";
+            if (lang == "es") return "Desinstalar integraciones";
+            return "Uninstall Integrations";
+        }
+        if (key == "btn_check_deps") {
+            if (lang == "tr") return "Bağımlılıkları Denetle";
+            if (lang == "de") return "Abhängigkeiten prüfen";
+            if (lang == "fr") return "Vérifier les dépendances";
+            if (lang == "es") return "Comprobar dependencias";
+            return "Check Dependencies";
+        }
         if (key == "btn_refresh") {
             if (lang == "tr") return "Yenile";
             if (lang == "de") return "Aktualisieren";

@@ -28,10 +28,64 @@
 #include <QMessageBox>
 #include <QCloseEvent>
 #include <QImageReader>
+#include <QFileDialog>
 
 #ifndef KONVERT_APP_VERSION
 #define KONVERT_APP_VERSION "v0.1-beta"
 #endif
+
+static QString findKonvertBinary() {
+    QString program = "konvert";
+    const QFileInfo sibling(QDir(QCoreApplication::applicationDirPath()).filePath("konvert"));
+    if (sibling.exists() && sibling.isExecutable()) {
+        return sibling.absoluteFilePath();
+    }
+    const QFileInfo cargoSibling(QDir(QCoreApplication::applicationDirPath()).filePath("../../target/release/konvert"));
+    if (cargoSibling.exists() && cargoSibling.isExecutable()) {
+        return cargoSibling.canonicalFilePath();
+    }
+    const QFileInfo cargoDebugSibling(QDir(QCoreApplication::applicationDirPath()).filePath("../../target/debug/konvert"));
+    if (cargoDebugSibling.exists() && cargoDebugSibling.isExecutable()) {
+        return cargoDebugSibling.canonicalFilePath();
+    }
+    return program;
+}
+
+static QString getPidFilePath() {
+    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
+    return QDir(cacheDir).filePath("konvert/running.pid");
+}
+
+static qint64 getActiveKonvertPid() {
+    QString pidPath = getPidFilePath();
+    QFile file(pidPath);
+    if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return 0;
+    }
+    QTextStream in(&file);
+    QString pidStr = in.readLine().trimmed();
+    bool ok = false;
+    qint64 pid = pidStr.toLongLong(&ok);
+    if (!ok || pid <= 0) {
+        return 0;
+    }
+
+    QFile commFile(QString("/proc/%1/comm").arg(pid));
+    if (commFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QString comm = QTextStream(&commFile).readLine().trimmed();
+        if (comm == "konvert") {
+            return pid;
+        }
+    }
+    QFileInfo exeInfo(QString("/proc/%1/exe").arg(pid));
+    if (exeInfo.exists()) {
+        QString symlink = exeInfo.symLinkTarget();
+        if (symlink.contains("konvert") && !symlink.contains("konvert-settings")) {
+            return pid;
+        }
+    }
+    return 0;
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -43,6 +97,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_saveTimer->setSingleShot(true);
     m_saveTimer->setInterval(400);
     connect(m_saveTimer, &QTimer::timeout, this, &MainWindow::saveSettingsNow);
+
+    m_processMonitorTimer = new QTimer(this);
+    m_processMonitorTimer->setInterval(2000);
+    connect(m_processMonitorTimer, &QTimer::timeout, this, &MainWindow::updateProcessMonitor);
+    m_processMonitorTimer->start();
+
     setWindowTitle("Konvert");
     setWindowIcon(QIcon(":/logo.svg"));
     resize(700, 740);
@@ -148,12 +208,15 @@ void MainWindow::setupUi() {
     const QString lang = currentLanguage();
     m_rootTabWidget->addTab(createConvertTab(), QIcon::fromTheme("document-edit-symbolic"), trKey("tab_convert", lang));
     const int historyTabIndex = m_rootTabWidget->addTab(createHistoryTab(), QIcon::fromTheme("view-history-symbolic"), trKey("tab_history", lang));
+    const int settingsTabIndex = m_rootTabWidget->addTab(createSettingsTab(), QIcon::fromTheme("configure-symbolic", QIcon::fromTheme("preferences-system-symbolic")), trKey("tab_settings", lang));
     m_rootTabWidget->addTab(createAboutTab(), QIcon::fromTheme("help-about-symbolic"), trKey("tab_about", lang));
 
     // CLI'den yapılan dönüşümler sekme açılınca görünsün.
-    connect(m_rootTabWidget, &QTabWidget::currentChanged, this, [this, historyTabIndex](int index) {
+    connect(m_rootTabWidget, &QTabWidget::currentChanged, this, [this, historyTabIndex, settingsTabIndex](int index) {
         if (index == historyTabIndex) {
             loadHistoryData();
+        } else if (index == settingsTabIndex) {
+            updateProcessMonitor();
         }
     });
 
@@ -1186,19 +1249,54 @@ QWidget* MainWindow::createAboutTab() {
     aboutTabs->addTab(licWidget, trKey("about_tab_license", lang));
 
     layout->addWidget(aboutTabs);
+    layout->addStretch();
 
-    // 3. General Preferences Card (Language Dropdown & Notifications - Clean & Emojisiz)
-    auto *prefWidget = new QWidget(container);
-    auto *prefLayout = new QVBoxLayout(prefWidget);
-    prefLayout->setContentsMargins(4, 4, 4, 4);
-    prefLayout->setSpacing(10);
+    scroll->setWidget(container);
+    return scroll;
+}
 
-    // Language selector row
+void MainWindow::updateProcessMonitor() {
+    if (!m_processStatusLabel || !m_cancelProcessBtn) return;
+    const QString lang = currentLanguage();
+    qint64 pid = getActiveKonvertPid();
+    if (pid > 0) {
+        m_processStatusLabel->setText(
+            QString("<span style='color: #27ae60; font-weight: bold;'>●</span> %1")
+                .arg(trKey("lbl_process_running", lang).arg(pid))
+        );
+        m_cancelProcessBtn->setEnabled(true);
+    } else {
+        m_processStatusLabel->setText(
+            QString("<span style='color: #7f8c8d;'>○</span> %1")
+                .arg(trKey("lbl_process_idle", lang))
+        );
+        m_cancelProcessBtn->setEnabled(false);
+    }
+}
+
+QWidget* MainWindow::createSettingsTab() {
+    const QString lang = currentLanguage();
+    auto *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+
+    auto *container = new QWidget();
+    auto *layout = new QVBoxLayout(container);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(12);
+
+    // --- Card 1: General Preferences ---
+    auto *genWidget = new QWidget(container);
+    auto *genLayout = new QVBoxLayout(genWidget);
+    genLayout->setContentsMargins(4, 4, 4, 4);
+    genLayout->setSpacing(12);
+
+    // Language row
     auto *langRow = new QHBoxLayout();
-    auto *lblLang = new QLabel(QString("<b>%1</b>").arg(trKey("lbl_language", lang)), prefWidget);
+    auto *lblLang = new QLabel(QString("<b>%1</b>").arg(trKey("lbl_language", lang)), genWidget);
     langRow->addWidget(lblLang);
 
-    m_langCombo = new QComboBox(prefWidget);
+    m_langCombo = new QComboBox(genWidget);
     m_langCombo->addItem(lang == "tr" ? "Otomatik Algıla (Sistem Dili)" : "Auto Detect (System)", "auto");
     m_langCombo->addItem("Türkçe", "tr");
     m_langCombo->addItem("English", "en");
@@ -1218,21 +1316,184 @@ QWidget* MainWindow::createAboutTab() {
 
     langRow->addWidget(m_langCombo);
     langRow->addStretch();
-    prefLayout->addLayout(langRow);
+    genLayout->addLayout(langRow);
 
-    m_notifyCheck = new QCheckBox(trKey("lbl_notifications", lang), prefWidget);
+    // Notification checkbox
+    m_notifyCheck = new QCheckBox(trKey("lbl_notifications", lang), genWidget);
     m_notifyCheck->setToolTip(lang == "tr" ? "Dönüştürme esnasında yerel ilerleme çubuğu ve D-Bus bildirimlerini gösterir." : "Displays real-time D-Bus notification with progress bar during conversion.");
     m_notifyCheck->setChecked(m_config.notificationEnabled);
     connect(m_notifyCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_config.notificationEnabled = checked;
         saveSettings();
     });
-    prefLayout->addWidget(m_notifyCheck);
+    genLayout->addWidget(m_notifyCheck);
 
-    layout->addWidget(createCard(lang == "tr" ? "Tercihler" : "Preferences", prefWidget));
+    // Output Directory selector (P3-10)
+    auto *outDirLabel = new QLabel(QString("<b>%1</b>").arg(trKey("lbl_output_dir", lang)), genWidget);
+    genLayout->addWidget(outDirLabel);
+
+    auto *outDirRow = new QHBoxLayout();
+    m_outputDirEdit = new QLineEdit(genWidget);
+    m_outputDirEdit->setReadOnly(true);
+    m_outputDirEdit->setPlaceholderText(trKey("lbl_output_dir_default", lang));
+    m_outputDirEdit->setText(m_config.outputDirectory);
+    m_outputDirEdit->setToolTip(lang == "tr" ? "Dönüştürülen tüm dosyaların kaydedileceği varsayılan klasör. Boş bırakıldığında girdi dosyasıyla aynı klasöre kaydedilir."
+                                            : "Default directory where converted files will be saved. If left empty, files are saved in the same folder as the input file.");
+    outDirRow->addWidget(m_outputDirEdit);
+
+    auto *browseBtn = new QPushButton(QIcon::fromTheme("document-open-symbolic"), trKey("btn_browse", lang), genWidget);
+    connect(browseBtn, &QPushButton::clicked, this, [this]() {
+        const QString lang = currentLanguage();
+        QString initial = m_config.outputDirectory.isEmpty() ? QDir::homePath() : m_config.outputDirectory;
+        QString dir = QFileDialog::getExistingDirectory(this, trKey("lbl_output_dir", lang), initial);
+        if (!dir.isEmpty()) {
+            m_config.outputDirectory = dir;
+            m_outputDirEdit->setText(dir);
+            saveSettings();
+        }
+    });
+    outDirRow->addWidget(browseBtn);
+
+    auto *resetBtn = new QPushButton(QIcon::fromTheme("edit-clear-symbolic"), trKey("btn_reset", lang), genWidget);
+    connect(resetBtn, &QPushButton::clicked, this, [this]() {
+        m_config.outputDirectory = "";
+        m_outputDirEdit->clear();
+        saveSettings();
+    });
+    outDirRow->addWidget(resetBtn);
+
+    genLayout->addLayout(outDirRow);
+    layout->addWidget(createCard(trKey("card_general_settings", lang), genWidget));
+
+    // --- Card 2: Active Process Monitor (P3-11) ---
+    auto *monitorWidget = new QWidget(container);
+    auto *monitorLayout = new QVBoxLayout(monitorWidget);
+    monitorLayout->setContentsMargins(4, 4, 4, 4);
+    monitorLayout->setSpacing(10);
+
+    auto *statusRow = new QHBoxLayout();
+    m_processStatusLabel = new QLabel(monitorWidget);
+    m_processStatusLabel->setStyleSheet("font-size: 13px;");
+    statusRow->addWidget(m_processStatusLabel);
+    statusRow->addStretch();
+
+    m_cancelProcessBtn = new QPushButton(QIcon::fromTheme("process-stop-symbolic"), trKey("btn_cancel_process", lang), monitorWidget);
+    m_cancelProcessBtn->setEnabled(false);
+    connect(m_cancelProcessBtn, &QPushButton::clicked, this, [this]() {
+        const QString lang = currentLanguage();
+        QProcess proc;
+        proc.start(findKonvertBinary(), {"--cancel"});
+        if (proc.waitForFinished(3000)) {
+            QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+            if (out.isEmpty()) {
+                out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+            }
+            if (!out.isEmpty()) {
+                QMessageBox::information(this, trKey("btn_cancel_process", lang), out);
+            }
+        }
+        updateProcessMonitor();
+        loadHistoryData();
+    });
+    statusRow->addWidget(m_cancelProcessBtn);
+    monitorLayout->addLayout(statusRow);
+    layout->addWidget(createCard(trKey("card_process_monitor", lang), monitorWidget));
+
+    // --- Card 3: Desktop Integration & System Dependencies (P3-9) ---
+    auto *deskWidget = new QWidget(container);
+    auto *deskLayout = new QVBoxLayout(deskWidget);
+    deskLayout->setContentsMargins(4, 4, 4, 4);
+    deskLayout->setSpacing(10);
+
+    auto *deskDesc = new QLabel(
+        lang == "tr" ? "KDE Dolphin, GNOME Nautilus, Cinnamon Nemo ve XFCE Thunar dosya yöneticisi entegrasyonlarını kurabilir veya kaldırabilirsiniz."
+                     : "Install or remove context menu integrations for KDE Dolphin, GNOME Nautilus, Cinnamon Nemo, and XFCE Thunar.",
+        deskWidget
+    );
+    deskDesc->setWordWrap(true);
+    deskLayout->addWidget(deskDesc);
+
+    auto *btnRow = new QHBoxLayout();
+    auto *installBtn = new QPushButton(QIcon::fromTheme("system-software-install-symbolic"), trKey("btn_install_integration", lang), deskWidget);
+    connect(installBtn, &QPushButton::clicked, this, [this]() {
+        const QString lang = currentLanguage();
+        QProcess proc;
+        proc.start(findKonvertBinary(), {"--install-all"});
+        if (proc.waitForFinished(5000)) {
+            QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+            if (out.isEmpty()) {
+                out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+            }
+            if (out.isEmpty()) {
+                out = lang == "tr" ? "Entegrasyonlar başarıyla kuruldu." : "Integrations installed successfully.";
+            }
+            QMessageBox::information(this, trKey("btn_install_integration", lang), out);
+        } else {
+            QMessageBox::warning(this, trKey("btn_install_integration", lang),
+                lang == "tr" ? "İşlem zaman aşımına uğradı veya başlatılamadı." : "Operation timed out or failed to start.");
+        }
+    });
+    btnRow->addWidget(installBtn);
+
+    auto *uninstallBtn = new QPushButton(QIcon::fromTheme("edit-delete-symbolic"), trKey("btn_uninstall_integration", lang), deskWidget);
+    connect(uninstallBtn, &QPushButton::clicked, this, [this]() {
+        const QString lang = currentLanguage();
+        auto reply = QMessageBox::question(
+            this,
+            trKey("btn_uninstall_integration", lang),
+            lang == "tr" ? "Konvert sağ tık menüsü eylemlerini tüm dosya yöneticilerinden kaldırmak istediğinize emin misiniz?"
+                         : "Are you sure you want to remove Konvert context menu actions from all file managers?",
+            QMessageBox::Yes | QMessageBox::No
+        );
+        if (reply == QMessageBox::Yes) {
+            QProcess proc;
+            proc.start(findKonvertBinary(), {"--uninstall-all"});
+            if (proc.waitForFinished(5000)) {
+                QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+                if (out.isEmpty()) {
+                    out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+                }
+                if (out.isEmpty()) {
+                    out = lang == "tr" ? "Entegrasyonlar kaldırıldı." : "Integrations uninstalled.";
+                }
+                QMessageBox::information(this, trKey("btn_uninstall_integration", lang), out);
+            }
+        }
+    });
+    btnRow->addWidget(uninstallBtn);
+
+    auto *checkDepsBtn = new QPushButton(QIcon::fromTheme("system-run-symbolic"), trKey("btn_check_deps", lang), deskWidget);
+    connect(checkDepsBtn, &QPushButton::clicked, this, [this]() {
+        const QString lang = currentLanguage();
+        QProcess proc;
+        proc.start(findKonvertBinary(), {"--check-deps"});
+        if (proc.waitForFinished(5000)) {
+            QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
+            if (out.isEmpty()) {
+                out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+            }
+            if (m_depsStatusLabel) {
+                m_depsStatusLabel->setText(QString("<pre style='margin:0; font-size:11px;'>%1</pre>").arg(out.toHtmlEscaped()));
+                m_depsStatusLabel->setVisible(true);
+            }
+        }
+    });
+    btnRow->addWidget(checkDepsBtn);
+    btnRow->addStretch();
+    deskLayout->addLayout(btnRow);
+
+    m_depsStatusLabel = new QLabel(deskWidget);
+    m_depsStatusLabel->setTextFormat(Qt::RichText);
+    m_depsStatusLabel->setStyleSheet("background: palette(base); border: 1px solid palette(midlight); border-radius: 4px; padding: 8px;");
+    m_depsStatusLabel->setVisible(false);
+    deskLayout->addWidget(m_depsStatusLabel);
+
+    layout->addWidget(createCard(trKey("card_desktop_integration", lang), deskWidget));
+
     layout->addStretch();
-
     scroll->setWidget(container);
+
+    updateProcessMonitor();
     return scroll;
 }
 
@@ -1266,6 +1527,10 @@ void MainWindow::captureScreenshots(const QString &outputDir) {
         grab().save(QDir(outputDir).filePath("screenshot_history.png"));
 
         m_rootTabWidget->setCurrentIndex(2);
+        QApplication::processEvents();
+        grab().save(QDir(outputDir).filePath("screenshot_settings.png"));
+
+        m_rootTabWidget->setCurrentIndex(3);
         QApplication::processEvents();
         grab().save(QDir(outputDir).filePath("screenshot_about.png"));
     }
