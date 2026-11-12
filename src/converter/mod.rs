@@ -278,6 +278,85 @@ pub fn plan_output_path(
     Ok((final_path, exists))
 }
 
+/// Klasörleri özyinelemeli (recursive) tarayarak hedef eylemle uyumlu dosyaları toplar.
+pub fn expand_files_recursive(
+    files: &[PathBuf],
+    target_action: Option<&TargetAction>,
+) -> Vec<PathBuf> {
+    let mut collected = Vec::new();
+    for path in files {
+        if path.is_file() {
+            collected.push(path.clone());
+        } else if path.is_dir() {
+            collect_dir_recursive(path, target_action, &mut collected);
+        }
+    }
+    collected.sort();
+    collected.dedup();
+    collected
+}
+
+fn collect_dir_recursive(
+    dir: &Path,
+    target_action: Option<&TargetAction>,
+    out: &mut Vec<PathBuf>,
+) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let p = entry.path();
+        if let Some(name) = p.file_name().and_then(|s| s.to_str())
+            && name.starts_with('.')
+        {
+            continue;
+        }
+        if p.is_dir() {
+            collect_dir_recursive(&p, target_action, out);
+        } else if p.is_file() {
+            let ext = p
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase();
+            let is_match = match target_action {
+                Some(TargetAction::Convert(target_fmt)) => {
+                    if is_image_ext(target_fmt) || target_fmt == "pdf" {
+                        is_image_ext(&ext) || ext == "docx" || ext == "udf" || ext == "pdf"
+                    } else if is_video_ext(target_fmt) {
+                        is_video_ext(&ext)
+                    } else if is_audio_ext(target_fmt) {
+                        is_audio_ext(&ext) || is_video_ext(&ext)
+                    } else {
+                        is_image_ext(&ext) || is_video_ext(&ext) || is_audio_ext(&ext)
+                    }
+                }
+                Some(TargetAction::Compress) => {
+                    is_image_ext(&ext) || is_video_ext(&ext) || ext == "pdf"
+                }
+                Some(TargetAction::StripMetadata) => {
+                    is_image_ext(&ext) || is_video_ext(&ext) || is_audio_ext(&ext)
+                }
+                Some(TargetAction::TargetSize(_)) => {
+                    is_image_ext(&ext) || is_video_ext(&ext) || ext == "pdf"
+                }
+                Some(TargetAction::WebOpt) => is_image_ext(&ext) || is_video_ext(&ext),
+                Some(TargetAction::Resize(_)) => is_image_ext(&ext),
+                Some(TargetAction::ExtractAudio)
+                | Some(TargetAction::Frames)
+                | Some(TargetAction::Gif) => is_video_ext(&ext),
+                Some(TargetAction::AudioToVideo) => is_audio_ext(&ext),
+                None => {
+                    is_image_ext(&ext) || is_video_ext(&ext) || is_audio_ext(&ext) || ext == "pdf"
+                }
+            };
+            if is_match {
+                out.push(p);
+            }
+        }
+    }
+}
+
 static FORCE_OVERWRITE: AtomicBool = AtomicBool::new(false);
 static JOB_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
@@ -1079,5 +1158,36 @@ mod tests {
 
         let _ = fs::remove_file(in_file);
         let _ = fs::remove_file(existing_out);
+    }
+
+    #[test]
+    fn test_expand_files_recursive_finds_nested_files() {
+        let temp_dir = std::env::temp_dir().join("konvert_test_rec_expand");
+        let sub_dir = temp_dir.join("sub");
+        let hidden_dir = temp_dir.join(".hidden");
+        fs::create_dir_all(&sub_dir).unwrap();
+        fs::create_dir_all(&hidden_dir).unwrap();
+
+        let img1 = temp_dir.join("pic1.png");
+        let img2 = sub_dir.join("pic2.jpg");
+        let doc = sub_dir.join("doc.docx");
+        let hidden_img = hidden_dir.join("secret.png");
+        let txt = temp_dir.join("note.txt");
+
+        fs::write(&img1, b"1").unwrap();
+        fs::write(&img2, b"2").unwrap();
+        fs::write(&doc, b"3").unwrap();
+        fs::write(&hidden_img, b"hidden").unwrap();
+        fs::write(&txt, b"txt").unwrap();
+
+        let action = TargetAction::Convert("webp".to_string());
+        let expanded = expand_files_recursive(std::slice::from_ref(&temp_dir), Some(&action));
+
+        assert!(expanded.contains(&img1));
+        assert!(expanded.contains(&img2));
+        assert!(!expanded.contains(&hidden_img));
+        assert!(!expanded.contains(&txt));
+
+        let _ = fs::remove_dir_all(temp_dir);
     }
 }

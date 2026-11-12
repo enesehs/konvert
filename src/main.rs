@@ -309,15 +309,25 @@ fn main() -> anyhow::Result<()> {
 
     // 1. Merge images into single PDF
     if cli.merge_pdf {
+        let files = if cli.recursive {
+            converter::expand_files_recursive(&cli.files, None)
+        } else {
+            cli.files.clone()
+        };
+        if files.is_empty() {
+            eprintln!("Error: No input files found to merge into PDF.");
+            std::process::exit(1);
+        }
+
         if cli.dry_run {
-            println!("[Dry Run] Planning merge into single PDF ({} input files):", cli.files.len());
-            let first_stem = cli.files.first()
+            println!("[Dry Run] Planning merge into single PDF ({} input files):", files.len());
+            let first_stem = files.first()
                 .and_then(|f| f.file_stem())
                 .and_then(|s| s.to_str())
                 .unwrap_or("images");
-            let target_dir = converter::get_output_dir(&cli.files[0], custom_output_dir.as_deref());
+            let target_dir = converter::get_output_dir(&files[0], custom_output_dir.as_deref());
             let out_pdf = target_dir.join(format!("{}_merged.pdf", first_stem));
-            for (i, f) in cli.files.iter().enumerate() {
+            for (i, f) in files.iter().enumerate() {
                 println!("  {:2}. {}", i + 1, f.display());
             }
             println!("  ➔ Output: {}", out_pdf.display());
@@ -327,15 +337,15 @@ fn main() -> anyhow::Result<()> {
         }
 
         write_pid_lock();
-        let orig_bytes: u64 = cli.files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
+        let orig_bytes: u64 = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
         let mut progress_handle = notifier.start_progress(
             "Konvert: Merging PDF...",
-            &format!("Scanning {} images...", cli.files.len()),
+            &format!("Scanning {} images...", files.len()),
             15,
         );
 
         let (tx, rx) = std::sync::mpsc::channel();
-        let merge_files = cli.files.clone();
+        let merge_files = files.clone();
         let merge_out_dir = custom_output_dir.clone();
         std::thread::spawn(move || {
             let res = converter::merge_images_to_pdf(&merge_files, merge_out_dir.as_deref());
@@ -344,7 +354,7 @@ fn main() -> anyhow::Result<()> {
 
         let mut progress_val = 20;
         let progress_title = "Konvert: PDF Birleştiriliyor...".to_string();
-        let progress_body = format!("{} görsel birleştiriliyor...", cli.files.len());
+        let progress_body = format!("{} görsel birleştiriliyor...", files.len());
 
         let merge_res = loop {
             match rx.recv_timeout(std::time::Duration::from_millis(300)) {
@@ -439,7 +449,18 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let files: Vec<PathBuf> = cli.files;
+    let target_action = converter::TargetAction::parse(&target).ok();
+    let files: Vec<PathBuf> = if cli.recursive {
+        converter::expand_files_recursive(&cli.files, target_action.as_ref())
+    } else {
+        cli.files
+    };
+
+    if files.is_empty() {
+        eprintln!("Error: No input files found to convert.");
+        std::process::exit(1);
+    }
+
     let total_count = files.len();
     let cores = std::thread::available_parallelism()
         .map(|n| n.get())

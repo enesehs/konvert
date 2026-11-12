@@ -33,6 +33,10 @@ pub struct Cli {
     #[arg(long = "dry-run")]
     pub dry_run: bool,
 
+    /// Recursively scan directories for input files
+    #[arg(short = 'r', long = "recursive")]
+    pub recursive: bool,
+
     /// Maximum number of files converted in parallel (default: CPU cores, capped at 4)
     #[arg(short = 'j', long = "jobs", value_name = "N", value_parser = parse_jobs)]
     pub jobs: Option<usize>,
