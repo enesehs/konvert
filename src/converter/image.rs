@@ -154,8 +154,12 @@ pub fn convert_image(
     ));
     ensure_parent_dir(&output_path)?;
 
-    // SVG (.svg)
+    // SVG (.svg) - Bitmap görseller potrace üzerinden vektörleştirilir
     if target_lower == "svg" {
+        crate::logger::info(&format!(
+            "Tracing raster image to vector SVG via ImageMagick/potrace: {}",
+            input_path.display()
+        ));
         let pending = crate::converter::PendingOutput::new(&output_path);
         let status = crate::converter::run_imagemagick(&[
             input_path.as_os_str(),

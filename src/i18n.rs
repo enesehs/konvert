@@ -437,6 +437,16 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("action_to_jpg", Language::Ja) => "JPGに変換",
         ("action_to_jpg", _) => "Convert to JPG",
 
+        ("action_to_svg", Language::Tr) => "SVG Olarak Vektörleştir",
+        ("action_to_svg", Language::De) => "In SVG vektorisieren",
+        ("action_to_svg", Language::Fr) => "Vectoriser en SVG",
+        ("action_to_svg", Language::Es) => "Vectorizar a SVG",
+        ("action_to_svg", Language::It) => "Vettorizza in SVG",
+        ("action_to_svg", Language::Ru) => "Векторизовать в SVG",
+        ("action_to_svg", Language::Zh) => "矢量化为 SVG",
+        ("action_to_svg", Language::Ja) => "SVGにベクター変換",
+        ("action_to_svg", _) => "Trace to SVG (Vectorize)",
+
         ("action_to_avif", Language::Tr) => "AVIF'e Dönüştür",
         ("action_to_avif", Language::De) => "In AVIF umwandeln",
         ("action_to_avif", Language::Fr) => "Convertir en AVIF",

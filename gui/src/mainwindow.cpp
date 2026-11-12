@@ -314,8 +314,8 @@ QWidget* MainWindow::createPhotosTab() {
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_svg",
-        lang == "tr" ? "SVG'ye Dönüştür" : "Convert to SVG",
-        lang == "tr" ? "Görseli ölçeklenebilir vektör grafiği formatına dönüştürür." : "Converts image to scalable vector graphic format.",
+        lang == "tr" ? "SVG Olarak Vektörleştir" : "Trace to SVG (Vectorize)",
+        lang == "tr" ? "Görseli potrace ile izleyerek ölçeklenebilir vektör (SVG) grafiğine dönüştürür." : "Traces raster image to scalable vector graphic (SVG) format using potrace.",
         "konvert-image",
         actionsWidget
     ), 2, 1);
