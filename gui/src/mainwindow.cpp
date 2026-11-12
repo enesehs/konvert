@@ -103,6 +103,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_processMonitorTimer, &QTimer::timeout, this, &MainWindow::updateProcessMonitor);
     m_processMonitorTimer->start();
 
+    setupConfigWatcher();
+
     setWindowTitle("Konvert");
     setWindowIcon(QIcon(":/logo.svg"));
     resize(700, 740);
@@ -1556,6 +1558,7 @@ void MainWindow::saveSettings() {
 }
 
 void MainWindow::saveSettingsNow() {
+    m_isSavingConfig = true;
     if (!m_config.save()) {
         const QString lang = currentLanguage();
         QMessageBox::warning(
@@ -1563,6 +1566,60 @@ void MainWindow::saveSettingsNow() {
             lang == "tr" ? "Ayarlar kaydedilemedi" : "Could not save settings",
             lang == "tr" ? "Ayar dosyası yazılamadı. Disk izinlerini kontrol edin."
                          : "The settings file could not be written. Check file permissions.");
+    }
+    if (m_configWatcher) {
+        m_configWatcher->addPath(ConfigManager::getConfigPath());
+    }
+    QTimer::singleShot(250, this, [this]() {
+        m_isSavingConfig = false;
+    });
+}
+
+void MainWindow::setupConfigWatcher() {
+    QString configPath = ConfigManager::getConfigPath();
+    if (!QFile::exists(configPath)) {
+        return;
+    }
+    if (!m_configWatcher) {
+        m_configWatcher = new QFileSystemWatcher(this);
+    }
+    m_configWatcher->addPath(configPath);
+    connect(m_configWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &path) {
+        if (m_configWatcher && QFile::exists(path)) {
+            m_configWatcher->addPath(path);
+        }
+        if (m_isSavingConfig) {
+            return;
+        }
+        reloadConfigToUi();
+    });
+}
+
+void MainWindow::reloadConfigToUi() {
+    m_config.load();
+    if (m_photoQualitySlider) m_photoQualitySlider->setValue(m_config.imageQuality);
+    if (m_photoLosslessCheck) m_photoLosslessCheck->setChecked(m_config.imageLossless);
+    if (m_videoCrfSlider) m_videoCrfSlider->setValue(m_config.videoCrf);
+    if (m_videoPresetCombo) {
+        int idx = m_videoPresetCombo->findText(m_config.videoPreset);
+        if (idx >= 0) m_videoPresetCombo->setCurrentIndex(idx);
+    }
+    if (m_videoLosslessCheck) m_videoLosslessCheck->setChecked(m_config.videoLossless);
+    if (m_audioBitrateCombo) {
+        int idx = m_audioBitrateCombo->findText(m_config.audioBitrate);
+        if (idx >= 0) m_audioBitrateCombo->setCurrentIndex(idx);
+    }
+    if (m_pdfDpiSpin) m_pdfDpiSpin->setValue(m_config.pdfDpi);
+    if (m_notifyCheck) m_notifyCheck->setChecked(m_config.notificationEnabled);
+    if (m_outputDirEdit) m_outputDirEdit->setText(m_config.outputDirectory);
+
+    for (auto *cb : m_actionCheckBoxes) {
+        if (cb) {
+            QString id = cb->property("actionId").toString();
+            cb->blockSignals(true);
+            cb->setChecked(m_config.enabledActions.contains(id));
+            cb->blockSignals(false);
+        }
     }
 }
 

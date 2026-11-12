@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 45'i tam, 7'si kısmi (~%73). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 4/12. Birim test sayısı 28 → 53. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-13/14, P5-2/6.
+> **İlerleme (2026-11-12):** 67 maddeden 46'sı tam, 6'sı kısmi (~%75). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 4/12. Birim test sayısı 28 → 53. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-14, P5-2/6.
 
 ---
 
@@ -321,7 +321,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P3-10 ✅ | ~~Genel ayarlar "Hakkında" sekmesinde gömülü~~ | Ayrı "Ayarlar" sekmesi eklendi; çıktı klasörü seçici (gözat/sıfırla), dil, bildirim ve süreç izleme taşındı (2026-11-12) | S |
 | P3-11 ✅ | ~~Çalışan işi izleme/iptal yok~~ | `running.pid` ve süreç durumunu izleyen monitör eklendi; çalışan görevi `--cancel` ile sonlandırma butonu bağlandı (2026-11-12) | M |
 | P3-12 ✅ | ~~Kaydetme hataları sessiz~~ | `save()` dönüşü kontrol edilip `QMessageBox` ile bildiriliyor (2026-11-11); `QSaveFile` hâlâ yapılabilir | S |
-| P3-13 `[~]` | ~~Aynı anda iki GUI config'i eziyor~~ | `QLockFile` ile tek örnek (`konvert-settings.lock`) eklendi; **kalan:** `QFileSystemWatcher` ile dış değişiklikleri yeniden yükleme (2026-11-11) | M |
+| P3-13 ✅ | ~~Aynı anda iki GUI config'i eziyor~~ | `QLockFile` ile tek örnek kilidi ve `QFileSystemWatcher` ile harici dosya değişikliklerinde otomatik UI senkronu eklendi (2026-11-12) | M |
 | P3-14 | Erişilebilirlik ve çeviri: 106 satır içi `lang == "tr" ?` ternary; `lbl_video_crf` yalnız TR/EN | Tüm metinleri `translator.h` anahtarlarına taşı; `setBuddy`, sekme sırası, kısayollar, `F1` | M |
 | P3-15 ✅ | ~~`--screenshot-all` dağıtımda~~ | Yalnız `KONVERT_DEBUG` (Debug) derlemesinde etkin (2026-11-11) | S |
 

@@ -12,6 +12,7 @@
 #include <QLineEdit>
 #include <QTableWidget>
 #include <QHeaderView>
+#include <QFileSystemWatcher>
 #include "configmanager.h"
 
 #include <QTimer>
@@ -49,6 +50,8 @@ private:
     void loadHistoryData();
     void clearHistoryData();
     void updateProcessMonitor();
+    void setupConfigWatcher();
+    void reloadConfigToUi();
 
     QWidget* createCard(const QString &title, QWidget *contentWidget);
     QCheckBox* createActionCheckBox(const QString &id, const QString &label, const QString &tooltip, const QString &iconName, QWidget *parent);
@@ -95,4 +98,6 @@ private:
     QTimer *m_processMonitorTimer = nullptr;
     QTabWidget *m_rootTabWidget = nullptr;
     QTimer *m_saveTimer = nullptr;
+    QFileSystemWatcher *m_configWatcher = nullptr;
+    bool m_isSavingConfig = false;
 };
