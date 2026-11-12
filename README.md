@@ -22,7 +22,7 @@
   </p>
 
   <p align="center">
-    🌐 <b>Interactive Web Demo & FAQ:</b> <a href="https://enesehs.dev/konvert"><b>enesehs.dev/konvert</b></a>
+    <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> <b>Interactive Web Demo & FAQ:</b> <a href="https://enesehs.dev/konvert"><b>enesehs.dev/konvert</b></a>
   </p>
 
   <p align="center">
@@ -67,14 +67,14 @@ konvert -s
 
 Tired of uploading private files to online converter sites, switching to browser tabs, or waiting for bloated Electron apps?
 
-* 🛡️ **Zero Telemetry & 100% Privacy:** Every single byte stays on your local hardware; zero network requests or background telemetry.
-* 🖱️ **Native Right-Click Menus:** Instant right-click integration for **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar**, and **GNOME Nautilus**.
-* ⚡ **Rust 2024 & Rayon Parallelism:** Multi-threaded parallel batch execution with zero GC pauses and ~25 MB peak memory footprint.
-* 🎯 **Mathematical Target Sizing:** Compress videos and images to strict limits (Discord 8 MB, Email 25 MB) with automated ladder search.
-* 🔔 **Live In-Place Plasma Notifications:** Dynamic animated progress bars and live ETA updates in your desktop notification center.
-* 📊 **Audit History & Savings:** Track cumulative disk space savings, preview 80×80 thumbnails, and reveal files in one click.
+* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Zero Telemetry & 100% Privacy:** Every single byte stays on your local hardware; zero network requests or background telemetry.
+* <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Native Right-Click Menus:** Instant right-click integration for **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar**, and **GNOME Nautilus**.
+* <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 & Rayon Parallelism:** Multi-threaded parallel batch execution with zero GC pauses and ~25 MB peak memory footprint.
+* <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Mathematical Target Sizing:** Compress videos and images to strict limits (Discord 8 MB, Email 25 MB) with automated ladder search.
+* <img src="assets/icons/konvert-monitor.svg" width="16" height="16" align="absmiddle" /> **Live In-Place Plasma Notifications:** Dynamic animated progress bars and live ETA updates in your desktop notification center.
+* <img src="assets/icons/konvert-scaling.svg" width="16" height="16" align="absmiddle" /> **Audit History & Savings:** Track cumulative disk space savings, preview 80×80 thumbnails, and reveal files in one click.
 
-👉 *Explore full interactive comparison and feature deep-dives at [enesehs.dev/konvert](https://enesehs.dev/konvert).*
+<img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> *Explore full interactive comparison and feature deep-dives at [enesehs.dev/konvert](https://enesehs.dev/konvert).*
 
 ---
 
@@ -87,7 +87,7 @@ Tested on AMD Ryzen 7 (8 cores / 16 threads), converting a **19.4 MB 4K PNG** (`
 | **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-92.2%** | 517 ms | **3.8s** (~3.9× speedup) |
 | **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-90.2%** | 843 ms | **5.4s** (~4.1× speedup) |
 | **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-78.8%** | 228 ms | **1.6s** (~3.8× speedup) |
-| **Unix Pipe (`-`)** | Stdin ➔ Stdout | Stream | — | **37 ms** latency | — |
+| **Unix Pipe (`-`)** | Stdin -> Stdout | Stream | — | **37 ms** latency | — |
 
 *Zero Electron/JVM runtime overhead. Base resident memory (RSS): ~24–28 MB.*
 

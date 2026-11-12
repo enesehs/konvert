@@ -22,7 +22,7 @@
   </p>
 
   <p align="center">
-    🌐 <b>Etkileşimli Canlı Demo ve SSS:</b> <a href="https://enesehs.dev/konvert"><b>enesehs.dev/konvert</b></a>
+    <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> <b>Etkileşimli Canlı Demo ve SSS:</b> <a href="https://enesehs.dev/konvert"><b>enesehs.dev/konvert</b></a>
   </p>
 
   <p align="center">
@@ -67,14 +67,14 @@ konvert -s
 
 Gizli dosyalarınızı çevrimiçi dönüştürücü sitelerine yüklemekten, tarayıcı sekmeleriyle uğraşmaktan veya hantal Electron uygulamalarının açılmasını beklemekten sıkıldınız mı?
 
-* 🛡️ **Sıfır Telemetri & %100 Gizlilik:** Her bir bayt yalnızca yerel donanımınızda işlenir; sıfır ağ isteği ve sıfır arka plan takibi.
-* 🖱️ **Yerel Sağ Tık Menüleri:** **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar** ve **GNOME Nautilus** üzerinde doğrudan sağ tıklayarak dönüştürün.
-* ⚡ **Rust 2024 & Rayon Paralelliği:** Sıfır GC duraklaması ve ~25 MB bellek kullanımıyla çok çekirdekli paralel toplu işleme.
-* 🎯 **Matematiksel Hedef Boyutlandırma:** Medyayı kesin boyut sınırlarına (Discord 8 MB, E-posta 25 MB) otomatik ayar arayışıyla sığdırın.
-* 🔔 **Canlı D-Bus İlerleme Bildirimleri:** Masaüstü bildirim merkezinizde dinamik animasyonlu ilerleme çubuğu ve anlık kalan süre (ETA) tahmini.
-* 📊 **Görsel Geçmiş ve Tasarruf Takibi:** Toplam disk alanı tasarrufunu izleyin, 80×80 küçük resim önizlemelerine bakın ve dosyaları tek tıkla açın.
+* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Sıfır Telemetri & %100 Gizlilik:** Her bir bayt yalnızca yerel donanımınızda işlenir; sıfır ağ isteği ve sıfır arka plan takibi.
+* <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Yerel Sağ Tık Menüleri:** **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar** ve **GNOME Nautilus** üzerinde doğrudan sağ tıklayarak dönüştürün.
+* <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 & Rayon Paralelliği:** Sıfır GC duraklaması ve ~25 MB bellek kullanımıyla çok çekirdekli paralel toplu işleme.
+* <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Matematiksel Hedef Boyutlandırma:** Medyayı kesin boyut sınırlarına (Discord 8 MB, E-posta 25 MB) otomatik ayar arayışıyla sığdırın.
+* <img src="assets/icons/konvert-monitor.svg" width="16" height="16" align="absmiddle" /> **Canlı D-Bus İlerleme Bildirimleri:** Masaüstü bildirim merkezinizde dinamik animasyonlu ilerleme çubuğu ve anlık kalan süre (ETA) tahmini.
+* <img src="assets/icons/konvert-scaling.svg" width="16" height="16" align="absmiddle" /> **Görsel Geçmiş ve Tasarruf Takibi:** Toplam disk alanı tasarrufunu izleyin, 80×80 küçük resim önizlemelerine bakın ve dosyaları tek tıkla açın.
 
-👉 *Kapsamlı etkileşimli karşılaştırma ve detaylar için: [enesehs.dev/konvert](https://enesehs.dev/konvert).*
+<img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> *Kapsamlı etkileşimli karşılaştırma ve detaylar için: [enesehs.dev/konvert](https://enesehs.dev/konvert).*
 
 ---
 
@@ -87,7 +87,7 @@ AMD Ryzen 7 (8 çekirdek / 16 iş parçacığı) üzerinde **19.4 MB 4K PNG** (`
 | **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-%92.2** | 517 ms | **3.8 sn** (~3.9× hızlanma) |
 | **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-%90.2** | 843 ms | **5.4 sn** (~4.1× hızlanma) |
 | **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-%78.8** | 228 ms | **1.6 sn** (~3.8× hızlanma) |
-| **Unix Boru Hattı (`-`)** | Stdin ➔ Stdout | Akış | — | **37 ms** gecikme | — |
+| **Unix Boru Hattı (`-`)** | Stdin -> Stdout | Akış | — | **37 ms** gecikme | — |
 
 *Sıfır Electron/JVM çalışma zamanı yükü. Taban bellek kullanımı (RSS): ~24–28 MB.*
 
