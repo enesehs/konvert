@@ -1,7 +1,6 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use image::{
-    codecs::jpeg::JpegEncoder, imageops, DynamicImage, GenericImageView, ImageDecoder,
-    ImageFormat,
+    DynamicImage, GenericImageView, ImageDecoder, ImageFormat, codecs::jpeg::JpegEncoder, imageops,
 };
 use std::fs::{self, File};
 use std::io::{BufRead, Seek};
@@ -53,8 +52,7 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             bail!("JXL görseli çözülemedi: {}", input_path.display());
         }
 
-        image::load_from_memory(&output.stdout)
-            .with_context(|| "djxl çıktısı bellekten okunamadı")
+        image::load_from_memory(&output.stdout).with_context(|| "djxl çıktısı bellekten okunamadı")
     } else if ext == "svg" {
         let output = Command::new("magick")
             .arg("-density")
@@ -149,8 +147,11 @@ pub fn convert_image(
         return convert_to_jxl(input_path, &output_path, quality, lossless);
     }
 
-    let output_path =
-        claim_output_path(determine_output_path(input_path, &target_lower, custom_output_dir));
+    let output_path = claim_output_path(determine_output_path(
+        input_path,
+        &target_lower,
+        custom_output_dir,
+    ));
     ensure_parent_dir(&output_path)?;
 
     // SVG (.svg)
@@ -192,9 +193,7 @@ pub fn convert_image(
             let rgb = img.to_rgb8(); // RGBA verilerini güvenli RGB8 formatına dönüştür
             crate::converter::write_file_atomic(&output_path, |writer| {
                 let mut encoder = JpegEncoder::new_with_quality(writer, q);
-                encoder
-                    .encode_image(&rgb)
-                    .context("JPEG kodlama hatası")?;
+                encoder.encode_image(&rgb).context("JPEG kodlama hatası")?;
                 Ok(())
             })?;
         }
@@ -268,9 +267,8 @@ pub fn convert_image(
         }
         _ => {
             crate::converter::write_file_atomic(&output_path, |writer| {
-                img.write_to(writer, format).with_context(|| {
-                    format!("Görsel kaydedilemedi: {}", output_path.display())
-                })?;
+                img.write_to(writer, format)
+                    .with_context(|| format!("Görsel kaydedilemedi: {}", output_path.display()))?;
                 Ok(())
             })?;
         }
@@ -297,7 +295,9 @@ fn convert_to_jxl(
         cmd.arg("-q").arg(q.to_string());
     }
 
-    let status = cmd.status().with_context(|| "cjxl komutu çalıştırılamadı")?;
+    let status = cmd
+        .status()
+        .with_context(|| "cjxl komutu çalıştırılamadı")?;
     if !status.success() {
         bail!("cjxl ile JPEG XL dönüştürme başarısız oldu");
     }
@@ -353,10 +353,7 @@ pub fn compress_image(
     encode_webp_optimized(input_path, quality, custom_output_dir, "compressed")
 }
 
-pub fn web_optimize_image(
-    input_path: &Path,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
+pub fn web_optimize_image(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
     encode_webp_optimized(input_path, Some(82), custom_output_dir, "web")
 }
 
@@ -438,7 +435,10 @@ pub fn resize_image(
     let (new_w, new_h) = match spec {
         crate::converter::ResizeSpec::Percent(pct) => {
             let p = *pct as f32 / 100.0;
-            (((w as f32 * p).round() as u32).max(1), ((h as f32 * p).round() as u32).max(1))
+            (
+                ((w as f32 * p).round() as u32).max(1),
+                ((h as f32 * p).round() as u32).max(1),
+            )
         }
         crate::converter::ResizeSpec::Fit1080p => {
             if w <= 1920 && h <= 1080 {
@@ -515,8 +515,7 @@ pub fn merge_images_to_pdf(
         .unwrap_or("images");
 
     let target_dir = get_output_dir(&images[0], custom_output_dir);
-    let output_path =
-        claim_output_path(target_dir.join(format!("{}_merged.pdf", first_stem)));
+    let output_path = claim_output_path(target_dir.join(format!("{}_merged.pdf", first_stem)));
     ensure_parent_dir(&output_path)?;
 
     let pending = crate::converter::PendingOutput::new(&output_path);
@@ -536,7 +535,9 @@ pub fn merge_images_to_pdf(
         for pdf in images {
             cmd.arg(pdf);
         }
-        let status = cmd.status().with_context(|| "Ghostscript (gs) çalıştırılamadı")?;
+        let status = cmd
+            .status()
+            .with_context(|| "Ghostscript (gs) çalıştırılamadı")?;
         if !status.success() {
             bail!("Ghostscript ile PDF dosyaları birleştirilemedi");
         }
@@ -588,7 +589,9 @@ pub fn merge_images_to_pdf(
             for pdf in &chunk_pdfs {
                 cmd.arg(pdf);
             }
-            let status = cmd.status().with_context(|| "Ghostscript çalıştırılamadı")?;
+            let status = cmd
+                .status()
+                .with_context(|| "Ghostscript çalıştırılamadı")?;
             if !status.success() {
                 bail!("Ghostscript ile parçalar birleştirilemedi");
             }
@@ -617,10 +620,7 @@ pub fn merge_images_to_pdf(
     pending.commit()
 }
 
-pub fn image_to_pdf(
-    input_path: &Path,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
+pub fn image_to_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
     let target_dir = get_output_dir(input_path, custom_output_dir);
     let stem = input_path
         .file_stem()
@@ -636,8 +636,7 @@ pub fn image_to_pdf(
         pending.path().as_os_str().to_os_string(),
     ];
 
-    crate::converter::run_imagemagick(&args)
-        .with_context(|| "Görsel PDF'e dönüştürülemedi")?;
+    crate::converter::run_imagemagick(&args).with_context(|| "Görsel PDF'e dönüştürülemedi")?;
 
     pending.commit()
 }

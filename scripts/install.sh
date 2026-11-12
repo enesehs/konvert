@@ -120,6 +120,17 @@ rm -f "${SERVICEMENU_DIR}/konvert.desktop" 2>/dev/null || true
 "${INSTALL_DIR}/konvert" --sync-menu --menu-dir "${SERVICEMENU_DIR}" || true
 chmod -f 755 "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
 
+# Man page & Shell completions
+MAN_DIR="${TARGET_HOME}/.local/share/man/man1"
+BASH_COMP_DIR="${TARGET_HOME}/.local/share/bash-completion/completions"
+FISH_COMP_DIR="${TARGET_HOME}/.config/fish/completions"
+ZSH_COMP_DIR="${TARGET_HOME}/.local/share/zsh/site-functions"
+mkdir -p "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
+[ -f "${SCRIPT_DIR}/../docs/konvert.1" ] && cp "${SCRIPT_DIR}/../docs/konvert.1" "${MAN_DIR}/konvert.1" 2>/dev/null || true
+"${INSTALL_DIR}/konvert" --completions bash > "${BASH_COMP_DIR}/konvert" 2>/dev/null || true
+"${INSTALL_DIR}/konvert" --completions fish > "${FISH_COMP_DIR}/konvert.fish" 2>/dev/null || true
+"${INSTALL_DIR}/konvert" --completions zsh > "${ZSH_COMP_DIR}/_konvert" 2>/dev/null || true
+
 # If script was run with sudo, fix ownership so standard user owns their local files
 if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
   echo "==> Ensuring user ownership for ${REAL_USER}..."

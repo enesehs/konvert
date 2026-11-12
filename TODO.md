@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 50'si tam, 6'sı kısmi (~%82). P0 %100, P1 ~%78, P2 11/13, P3 14/15, P4 7,5/12, P5 6/12. Birim test sayısı 28 → 57. Sıradaki: P4-2/6/12, P2-9/10, P1-7 (i18n), P3-14, P5-5 (completion).
+> **İlerleme (2026-11-12):** 67 maddeden 52'si tam, 5'i kısmi (~%85). P0 %100, P1 ~%78, P2 11/13, P3 14/15, P4 8,5/12, P5 7/12. Birim test sayısı 28 → 57. Sıradaki: P4-2/6, P2-9/10, P1-7 (i18n), P3-14, P5-7..12.
 
 ---
 
@@ -344,7 +344,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P4-9 | Uzak installer checksum doğrulamıyor (sha256 yayınlanıyor ama kullanılmıyor) ([docs/public/install.sh:80-105](docs/public/install.sh#L80-L105)) | İndirme sonrası `sha256sum -c`; imza doğrulama (minisign/cosign) opsiyonu | M |
 | P4-10 | İki ayrı installer (`scripts/install.sh` + `docs/public/install.sh`) sapıyor | Tek kaynak + build sırasında kopyalama; ortak `lib.sh` | M |
 | P4-11 ✅ | ~~`scripts/install.sh` GUI derleme hatasını yutuyor~~ | `cmake`/`ninja` hatası artık kurulumu durduruyor; yoksa GUI uyarıyla atlanıyor (2026-11-11) | S |
-| P4-12 `[~]` | ~~CI'da lint yok~~ | `cargo clippy --all-targets -- -D warnings` adımı eklendi; **kalan:** `cargo fmt --check` (depo formatlı değil) ve aarch64 matrisi (2026-11-11) | M |
+| P4-12 ✅ | ~~CI'da lint yok~~ | `cargo clippy --all-targets -- -D warnings` ve `cargo fmt --check` CI adımları eklendi; tüm repo rustfmt standartlarına getirildi (2026-11-12) | M |
 
 **Ek küçükler:** `entry.rs` ikonu `preferences-system-symbolic` yerine `konvert` olmalı; `.desktop` dosyaları 755 değil 644; `Exec` yolu boşluk içeriyorsa tırnaklanmalı ([dolphin.rs:572](src/desktop/dolphin.rs#L572)); `--install-all` masaüstü girdisi ile paketlenen `.desktop` tek kaynak olmalı.
 
@@ -358,7 +358,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P5-2 ✅ | ~~Klasör / recursive toplu dönüşüm (`-r`)~~ | `-r`/`--recursive` eklendi; alt klasörleri hedefe göre akıllı filtreleyerek toplu tarama ve işleme desteği (2026-11-12) | M |
 | P5-3 ✅ | ~~`--dry-run`~~ | `--dry-run` eklendi; `plan_output_path` ile çıktı hedefleri, çakışma ve üzerine yazma durumları simüle ediliyor (2026-11-12) | S |
 | P5-4 ✅ | ~~`--jobs`~~ | P1-4 kapsamında eklendi; clap range doğrulayıcısı ve thread budget ile tamamlandı (2026-11-11) | S |
-| P5-5 `[~]` | ~~Man page + shell completion~~ | `docs/konvert.1` yazıldı; PKGBUILD, .deb ve installer'a kurulum eklendi (2026-11-12). **Kalan:** shell completion (`clap_complete`) | S |
+| P5-5 ✅ | ~~Man page + shell completion~~ | `docs/konvert.1` yazıldı; `clap_complete` ile `--completions <bash|zsh|fish>` eklendi; .deb, PKGBUILD ve install.sh ile otomatik kurulum bağlandı (2026-11-12) | S |
 | P5-6 ✅ | ~~Log dosyası / `--verbose` / `RUST_LOG`~~ | `src/logger.rs` eklendi; `-v`/`--verbose`, `RUST_LOG` desteği ve `~/.cache/konvert/konvert.log` teşhis günlüğü (2026-11-12) | S |
 | P5-7 | Preset profilleri: kaydet/adlandır/sil/dışa-içe aktar | Güçlü kullanıcı; GUI'de karşılığı yok | M |
 | P5-8 | Geri alma: çöp kutusuna taşıma / `.bak` | Yanlış dönüşümde kurtarma | M |

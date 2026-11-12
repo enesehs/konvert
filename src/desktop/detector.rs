@@ -1,4 +1,3 @@
-
 /// Masaüstü entegrasyon kurulum/kaldırma sonucu.
 ///
 /// Tek tek başarısızlıklar yutulmaz; komut satırından çıkış koduna ve

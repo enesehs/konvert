@@ -37,6 +37,11 @@ package() {
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 docs/konvert.1 "$pkgdir/usr/share/man/man1/konvert.1"
 
+    # Shell completions
+    "target/release/konvert" --completions bash | install -Dm644 /dev/stdin "$pkgdir/usr/share/bash-completion/completions/konvert"
+    "target/release/konvert" --completions zsh | install -Dm644 /dev/stdin "$pkgdir/usr/share/zsh/site-functions/_konvert"
+    "target/release/konvert" --completions fish | install -Dm644 /dev/stdin "$pkgdir/usr/share/fish/vendor_completions.d/konvert.fish"
+
     # Install system-wide Dolphin servicemenus
     mkdir -p "$pkgdir/usr/share/kio/servicemenus"
     "target/release/konvert" --sync-menu --menu-dir "$pkgdir/usr/share/kio/servicemenus" --menu-exec "konvert"

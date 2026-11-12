@@ -1,10 +1,10 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 static TEMP_DOC_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static SOFFICE_MUTEX: Mutex<()> = Mutex::new(());
@@ -22,9 +22,8 @@ pub fn convert_pdf_to_images(
         .unwrap_or("pdf_pages");
 
     let base_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
-    let pages_dir = crate::converter::claim_output_path(
-        base_dir.join(format!("{}_pages", file_stem)),
-    );
+    let pages_dir =
+        crate::converter::claim_output_path(base_dir.join(format!("{}_pages", file_stem)));
     fs::create_dir_all(&pages_dir)?;
 
     let output_prefix = pages_dir.join("page");
@@ -69,7 +68,10 @@ pub fn convert_to_pdf_via_soffice(
     // Paralel LibreOffice kilit çatışmasını önlemek için süreç içi kilit ve bağımsız profil
     let _lock = SOFFICE_MUTEX.lock();
     let status = Command::new("soffice")
-        .arg(format!("-env:UserInstallation=file://{}", temp_profile.display()))
+        .arg(format!(
+            "-env:UserInstallation=file://{}",
+            temp_profile.display()
+        ))
         .arg("--headless")
         .arg("--convert-to")
         .arg("pdf")
@@ -87,7 +89,9 @@ pub fn convert_to_pdf_via_soffice(
         return Ok(output_path.to_path_buf());
     }
 
-    bail!("LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil")
+    bail!(
+        "LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil"
+    )
 }
 
 pub fn write_html_document(
@@ -103,7 +107,10 @@ pub fn write_html_document(
         .join("\n");
 
     let header_html = if let Some(h) = header {
-        format!("<div class=\"header\">{}</div>", html_escape::encode_text(h))
+        format!(
+            "<div class=\"header\">{}</div>",
+            html_escape::encode_text(h)
+        )
     } else {
         String::new()
     };
@@ -128,13 +135,11 @@ pub fn convert_udf(
     target_format: &str,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_output_path(
-            input_path,
-            target_format,
-            custom_output_dir,
-        ),
-    );
+    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
+        input_path,
+        target_format,
+        custom_output_dir,
+    ));
     crate::converter::ensure_parent_dir(&output_path)?;
 
     let mut xml_content = String::new();
@@ -143,7 +148,9 @@ pub fn convert_udf(
     if let Ok(mut archive) = zip::ZipArchive::new(file)
         && let Ok(zip_file) = archive.by_name("content.xml")
     {
-        zip_file.take(50 * 1024 * 1024).read_to_string(&mut xml_content)?;
+        zip_file
+            .take(50 * 1024 * 1024)
+            .read_to_string(&mut xml_content)?;
     }
 
     // ZIP olmayan düz dosya yedeğinde DoS saldırısını önlemek için 50 MB sınır koy
@@ -189,7 +196,10 @@ pub fn convert_udf(
             let res = convert_to_pdf_via_soffice(&temp_html, &output_path, &target_dir);
             let _ = fs::remove_file(&temp_html);
 
-            let intermediate_pdf = target_dir.join(format!("{}.pdf", temp_html.file_stem().unwrap().to_string_lossy()));
+            let intermediate_pdf = target_dir.join(format!(
+                "{}.pdf",
+                temp_html.file_stem().unwrap().to_string_lossy()
+            ));
             if intermediate_pdf.exists() && intermediate_pdf != output_path {
                 let _ = fs::rename(&intermediate_pdf, &output_path);
             }
@@ -201,7 +211,10 @@ pub fn convert_udf(
             }
         }
         _ => {
-            bail!("UDF dosyası için desteklenmeyen hedef format: .{}", target_format);
+            bail!(
+                "UDF dosyası için desteklenmeyen hedef format: .{}",
+                target_format
+            );
         }
     }
 }
@@ -211,13 +224,11 @@ pub fn convert_docx(
     target_format: &str,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_output_path(
-            input_path,
-            target_format,
-            custom_output_dir,
-        ),
-    );
+    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
+        input_path,
+        target_format,
+        custom_output_dir,
+    ));
     crate::converter::ensure_parent_dir(&output_path)?;
 
     if target_format.eq_ignore_ascii_case("pdf") {
@@ -230,7 +241,8 @@ pub fn convert_docx(
     let mut xml_content = String::new();
 
     if let Ok(doc) = archive.by_name("word/document.xml") {
-        doc.take(50 * 1024 * 1024).read_to_string(&mut xml_content)?;
+        doc.take(50 * 1024 * 1024)
+            .read_to_string(&mut xml_content)?;
     } else {
         bail!("DOCX belgesi içinde word/document.xml bulunamadı");
     }
@@ -248,7 +260,10 @@ pub fn convert_docx(
             pending.commit()
         }
         _ => {
-            bail!("DOCX dosyası için desteklenmeyen hedef format: .{}", target_format);
+            bail!(
+                "DOCX dosyası için desteklenmeyen hedef format: .{}",
+                target_format
+            );
         }
     }
 }
@@ -276,12 +291,36 @@ fn unescape_xml(input: &str) -> String {
                 let entity: String = chars[(i + 1)..pos].iter().collect();
                 let lower = entity.to_ascii_lowercase();
                 match lower.as_str() {
-                    "amp" => { out.push('&'); i = pos + 1; continue; }
-                    "lt" => { out.push('<'); i = pos + 1; continue; }
-                    "gt" => { out.push('>'); i = pos + 1; continue; }
-                    "quot" => { out.push('"'); i = pos + 1; continue; }
-                    "apos" => { out.push('\''); i = pos + 1; continue; }
-                    "nbsp" => { out.push(' '); i = pos + 1; continue; }
+                    "amp" => {
+                        out.push('&');
+                        i = pos + 1;
+                        continue;
+                    }
+                    "lt" => {
+                        out.push('<');
+                        i = pos + 1;
+                        continue;
+                    }
+                    "gt" => {
+                        out.push('>');
+                        i = pos + 1;
+                        continue;
+                    }
+                    "quot" => {
+                        out.push('"');
+                        i = pos + 1;
+                        continue;
+                    }
+                    "apos" => {
+                        out.push('\'');
+                        i = pos + 1;
+                        continue;
+                    }
+                    "nbsp" => {
+                        out.push(' ');
+                        i = pos + 1;
+                        continue;
+                    }
                     _ if lower.starts_with("#x") => {
                         if let Ok(code) = u32::from_str_radix(&lower[2..], 16)
                             && let Some(c) = char::from_u32(code)
@@ -362,7 +401,11 @@ pub fn extract_text_from_xml(xml: &str) -> String {
                 .unwrap_or("")
                 .to_ascii_lowercase();
 
-            if (is_closing && (tag_token == "w:p" || tag_token == "p" || tag_token == "tr" || tag_token == "w:tr"))
+            if (is_closing
+                && (tag_token == "w:p"
+                    || tag_token == "p"
+                    || tag_token == "tr"
+                    || tag_token == "w:tr"))
                 || tag_token == "br"
                 || tag_token == "w:br"
             {
@@ -444,14 +487,13 @@ pub fn compress_pdf_to_size(
         );
     }
 
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             "compressed",
             "pdf",
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
 
     // Hedefe ulaşana kadar kademeli olarak daha agresif ayarlar dene.
@@ -472,9 +514,7 @@ pub fn compress_pdf_to_size(
     ));
 
     if Command::new("gs").arg("--version").output().is_err() {
-        bail!(
-            "PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı"
-        );
+        bail!("PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı");
     }
 
     let mut best_size: Option<u64> = None;
@@ -491,8 +531,9 @@ pub fn compress_pdf_to_size(
         let size = meta.len();
 
         if size <= target_bytes {
-            fs::rename(&scratch, &output_path)
-                .with_context(|| format!("Sıkıştırılmış PDF taşınamadı: {}", output_path.display()))?;
+            fs::rename(&scratch, &output_path).with_context(|| {
+                format!("Sıkıştırılmış PDF taşınamadı: {}", output_path.display())
+            })?;
             return Ok(output_path);
         }
 
@@ -518,14 +559,13 @@ pub fn compress_pdf_to_size(
 }
 
 pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             "compressed",
             "pdf",
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
 
     let pending = crate::converter::PendingOutput::new(&output_path);

@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -19,13 +19,11 @@ pub fn convert_video(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     let target = target_ext.to_lowercase();
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_output_path(
-            input_path,
-            &target,
-            custom_output_dir,
-        ),
-    );
+    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
+        input_path,
+        &target,
+        custom_output_dir,
+    ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
@@ -50,26 +48,39 @@ pub fn convert_video(
         match target.as_str() {
             "webm" => {
                 let crf_val = crf.unwrap_or(30);
-                cmd.arg("-c:v").arg("libvpx-vp9")
-                    .arg("-b:v").arg("0")
-                    .arg("-crf").arg(crf_val.to_string())
-                    .arg("-c:a").arg("libopus");
+                cmd.arg("-c:v")
+                    .arg("libvpx-vp9")
+                    .arg("-b:v")
+                    .arg("0")
+                    .arg("-crf")
+                    .arg(crf_val.to_string())
+                    .arg("-c:a")
+                    .arg("libopus");
             }
             "avi" => {
-                cmd.arg("-c:v").arg("mpeg4")
-                    .arg("-qscale:v").arg("3")
-                    .arg("-c:a").arg("mp3");
+                cmd.arg("-c:v")
+                    .arg("mpeg4")
+                    .arg("-qscale:v")
+                    .arg("3")
+                    .arg("-c:a")
+                    .arg("mp3");
             }
             "flv" => {
-                cmd.arg("-c:v").arg("flv1")
-                    .arg("-qscale:v").arg("3")
-                    .arg("-c:a").arg("mp3");
+                cmd.arg("-c:v")
+                    .arg("flv1")
+                    .arg("-qscale:v")
+                    .arg("3")
+                    .arg("-c:a")
+                    .arg("mp3");
             }
             _ => {
                 let crf_val = crf.unwrap_or(23);
-                cmd.arg("-c:v").arg("libx264")
-                    .arg("-crf").arg(crf_val.to_string())
-                    .arg("-c:a").arg("aac");
+                cmd.arg("-c:v")
+                    .arg("libx264")
+                    .arg("-crf")
+                    .arg(crf_val.to_string())
+                    .arg("-c:a")
+                    .arg("aac");
                 if let Some(p) = preset {
                     cmd.arg("-preset").arg(p);
                 }
@@ -81,7 +92,10 @@ pub fn convert_video(
 
     let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı")?;
     if !status.success() {
-        bail!("Video dönüştürme işlemi başarısız oldu: {}", output_path.display());
+        bail!(
+            "Video dönüştürme işlemi başarısız oldu: {}",
+            output_path.display()
+        );
     }
 
     pending.commit()
@@ -93,13 +107,11 @@ pub fn convert_to_gif(
     duration_secs: f64,
     fps: u32,
 ) -> Result<PathBuf> {
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_output_path(
-            input_path,
-            "gif",
-            custom_output_dir,
-        ),
-    );
+    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
+        input_path,
+        "gif",
+        custom_output_dir,
+    ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
@@ -138,19 +150,15 @@ pub fn convert_to_gif(
     pending.commit()
 }
 
-pub fn extract_frames(
-    input_path: &Path,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
+pub fn extract_frames(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
     let file_stem = input_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("video");
 
     let base_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
-    let frames_dir = crate::converter::claim_output_path(
-        base_dir.join(format!("{}_frames", file_stem)),
-    );
+    let frames_dir =
+        crate::converter::claim_output_path(base_dir.join(format!("{}_frames", file_stem)));
     fs::create_dir_all(&frames_dir)?;
 
     let output_pattern = frames_dir.join("frame_%04d.png");
@@ -175,22 +183,18 @@ pub fn extract_frames(
     Ok(frames_dir)
 }
 
-pub fn extract_audio(
-    input_path: &Path,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
+pub fn extract_audio(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
     crate::converter::audio::convert_audio(input_path, "mp3", Some("256k"), custom_output_dir)
 }
 
 pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             "compressed",
             "mp4",
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
@@ -222,20 +226,22 @@ pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     pending.commit()
 }
 
-pub fn strip_video_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+pub fn strip_video_metadata(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
     let ext = input_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("mp4")
         .to_lowercase();
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             "clean",
             &ext,
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
@@ -278,14 +284,20 @@ pub fn get_video_duration(input_path: &Path) -> Result<f64> {
     }
 
     let s = String::from_utf8_lossy(&output.stdout);
-    let duration: f64 = s.trim().parse().with_context(|| "Video süresi çözümlenemedi")?;
+    let duration: f64 = s
+        .trim()
+        .parse()
+        .with_context(|| "Video süresi çözümlenemedi")?;
     if duration <= 0.0 {
         bail!("Geçersiz video süresi: {}", duration);
     }
     Ok(duration)
 }
 
-pub fn calculate_video_bitrates(target_bytes: u64, duration: f64) -> Result<(u32, u32, &'static str)> {
+pub fn calculate_video_bitrates(
+    target_bytes: u64,
+    duration: f64,
+) -> Result<(u32, u32, &'static str)> {
     if target_bytes == 0 {
         bail!("Hedef dosya boyutu 0 olamaz");
     }
@@ -400,14 +412,13 @@ pub fn compress_video_to_size(
     let (initial_video_kbps, audio_kbps, suffix) =
         calculate_video_bitrates(target_bytes, duration)?;
 
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             suffix,
             "mp4",
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
@@ -453,19 +464,14 @@ pub fn compress_video_to_size(
     bail!("Video hedef boyuta sıkıştırılamadı: hiçbir kodlama denemesi sonuç üretmedi")
 }
 
-
-pub fn web_optimize_video(
-    input_path: &Path,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+pub fn web_optimize_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             "web",
             "mp4",
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
@@ -490,7 +496,9 @@ pub fn web_optimize_video(
         .arg("+faststart")
         .arg(pending.path());
 
-    let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı (web video optimizasyonu)")?;
+    let status = cmd
+        .status()
+        .with_context(|| "ffmpeg çalıştırılamadı (web video optimizasyonu)")?;
     if !status.success() {
         bail!("Web video optimizasyonu başarısız oldu");
     }

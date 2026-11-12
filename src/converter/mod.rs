@@ -3,7 +3,7 @@ pub mod document;
 pub mod image;
 pub mod video;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::ffi::OsString;
@@ -296,11 +296,7 @@ pub fn expand_files_recursive(
     collected
 }
 
-fn collect_dir_recursive(
-    dir: &Path,
-    target_action: Option<&TargetAction>,
-    out: &mut Vec<PathBuf>,
-) {
+fn collect_dir_recursive(dir: &Path, target_action: Option<&TargetAction>, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -591,9 +587,8 @@ where
     use std::io::Write;
 
     let pending = PendingOutput::new(output_path);
-    let file = std::fs::File::create(pending.path()).with_context(|| {
-        format!("Dosya oluşturulamadı: {}", pending.path().display())
-    })?;
+    let file = std::fs::File::create(pending.path())
+        .with_context(|| format!("Dosya oluşturulamadı: {}", pending.path().display()))?;
     let mut writer = std::io::BufWriter::with_capacity(64 * 1024, file);
     write(&mut writer)?;
     writer.flush().context("Tampon diske yazılamadı")?;
@@ -683,14 +678,20 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             } else if is_audio_ext(&ext) {
                 audio::strip_audio_metadata(input_path, out_dir)
             } else {
-                bail!("Metadata temizleme sadece görsel, video ve ses dosyaları için desteklenir: .{}", ext)
+                bail!(
+                    "Metadata temizleme sadece görsel, video ve ses dosyaları için desteklenir: .{}",
+                    ext
+                )
             }
         }
         TargetAction::Resize(spec) => {
             if is_image_ext(&ext) {
                 image::resize_image(input_path, &spec, out_dir)
             } else {
-                bail!("Yeniden boyutlandırma sadece görseller için geçerlidir (.{})", ext)
+                bail!(
+                    "Yeniden boyutlandırma sadece görseller için geçerlidir (.{})",
+                    ext
+                )
             }
         }
         TargetAction::Compress => {
@@ -712,7 +713,10 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             } else if ext == "pdf" {
                 document::compress_pdf_to_size(input_path, target_bytes, out_dir)
             } else {
-                bail!("Bu format için hedef boyut sıkıştırması desteklenmiyor: .{}", ext)
+                bail!(
+                    "Bu format için hedef boyut sıkıştırması desteklenmiyor: .{}",
+                    ext
+                )
             }
         }
         TargetAction::WebOpt => {
@@ -721,39 +725,55 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             } else if is_image_ext(&ext) {
                 image::web_optimize_image(input_path, out_dir)
             } else {
-                bail!("Web optimizasyonu sadece görsel ve videolar için geçerlidir (.{})", ext)
+                bail!(
+                    "Web optimizasyonu sadece görsel ve videolar için geçerlidir (.{})",
+                    ext
+                )
             }
         }
         TargetAction::ExtractAudio => {
             if is_video_ext(&ext) {
                 video::extract_audio(input_path, out_dir)
             } else {
-                bail!("Videodan ses ayıklama sadece video dosyaları için geçerlidir (.{})", ext)
+                bail!(
+                    "Videodan ses ayıklama sadece video dosyaları için geçerlidir (.{})",
+                    ext
+                )
             }
         }
         TargetAction::Frames => {
             if is_video_ext(&ext) {
                 video::extract_frames(input_path, out_dir)
             } else {
-                bail!("Kare çıkarma sadece video dosyaları için geçerlidir (.{})", ext)
+                bail!(
+                    "Kare çıkarma sadece video dosyaları için geçerlidir (.{})",
+                    ext
+                )
             }
         }
         TargetAction::Gif => {
             if is_video_ext(&ext) {
                 video::convert_to_gif(input_path, out_dir, opts.gif_duration, opts.gif_fps)
             } else {
-                bail!("GIF dönüşümü sadece video dosyaları için geçerlidir (.{})", ext)
+                bail!(
+                    "GIF dönüşümü sadece video dosyaları için geçerlidir (.{})",
+                    ext
+                )
             }
         }
         TargetAction::AudioToVideo => {
             if is_audio_ext(&ext) {
                 audio::convert_audio_to_video(input_path, out_dir)
             } else {
-                bail!("Ses dalgası videosu oluşturmak için bir ses dosyası gereklidir (.{})", ext)
+                bail!(
+                    "Ses dalgası videosu oluşturmak için bir ses dosyası gereklidir (.{})",
+                    ext
+                )
             }
         }
         TargetAction::Convert(target_fmt) => {
-            if ext == "pdf" && (target_fmt == "png" || target_fmt == "jpg" || target_fmt == "jpeg") {
+            if ext == "pdf" && (target_fmt == "png" || target_fmt == "jpg" || target_fmt == "jpeg")
+            {
                 document::convert_pdf_to_images(
                     input_path,
                     &target_fmt,
@@ -768,7 +788,13 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             } else if is_image_ext(&ext) && target_fmt == "pdf" {
                 image::image_to_pdf(input_path, out_dir)
             } else if is_image_ext(&ext) && image::is_supported_image_target(&target_fmt) {
-                image::convert_image(input_path, &target_fmt, opts.quality, opts.image_lossless, out_dir)
+                image::convert_image(
+                    input_path,
+                    &target_fmt,
+                    opts.quality,
+                    opts.image_lossless,
+                    out_dir,
+                )
             } else if is_video_ext(&ext) && video::is_supported_video_target(&target_fmt) {
                 video::convert_video(
                     input_path,
@@ -790,7 +816,10 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
     }
 }
 
-pub fn merge_images_to_pdf(images: &[PathBuf], custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+pub fn merge_images_to_pdf(
+    images: &[PathBuf],
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
     image::merge_images_to_pdf(images, custom_output_dir)
 }
 
@@ -852,7 +881,20 @@ where
 pub fn is_image_ext(ext: &str) -> bool {
     matches!(
         ext.to_lowercase().as_str(),
-        "png" | "jpg" | "jpeg" | "webp" | "avif" | "jxl" | "bmp" | "ico" | "tiff" | "tif" | "qoi" | "svg" | "heic" | "heif"
+        "png"
+            | "jpg"
+            | "jpeg"
+            | "webp"
+            | "avif"
+            | "jxl"
+            | "bmp"
+            | "ico"
+            | "tiff"
+            | "tif"
+            | "qoi"
+            | "svg"
+            | "heic"
+            | "heif"
     )
 }
 
@@ -943,22 +985,61 @@ mod tests {
 
     #[test]
     fn test_target_action_parse() {
-        assert_eq!(TargetAction::parse("compress").unwrap(), TargetAction::Compress);
-        assert_eq!(TargetAction::parse("web_opt").unwrap(), TargetAction::WebOpt);
-        assert_eq!(TargetAction::parse("web-opt").unwrap(), TargetAction::WebOpt);
-        assert_eq!(TargetAction::parse("discord_8mb").unwrap(), TargetAction::TargetSize(8 * 1024 * 1024));
-        assert_eq!(TargetAction::parse("email_25mb").unwrap(), TargetAction::TargetSize(25 * 1024 * 1024));
-        assert_eq!(TargetAction::parse("50mb").unwrap(), TargetAction::TargetSize(50 * 1024 * 1024));
-        assert_eq!(TargetAction::parse("target_100mb").unwrap(), TargetAction::TargetSize(100 * 1024 * 1024));
-        assert_eq!(TargetAction::parse("strip-metadata").unwrap(), TargetAction::StripMetadata);
-        assert_eq!(TargetAction::parse("resize_50%").unwrap(), TargetAction::Resize(ResizeSpec::Percent(50)));
-        assert_eq!(TargetAction::parse("resize_30%").unwrap(), TargetAction::Resize(ResizeSpec::Percent(30)));
-        assert_eq!(TargetAction::parse("resize_150").unwrap(), TargetAction::Resize(ResizeSpec::Percent(150)));
+        assert_eq!(
+            TargetAction::parse("compress").unwrap(),
+            TargetAction::Compress
+        );
+        assert_eq!(
+            TargetAction::parse("web_opt").unwrap(),
+            TargetAction::WebOpt
+        );
+        assert_eq!(
+            TargetAction::parse("web-opt").unwrap(),
+            TargetAction::WebOpt
+        );
+        assert_eq!(
+            TargetAction::parse("discord_8mb").unwrap(),
+            TargetAction::TargetSize(8 * 1024 * 1024)
+        );
+        assert_eq!(
+            TargetAction::parse("email_25mb").unwrap(),
+            TargetAction::TargetSize(25 * 1024 * 1024)
+        );
+        assert_eq!(
+            TargetAction::parse("50mb").unwrap(),
+            TargetAction::TargetSize(50 * 1024 * 1024)
+        );
+        assert_eq!(
+            TargetAction::parse("target_100mb").unwrap(),
+            TargetAction::TargetSize(100 * 1024 * 1024)
+        );
+        assert_eq!(
+            TargetAction::parse("strip-metadata").unwrap(),
+            TargetAction::StripMetadata
+        );
+        assert_eq!(
+            TargetAction::parse("resize_50%").unwrap(),
+            TargetAction::Resize(ResizeSpec::Percent(50))
+        );
+        assert_eq!(
+            TargetAction::parse("resize_30%").unwrap(),
+            TargetAction::Resize(ResizeSpec::Percent(30))
+        );
+        assert_eq!(
+            TargetAction::parse("resize_150").unwrap(),
+            TargetAction::Resize(ResizeSpec::Percent(150))
+        );
         assert!(TargetAction::parse("resize_0").is_err());
         assert!(TargetAction::parse("resize_401").is_err());
-        assert_eq!(TargetAction::parse("resize_1080p").unwrap(), TargetAction::Resize(ResizeSpec::Fit1080p));
+        assert_eq!(
+            TargetAction::parse("resize_1080p").unwrap(),
+            TargetAction::Resize(ResizeSpec::Fit1080p)
+        );
         assert!(TargetAction::parse("resize_invalid").is_err());
-        assert_eq!(TargetAction::parse("webp").unwrap(), TargetAction::Convert("webp".to_string()));
+        assert_eq!(
+            TargetAction::parse("webp").unwrap(),
+            TargetAction::Convert("webp".to_string())
+        );
     }
 
     #[test]

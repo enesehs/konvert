@@ -13,15 +13,14 @@ use clap::Parser;
 use cli::Cli;
 use config::Config;
 use converter::ConvertOptions;
-use history::{add_history_entry, format_bytes, HistoryEntry};
+use history::{HistoryEntry, add_history_entry, format_bytes};
 use i18n::t;
 use notification::Notifier;
 use std::fs;
 use std::path::PathBuf;
 
 fn pid_file_path() -> Option<PathBuf> {
-    directories::ProjectDirs::from("", "", "konvert")
-        .map(|p| p.cache_dir().join("running.pid"))
+    directories::ProjectDirs::from("", "", "konvert").map(|p| p.cache_dir().join("running.pid"))
 }
 
 /// İşlem, terminale bağlı değilse (sağ tık menüsü, .desktop, servis) kendi
@@ -119,6 +118,14 @@ fn terminate_process(pid: i32) -> bool {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+
+    if let Some(shell) = cli.completions {
+        use clap::CommandFactory;
+        let mut cmd = cli::Cli::command();
+        clap_complete::generate(shell, &mut cmd, "konvert", &mut std::io::stdout());
+        return Ok(());
+    }
+
     logger::init(cli.verbose);
     let config = Config::load();
     i18n::init(config.general.language.as_deref());
@@ -218,7 +225,10 @@ fn main() -> anyhow::Result<()> {
             eprintln!("Installation failed ({}): {}", name, err);
         }
         if report.affected.is_empty() {
-            notifier.error(t("notify_failed"), "No desktop integration could be installed.");
+            notifier.error(
+                t("notify_failed"),
+                "No desktop integration could be installed.",
+            );
             bail!(
                 "Hiçbir masaüstü entegrasyonu kurulamadı ({} hata)",
                 report.failed.len()
@@ -263,7 +273,10 @@ fn main() -> anyhow::Result<()> {
         }
         if report.affected.is_empty() && !report.failed.is_empty() {
             notifier.error(t("notify_failed"), "No integration could be removed.");
-            bail!("Hiçbir entegrasyon kaldırılamadı ({} hata)", report.failed.len());
+            bail!(
+                "Hiçbir entegrasyon kaldırılamadı ({} hata)",
+                report.failed.len()
+            );
         }
         if report.affected.is_empty() {
             println!("No integrations were installed.");
@@ -301,13 +314,10 @@ fn main() -> anyhow::Result<()> {
         std::process::exit(1);
     }
 
-    let custom_output_dir = cli.output_dir.clone().or_else(|| {
-        config
-            .general
-            .output_directory
-            .as_ref()
-            .map(PathBuf::from)
-    });
+    let custom_output_dir = cli
+        .output_dir
+        .clone()
+        .or_else(|| config.general.output_directory.as_ref().map(PathBuf::from));
 
     // 1. Merge images into single PDF
     if cli.merge_pdf {
@@ -322,8 +332,12 @@ fn main() -> anyhow::Result<()> {
         }
 
         if cli.dry_run {
-            println!("[Dry Run] Planning merge into single PDF ({} input files):", files.len());
-            let first_stem = files.first()
+            println!(
+                "[Dry Run] Planning merge into single PDF ({} input files):",
+                files.len()
+            );
+            let first_stem = files
+                .first()
                 .and_then(|f| f.file_stem())
                 .and_then(|s| s.to_str())
                 .unwrap_or("images");
@@ -333,13 +347,23 @@ fn main() -> anyhow::Result<()> {
                 println!("  {:2}. {}", i + 1, f.display());
             }
             println!("  ➔ Output: {}", out_pdf.display());
-            println!("  ➔ Collision: {}", if out_pdf.exists() { "yes (file exists)" } else { "none" });
+            println!(
+                "  ➔ Collision: {}",
+                if out_pdf.exists() {
+                    "yes (file exists)"
+                } else {
+                    "none"
+                }
+            );
             println!("[Dry Run] Completed: 1 output file planned, 0 written.");
             return Ok(());
         }
 
         write_pid_lock();
-        let orig_bytes: u64 = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
+        let orig_bytes: u64 = files
+            .iter()
+            .map(|f| f.metadata().map(|m| m.len()).unwrap_or(0))
+            .sum();
         let mut progress_handle = notifier.start_progress(
             "Konvert: Merging PDF...",
             &format!("Scanning {} images...", files.len()),
@@ -373,7 +397,9 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    break Err(anyhow::anyhow!("PDF birleştirme işlemi beklenmeyen şekilde sonlandı"));
+                    break Err(anyhow::anyhow!(
+                        "PDF birleştirme işlemi beklenmeyen şekilde sonlandı"
+                    ));
                 }
             }
         };
@@ -382,7 +408,10 @@ fn main() -> anyhow::Result<()> {
             Ok(out_pdf) => {
                 remove_pid_lock();
                 let out_bytes = history::path_size_bytes(&out_pdf);
-                let out_name = out_pdf.file_name().and_then(|s| s.to_str()).unwrap_or("merged.pdf");
+                let out_name = out_pdf
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("merged.pdf");
                 let msg = format!(
                     "{} images merged into single PDF:\n{}\n({} ➔ {})",
                     cli.files.len(),
@@ -394,7 +423,13 @@ fn main() -> anyhow::Result<()> {
                 notifier.finish_progress(
                     &mut progress_handle,
                     "PDF Merge Completed",
-                    &format!("{}\n{} images ({} ➔ {})", out_name, cli.files.len(), format_bytes(orig_bytes), format_bytes(out_bytes)),
+                    &format!(
+                        "{}\n{} images ({} ➔ {})",
+                        out_name,
+                        cli.files.len(),
+                        format_bytes(orig_bytes),
+                        format_bytes(out_bytes)
+                    ),
                 );
 
                 let _ = add_history_entry(HistoryEntry {
@@ -513,7 +548,13 @@ fn main() -> anyhow::Result<()> {
                     } else {
                         "(new file)"
                     };
-                    println!("  {:2}. {} ➔ {} {}", i + 1, file.display(), predicted.display(), status);
+                    println!(
+                        "  {:2}. {} ➔ {} {}",
+                        i + 1,
+                        file.display(),
+                        predicted.display(),
+                        status
+                    );
                 }
                 Err(err) => {
                     println!("  {:2}. {} ➔ [Hata: {}]", i + 1, file.display(), err);
@@ -531,11 +572,17 @@ fn main() -> anyhow::Result<()> {
 
     write_pid_lock();
 
-    let orig_total_bytes: u64 = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
+    let orig_total_bytes: u64 = files
+        .iter()
+        .map(|f| f.metadata().map(|m| m.len()).unwrap_or(0))
+        .sum();
 
     if total_count == 1 {
         let in_file = &files[0];
-        let file_name = in_file.file_name().and_then(|s| s.to_str()).unwrap_or("dosya");
+        let file_name = in_file
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("dosya");
         let target_display = if target == "compress" {
             "Sıkıştırma".to_string()
         } else if target == "discord_8mb" {
@@ -587,7 +634,9 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    break Err(anyhow::anyhow!("Dönüştürme işlemi beklenmeyen şekilde sonlandı"));
+                    break Err(anyhow::anyhow!(
+                        "Dönüştürme işlemi beklenmeyen şekilde sonlandı"
+                    ));
                 }
             }
         };
@@ -597,7 +646,10 @@ fn main() -> anyhow::Result<()> {
                 remove_pid_lock();
                 let out_bytes = history::path_size_bytes(&output);
                 let savings_str = calculate_savings_str(orig_total_bytes, out_bytes);
-                let out_name = output.file_name().and_then(|s| s.to_str()).unwrap_or("output");
+                let out_name = output
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("output");
 
                 let msg = format!("Converted:\n{}\n{}", output.display(), savings_str);
                 println!("{}", msg);
@@ -649,13 +701,14 @@ fn main() -> anyhow::Result<()> {
             0,
         );
 
-        let batch_result = converter::convert_batch_with_progress(&files, &opts, |curr, total, file, percent| {
-            let file_name = file.file_name().and_then(|s| s.to_str()).unwrap_or("file");
-            let summary = format!("Konvert: [{}/{}] Converting ({}%)", curr, total, percent);
-            let body = file_name.to_string();
-            notifier.update_progress(&mut progress_handle, &summary, &body, percent);
-            println!("[{}/{}] {} ({}%)", curr, total, file_name, percent);
-        });
+        let batch_result =
+            converter::convert_batch_with_progress(&files, &opts, |curr, total, file, percent| {
+                let file_name = file.file_name().and_then(|s| s.to_str()).unwrap_or("file");
+                let summary = format!("Konvert: [{}/{}] Converting ({}%)", curr, total, percent);
+                let body = file_name.to_string();
+                notifier.update_progress(&mut progress_handle, &summary, &body, percent);
+                println!("[{}/{}] {} ({}%)", curr, total, file_name, percent);
+            });
 
         remove_pid_lock();
 
@@ -663,10 +716,10 @@ fn main() -> anyhow::Result<()> {
         let fail_count = batch_result.failed.len();
 
         let out_total_bytes: u64 = batch_result
-        .succeeded
-        .iter()
-        .map(|path| history::path_size_bytes(path))
-        .sum();
+            .succeeded
+            .iter()
+            .map(|path| history::path_size_bytes(path))
+            .sum();
         let savings_str = calculate_savings_str(orig_total_bytes, out_total_bytes);
         let savings_pct = calculate_savings_pct(orig_total_bytes, out_total_bytes);
 
@@ -686,8 +739,15 @@ fn main() -> anyhow::Result<()> {
             original_size_bytes: orig_total_bytes,
             output_size_bytes: out_total_bytes,
             savings_percent: savings_pct,
-            status: if fail_count == 0 { "Success".into() } else { "Partial".into() },
-            output_path: batch_result.succeeded.first().map(|p| p.to_string_lossy().to_string()),
+            status: if fail_count == 0 {
+                "Success".into()
+            } else {
+                "Partial".into()
+            },
+            output_path: batch_result
+                .succeeded
+                .first()
+                .map(|p| p.to_string_lossy().to_string()),
         });
 
         if fail_count == 0 {
@@ -700,7 +760,10 @@ fn main() -> anyhow::Result<()> {
             notifier.finish_progress(
                 &mut progress_handle,
                 t("notify_partial_batch"),
-                &format!("{} succeeded, {} failed.\n{}", success_count, fail_count, savings_str),
+                &format!(
+                    "{} succeeded, {} failed.\n{}",
+                    success_count, fail_count, savings_str
+                ),
             );
         } else {
             notifier.error_progress(
@@ -719,7 +782,12 @@ fn calculate_savings_str(orig: u64, out: u64) -> String {
     if orig > out && orig > 0 {
         let saved = orig - out;
         let pct = (saved as f64 / orig as f64) * 100.0;
-        format!("{} ➔ {} ({:.0}% saved)", format_bytes(orig), format_bytes(out), pct)
+        format!(
+            "{} ➔ {} ({:.0}% saved)",
+            format_bytes(orig),
+            format_bytes(out),
+            pct
+        )
     } else {
         format!("{} ➔ {}", format_bytes(orig), format_bytes(out))
     }

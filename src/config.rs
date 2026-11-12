@@ -78,9 +78,7 @@ impl Default for Config {
             audio: AudioConfig {
                 bitrate: "320k".into(),
             },
-            document: DocumentConfig {
-                pdf_dpi: 300,
-            },
+            document: DocumentConfig { pdf_dpi: 300 },
         }
     }
 }

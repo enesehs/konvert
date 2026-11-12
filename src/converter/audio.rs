@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -87,7 +87,10 @@ pub fn convert_audio(
             cmd.arg("-b:a").arg(b_rate);
         }
         "flac" => {
-            cmd.arg("-c:a").arg("flac").arg("-compression_level").arg("8");
+            cmd.arg("-c:a")
+                .arg("flac")
+                .arg("-compression_level")
+                .arg("8");
         }
         "wav" => {
             cmd.arg("-c:a").arg("pcm_s16le");
@@ -97,28 +100,35 @@ pub fn convert_audio(
 
     cmd.arg(pending.path());
 
-    let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı (ses dönüştürme)")?;
+    let status = cmd
+        .status()
+        .with_context(|| "ffmpeg çalıştırılamadı (ses dönüştürme)")?;
     if !status.success() {
-        bail!("Ses dönüştürme işlemi başarısız oldu: {}", output_path.display());
+        bail!(
+            "Ses dönüştürme işlemi başarısız oldu: {}",
+            output_path.display()
+        );
     }
 
     pending.commit()
 }
 
-pub fn strip_audio_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+pub fn strip_audio_metadata(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
     let ext = input_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("mp3")
         .to_lowercase();
-    let output_path = crate::converter::claim_output_path(
-        crate::converter::determine_suffixed_output_path(
+    let output_path =
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
             "clean",
             &ext,
             custom_output_dir,
-        ),
-    );
+        ));
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 

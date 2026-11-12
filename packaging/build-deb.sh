@@ -57,6 +57,17 @@ mkdir -p "${BUILD_DIR}/usr/share/kio/servicemenus"
 "${ROOT_DIR}/target/release/konvert" --sync-menu --menu-dir "${BUILD_DIR}/usr/share/kio/servicemenus" --menu-exec "konvert"
 chmod 644 "${BUILD_DIR}/usr/share/kio/servicemenus"/*.desktop
 
+# Shell completions (bash, zsh, fish)
+mkdir -p "${BUILD_DIR}/usr/share/bash-completion/completions"
+mkdir -p "${BUILD_DIR}/usr/share/zsh/site-functions"
+mkdir -p "${BUILD_DIR}/usr/share/fish/vendor_completions.d"
+"${ROOT_DIR}/target/release/konvert" --completions bash > "${BUILD_DIR}/usr/share/bash-completion/completions/konvert"
+"${ROOT_DIR}/target/release/konvert" --completions zsh > "${BUILD_DIR}/usr/share/zsh/site-functions/_konvert"
+"${ROOT_DIR}/target/release/konvert" --completions fish > "${BUILD_DIR}/usr/share/fish/vendor_completions.d/konvert.fish"
+chmod 644 "${BUILD_DIR}/usr/share/bash-completion/completions/konvert"
+chmod 644 "${BUILD_DIR}/usr/share/zsh/site-functions/_konvert"
+chmod 644 "${BUILD_DIR}/usr/share/fish/vendor_completions.d/konvert.fish"
+
 # 3. Simgeleri yerleştir
 cp "${ROOT_DIR}/assets/logo.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/konvert.svg"
 cp "${ROOT_DIR}/assets/logo.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg"

@@ -108,6 +108,10 @@ pub struct Cli {
     #[arg(long = "cancel")]
     pub cancel: bool,
 
+    /// Generate shell auto-completion script (bash, zsh, fish)
+    #[arg(long = "completions", value_name = "SHELL")]
+    pub completions: Option<clap_complete::Shell>,
+
     /// Check external tool dependencies (ffmpeg, ImageMagick, ghostscript, ...)
     #[arg(long = "check-deps")]
     pub check_deps: bool,

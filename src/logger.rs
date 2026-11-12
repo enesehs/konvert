@@ -21,8 +21,7 @@ pub fn is_verbose() -> bool {
 }
 
 pub fn log_file_path() -> Option<PathBuf> {
-    directories::ProjectDirs::from("", "", "konvert")
-        .map(|p| p.cache_dir().join("konvert.log"))
+    directories::ProjectDirs::from("", "", "konvert").map(|p| p.cache_dir().join("konvert.log"))
 }
 
 #[allow(dead_code)]

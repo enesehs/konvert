@@ -1,14 +1,11 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use directories::BaseDirs;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub fn get_thunar_uca_path() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Kullanıcı ev dizini bulunamadı")?;
-    let path = base_dirs
-        .config_dir()
-        .join("Thunar")
-        .join("uca.xml");
+    let path = base_dirs.config_dir().join("Thunar").join("uca.xml");
     Ok(path)
 }
 
@@ -32,7 +29,7 @@ fn xml_escape(input: &str) -> String {
 }
 
 fn generate_thunar_actions(exec: &str) -> String {
-    use crate::desktop::dolphin::{find_action, QUICK_ACTION_IDS};
+    use crate::desktop::dolphin::{QUICK_ACTION_IDS, find_action};
 
     let mut out = String::new();
     for id in QUICK_ACTION_IDS {
@@ -114,8 +111,7 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
     let tmp = path.with_extension("xml.tmp");
     fs::write(&tmp, content)
         .with_context(|| format!("Geçici dosya yazılamadı: {}", tmp.display()))?;
-    fs::rename(&tmp, path)
-        .with_context(|| format!("Dosya güncellenemedi: {}", path.display()))?;
+    fs::rename(&tmp, path).with_context(|| format!("Dosya güncellenemedi: {}", path.display()))?;
     Ok(())
 }
 

@@ -33,7 +33,12 @@ impl Notifier {
             .show();
     }
 
-    pub fn start_progress(&self, title: &str, body: &str, percent: i32) -> Option<NotificationHandle> {
+    pub fn start_progress(
+        &self,
+        title: &str,
+        body: &str,
+        percent: i32,
+    ) -> Option<NotificationHandle> {
         if !self.enabled {
             return None;
         }
@@ -88,12 +93,7 @@ impl Notifier {
         }
     }
 
-    pub fn error_progress(
-        &self,
-        handle: &mut Option<NotificationHandle>,
-        title: &str,
-        body: &str,
-    ) {
+    pub fn error_progress(&self, handle: &mut Option<NotificationHandle>, title: &str, body: &str) {
         if !self.enabled {
             return;
         }

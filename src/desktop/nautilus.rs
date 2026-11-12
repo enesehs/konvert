@@ -16,7 +16,9 @@ pub fn get_nautilus_scripts_dir() -> Result<PathBuf> {
 
 #[allow(dead_code)]
 pub fn is_nautilus_installed() -> bool {
-    get_nautilus_scripts_dir().map(|p| p.exists()).unwrap_or(false)
+    get_nautilus_scripts_dir()
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 pub fn install_nautilus_scripts(custom_exec: Option<&str>) -> Result<PathBuf> {
@@ -30,7 +32,7 @@ pub fn install_nautilus_scripts(custom_exec: Option<&str>) -> Result<PathBuf> {
             .unwrap_or_else(|_| "konvert".to_string()),
     };
 
-    use crate::desktop::dolphin::{find_action, QUICK_ACTION_IDS};
+    use crate::desktop::dolphin::{QUICK_ACTION_IDS, find_action};
 
     for id in QUICK_ACTION_IDS {
         let Some(action) = find_action(id) else {

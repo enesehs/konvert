@@ -235,7 +235,6 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         icon: "konvert-mail",
         cmd_args: "-t email_25mb %F",
     },
-
     // VIDEOS
     ActionDef {
         id: "compress_video",
@@ -345,7 +344,6 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         icon: "konvert-mail",
         cmd_args: "-t email_25mb %F",
     },
-
     // MUSIC / AUDIO
     ActionDef {
         id: "to_mp3",
@@ -383,7 +381,6 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
         icon: "konvert-video",
         cmd_args: "-t audio-to-video %F",
     },
-
     // DOCUMENTS
     ActionDef {
         id: "compress_doc",
@@ -437,7 +434,8 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
 
 /// Nautilus/Thunar gibi basit entegrasyonlarda sunulan ortak action kümesi.
 /// Tek kaynak: `ALL_ACTIONS` (isim, ikon ve komutlar oradan gelir).
-pub const QUICK_ACTION_IDS: &[&str] = &["to_webp", "to_png", "to_jpg", "to_avif", "to_mp3", "to_gif"];
+pub const QUICK_ACTION_IDS: &[&str] =
+    &["to_webp", "to_png", "to_jpg", "to_avif", "to_mp3", "to_gif"];
 
 pub fn find_action(id: &str) -> Option<&'static ActionDef> {
     ALL_ACTIONS.iter().find(|action| action.id == id)
@@ -445,10 +443,7 @@ pub fn find_action(id: &str) -> Option<&'static ActionDef> {
 
 pub fn get_service_menus_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Kullanıcı ev dizini bulunamadı")?;
-    let path = base_dirs
-        .data_local_dir()
-        .join("kio")
-        .join("servicemenus");
+    let path = base_dirs.data_local_dir().join("kio").join("servicemenus");
     Ok(path)
 }
 
@@ -536,7 +531,9 @@ pub fn install_dolphin_service_with_options(
     for cat in CATEGORIES {
         let active_actions: Vec<&ActionDef> = ALL_ACTIONS
             .iter()
-            .filter(|act| act.category == cat.key && enabled_action_ids.iter().any(|id| id == act.id))
+            .filter(|act| {
+                act.category == cat.key && enabled_action_ids.iter().any(|id| id == act.id)
+            })
             .collect();
 
         let file_path = dir.join(cat.file_name);
