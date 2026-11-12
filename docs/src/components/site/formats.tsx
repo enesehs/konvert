@@ -41,6 +41,8 @@ export function Formats() {
       conversions: [
         { from: "PNG", to: "JXL", engine: "libjxl", speed: "~24ms", param: t.formats.params.jxlNextGen },
         { from: "JPG", to: "JXL", engine: "libjxl", speed: "~20ms", param: t.formats.params.jxlLossless },
+        { from: "JXL", to: "PNG", engine: "djxl / image-rs", speed: "~18ms", param: t.formats.params.losslessRgba },
+        { from: "JXL", to: "JPG", engine: "djxl / mozjpeg", speed: "~19ms", param: t.formats.params.exifStrip },
         { from: "WEBP", to: "PNG", engine: "image-rs", speed: "~14ms", param: t.formats.params.losslessRgba },
         { from: "PNG", to: "WEBP", engine: "libwebp", speed: "~22ms", param: t.formats.params.webOptimize },
         { from: "JPG", to: "WEBP", engine: "libwebp", speed: "~18ms", param: t.formats.params.saving60 },
