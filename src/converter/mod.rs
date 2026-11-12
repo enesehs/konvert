@@ -125,10 +125,52 @@ impl TargetAction {
 
 pub fn sanitize_cli_path(path: &Path) -> PathBuf {
     let s = path.as_os_str().to_string_lossy();
-    if s.starts_with('-') {
+    if s == "-" {
+        PathBuf::from("-")
+    } else if s.starts_with('-') {
         PathBuf::from(format!("./{}", s))
     } else {
         path.to_path_buf()
+    }
+}
+
+/// Girdi baytlarından (magic bytes) dosya uzantısını tahmin eder.
+/// stdin (`-`) üzerinden gelen verinin geçici dosyaya kaydedilmesinde kullanılır.
+pub fn detect_extension_from_bytes(bytes: &[u8]) -> &'static str {
+    if bytes.starts_with(b"%PDF-") {
+        "pdf"
+    } else if bytes.starts_with(b"<!DOCTYPE svg")
+        || bytes.starts_with(b"<svg")
+        || (bytes.starts_with(b"<?xml") && bytes.windows(4).any(|w| w == b"<svg"))
+    {
+        "svg"
+    } else if bytes.starts_with(b"ID3")
+        || bytes.starts_with(b"\xFF\xFB")
+        || bytes.starts_with(b"\xFF\xF3")
+    {
+        "mp3"
+    } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {
+        "wav"
+    } else if bytes.len() >= 8 && (&bytes[4..8] == b"ftyp" || &bytes[4..8] == b"moov") {
+        "mp4"
+    } else if bytes.starts_with(b"OggS") {
+        "ogg"
+    } else if bytes.starts_with(b"fLaC") {
+        "flac"
+    } else if let Ok(fmt) = ::image::guess_format(bytes) {
+        match fmt {
+            ::image::ImageFormat::Png => "png",
+            ::image::ImageFormat::Jpeg => "jpg",
+            ::image::ImageFormat::Gif => "gif",
+            ::image::ImageFormat::WebP => "webp",
+            ::image::ImageFormat::Bmp => "bmp",
+            ::image::ImageFormat::Ico => "ico",
+            ::image::ImageFormat::Tiff => "tiff",
+            ::image::ImageFormat::Qoi => "qoi",
+            _ => "tmp",
+        }
+    } else {
+        "tmp"
     }
 }
 
@@ -995,6 +1037,32 @@ mod tests {
 
         let dash = Path::new("-dash_file.mp4");
         assert_eq!(sanitize_cli_path(dash), PathBuf::from("./-dash_file.mp4"));
+
+        let stdin_dash = Path::new("-");
+        assert_eq!(sanitize_cli_path(stdin_dash), PathBuf::from("-"));
+    }
+
+    #[test]
+    fn test_detect_extension_from_bytes() {
+        assert_eq!(detect_extension_from_bytes(b"%PDF-1.7\n..."), "pdf");
+        assert_eq!(
+            detect_extension_from_bytes(b"<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"),
+            "svg"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"<?xml version=\"1.0\"?><svg></svg>"),
+            "svg"
+        );
+        assert_eq!(detect_extension_from_bytes(b"ID3\x04\x00\x00..."), "mp3");
+        assert_eq!(
+            detect_extension_from_bytes(b"RIFF\x24\x00\x00\x00WAVEfmt "),
+            "wav"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"\x00\x00\x00\x18ftypmp42..."),
+            "mp4"
+        );
+        assert_eq!(detect_extension_from_bytes(b"unknown data stream"), "tmp");
     }
 
     #[test]

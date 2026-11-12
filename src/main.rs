@@ -8,7 +8,7 @@ mod i18n;
 mod logger;
 mod notification;
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 use clap::Parser;
 use cli::Cli;
 use config::Config;
@@ -113,6 +113,62 @@ fn terminate_process(pid: i32) -> bool {
     {
         let _ = pid;
         false
+    }
+}
+
+fn check_for_updates() -> anyhow::Result<()> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    println!(
+        "Checking for updates... (Current version: v{})",
+        current_version
+    );
+
+    let output = std::process::Command::new("curl")
+        .args([
+            "-sSL",
+            "--connect-timeout",
+            "5",
+            "-H",
+            "User-Agent: konvert",
+            "https://api.github.com/repos/enesehs/konvert/releases/latest",
+        ])
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let body = String::from_utf8_lossy(&out.stdout);
+            if let Some(pos) = body.find("\"tag_name\":") {
+                let after = &body[pos + 11..];
+                if let Some(start_quote) = after.find('"') {
+                    let tag_part = &after[start_quote + 1..];
+                    if let Some(end_quote) = tag_part.find('"') {
+                        let tag = &tag_part[..end_quote];
+                        let remote_ver = tag.trim_start_matches('v');
+                        if remote_ver != current_version {
+                            println!(
+                                "\n✨ A new version of Konvert is available: {} (current: v{})",
+                                tag, current_version
+                            );
+                            println!("Download release or run installer:");
+                            println!(
+                                "  curl -fsSL https://enesehs.github.io/konvert/install.sh | bash"
+                            );
+                            println!("  https://github.com/enesehs/konvert/releases/tag/{}", tag);
+                            return Ok(());
+                        } else {
+                            println!("Konvert is up to date (v{}).", current_version);
+                            return Ok(());
+                        }
+                    }
+                }
+            }
+            println!("Notice: Could not parse latest release information from GitHub.");
+            Ok(())
+        }
+        _ => {
+            println!("Could not connect to update server. Please check your internet connection.");
+            Ok(())
+        }
     }
 }
 
@@ -335,20 +391,47 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    if cli.uninstall_dolphin {
-        match desktop::dolphin::uninstall_dolphin_service() {
-            Ok(true) => {
-                println!("Dolphin service menu removed.");
-                notifier.success(t("notify_integ_title"), "Dolphin context menu removed.");
-            }
-            Ok(false) => {
-                println!("Dolphin service menu was not installed.");
-            }
-            Err(e) => {
-                notifier.error(t("notify_failed"), &format!("Removal failed: {}", e));
-                return Err(anyhow::anyhow!("Dolphin removal error: {:#}", e));
+    if cli.check_update {
+        check_for_updates()?;
+        return Ok(());
+    }
+
+    if cli.list_profiles {
+        println!("Available Conversion Profiles:");
+        println!("\n  Built-in:");
+        println!("    web        - quality: 80, crf: 28, preset: fast, bitrate: 128k, dpi: 150");
+        println!(
+            "    balanced   - quality: 85, crf: 23, preset: medium, bitrate: 192k, dpi: 300 (default)"
+        );
+        println!("    archive    - quality: 95, crf: 18, preset: slow, bitrate: 320k, dpi: 600");
+        println!("    lossless   - image/video lossless: true, crf: 0, bitrate: 320k");
+        println!("\n  Custom (from config.toml):");
+        if config.profiles.is_empty() {
+            println!("    (none saved yet - use --save-profile <name> to create one)");
+        } else {
+            for (name, p) in &config.profiles {
+                println!(
+                    "    {:<10} - quality: {:?}, crf: {:?}, preset: {:?}, bitrate: {:?}, dpi: {:?}",
+                    name, p.quality, p.crf, p.preset, p.bitrate, p.dpi
+                );
             }
         }
+        return Ok(());
+    }
+
+    if let Some(name) = cli.save_profile {
+        let mut cfg = config.clone();
+        let profile = config::ProfileConfig {
+            quality: cli.quality,
+            crf: cli.crf,
+            preset: cli.preset.clone(),
+            bitrate: cli.bitrate.clone(),
+            dpi: cli.dpi,
+            lossless: if cli.lossless { Some(true) } else { None },
+        };
+        cfg.profiles.insert(name.clone(), profile);
+        cfg.save()?;
+        println!("Profile '{}' saved to config.", name);
         return Ok(());
     }
 
@@ -421,23 +504,37 @@ fn main() -> anyhow::Result<()> {
             let _ = tx.send(res);
         });
 
-        let mut progress_val = 20;
-        let progress_title = "Konvert: PDF Birleştiriliyor...".to_string();
-        let progress_body = format!("{} görsel birleştiriliyor...", files.len());
+        let start_time = std::time::Instant::now();
+        let mut progress_val = 15;
+        let progress_title = "Konvert: Merging PDF...".to_string();
 
         let merge_res = loop {
             match rx.recv_timeout(std::time::Duration::from_millis(300)) {
                 Ok(res) => break res,
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    if progress_val < 90 {
-                        progress_val += 5;
-                        notifier.update_progress(
-                            &mut progress_handle,
-                            &progress_title,
-                            &progress_body,
-                            progress_val,
-                        );
+                    let elapsed_secs = start_time.elapsed().as_secs();
+                    let target_pct = if elapsed_secs <= 5 {
+                        15 + (elapsed_secs as i32 * 6)
+                    } else if elapsed_secs <= 15 {
+                        45 + ((elapsed_secs - 5) as i32 * 25 / 10)
+                    } else if elapsed_secs <= 30 {
+                        70 + ((elapsed_secs - 15) as i32 * 15 / 15)
+                    } else {
+                        85 + (((elapsed_secs - 30) as f32 / (elapsed_secs + 30) as f32) * 10.0)
+                            as i32
                     }
+                    .min(95);
+
+                    if target_pct > progress_val {
+                        progress_val = target_pct;
+                    }
+                    let progress_body = format!("{} images ({}s)", files.len(), elapsed_secs);
+                    notifier.update_progress(
+                        &mut progress_handle,
+                        &progress_title,
+                        &progress_body,
+                        progress_val,
+                    );
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     break Err(anyhow::anyhow!(
@@ -530,7 +627,10 @@ fn main() -> anyhow::Result<()> {
     };
 
     let target_action = converter::TargetAction::parse(&target).ok();
-    let files: Vec<PathBuf> = if cli.recursive {
+    let is_stdin = cli.files.len() == 1 && cli.files[0].as_os_str() == "-";
+    let files: Vec<PathBuf> = if is_stdin {
+        vec![PathBuf::from("-")]
+    } else if cli.recursive {
         converter::expand_files_recursive(&cli.files, target_action.as_ref())
     } else {
         cli.files
@@ -568,70 +668,103 @@ fn main() -> anyhow::Result<()> {
         custom_output_dir,
     };
 
-    if let Some(profile) = cli.profile.as_deref() {
-        match profile {
-            "web" => {
-                if cli.quality.is_none() {
-                    opts.quality = Some(80);
-                }
-                if cli.crf.is_none() {
-                    opts.crf = Some(28);
-                }
-                if cli.preset.is_none() {
-                    opts.preset = Some("fast".into());
-                }
-                if cli.bitrate.is_none() {
-                    opts.bitrate = Some("128k".into());
-                }
-                if cli.dpi.is_none() {
-                    opts.dpi = Some(150);
-                }
+    if let Some(profile_name) = cli.profile.as_deref() {
+        if let Some(p) = config.get_profile(profile_name) {
+            if cli.quality.is_none()
+                && let Some(q) = p.quality
+            {
+                opts.quality = Some(q);
             }
-            "balanced" => {
-                if cli.quality.is_none() {
-                    opts.quality = Some(85);
-                }
-                if cli.crf.is_none() {
-                    opts.crf = Some(23);
-                }
-                if cli.preset.is_none() {
-                    opts.preset = Some("medium".into());
-                }
-                if cli.bitrate.is_none() {
-                    opts.bitrate = Some("192k".into());
-                }
-                if cli.dpi.is_none() {
-                    opts.dpi = Some(300);
-                }
+            if cli.crf.is_none()
+                && let Some(c) = p.crf
+            {
+                opts.crf = Some(c);
             }
-            "archive" => {
-                if cli.quality.is_none() {
-                    opts.quality = Some(95);
-                }
-                if cli.crf.is_none() {
-                    opts.crf = Some(18);
-                }
-                if cli.preset.is_none() {
-                    opts.preset = Some("slow".into());
-                }
-                if cli.bitrate.is_none() {
-                    opts.bitrate = Some("320k".into());
-                }
-                if cli.dpi.is_none() {
-                    opts.dpi = Some(600);
-                }
+            if cli.preset.is_none()
+                && let Some(ref pr) = p.preset
+            {
+                opts.preset = Some(pr.clone());
             }
-            "lossless" => {
+            if cli.bitrate.is_none()
+                && let Some(ref b) = p.bitrate
+            {
+                opts.bitrate = Some(b.clone());
+            }
+            if cli.dpi.is_none()
+                && let Some(d) = p.dpi
+            {
+                opts.dpi = Some(d);
+            }
+            if let Some(l) = p.lossless
+                && l
+            {
                 opts.image_lossless = true;
                 opts.video_lossless = true;
-                if cli.crf.is_none() {
-                    opts.crf = Some(0);
-                }
-                if cli.bitrate.is_none() {
-                    opts.bitrate = Some("320k".into());
-                }
             }
-            _ => {}
+        } else {
+            eprintln!(
+                "Warning: Unknown profile '{}'. Use --list-profiles to view available profiles.",
+                profile_name
+            );
+        }
+    }
+
+    if is_stdin {
+        use std::io::Read;
+        let mut input_bytes = Vec::new();
+        std::io::stdin()
+            .lock()
+            .read_to_end(&mut input_bytes)
+            .context("Failed to read from stdin")?;
+
+        if input_bytes.is_empty() {
+            eprintln!("Error: stdin was empty.");
+            std::process::exit(1);
+        }
+
+        let detected = converter::detect_extension_from_bytes(&input_bytes);
+        if cli.dry_run {
+            println!(
+                "[Dry Run] Planning stdin conversion: detected format .{} ➔ target: {}",
+                detected, opts.target
+            );
+            return Ok(());
+        }
+
+        let temp_dir = std::env::temp_dir();
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let temp_file = temp_dir.join(format!(
+            "konvert_stdin_{}_{}.{}",
+            std::process::id(),
+            unique,
+            detected
+        ));
+        std::fs::write(&temp_file, &input_bytes)?;
+
+        let convert_res = converter::convert_single(&temp_file, &opts);
+        let _ = std::fs::remove_file(&temp_file);
+
+        match convert_res {
+            Ok(output_path) => {
+                use std::io::IsTerminal;
+                if !std::io::stdout().is_terminal() && cli.output_dir.is_none() {
+                    let out_data = std::fs::read(&output_path)?;
+                    let _ = std::fs::remove_file(&output_path);
+                    let mut out = std::io::stdout().lock();
+                    std::io::Write::write_all(&mut out, &out_data)?;
+                    std::io::Write::flush(&mut out)?;
+                } else {
+                    println!("Converted stdin ➔ {}", output_path.display());
+                }
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Error: Stdin conversion failed: {:#}", e);
+                std::process::exit(1);
+            }
         }
     }
 
@@ -729,23 +862,42 @@ fn main() -> anyhow::Result<()> {
             let _ = tx.send(res);
         });
 
-        let mut progress_val = 20;
+        let start_time = std::time::Instant::now();
+        let mut progress_val = 15;
         let progress_title = format!("Konvert: {}", target_display);
-        let progress_body = format!("{}: {}", t("progress_processing"), file_name);
 
         let convert_res = loop {
             match rx.recv_timeout(std::time::Duration::from_millis(300)) {
                 Ok(res) => break res,
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    if progress_val < 90 {
-                        progress_val += 5;
-                        notifier.update_progress(
-                            &mut progress_handle,
-                            &progress_title,
-                            &progress_body,
-                            progress_val,
-                        );
+                    let elapsed_secs = start_time.elapsed().as_secs();
+                    let target_pct = if elapsed_secs <= 5 {
+                        15 + (elapsed_secs as i32 * 6)
+                    } else if elapsed_secs <= 15 {
+                        45 + ((elapsed_secs - 5) as i32 * 25 / 10)
+                    } else if elapsed_secs <= 30 {
+                        70 + ((elapsed_secs - 15) as i32 * 15 / 15)
+                    } else {
+                        85 + (((elapsed_secs - 30) as f32 / (elapsed_secs + 30) as f32) * 10.0)
+                            as i32
                     }
+                    .min(95);
+
+                    if target_pct > progress_val {
+                        progress_val = target_pct;
+                    }
+                    let progress_body = format!(
+                        "{}: {} ({}s)",
+                        t("progress_processing"),
+                        file_name,
+                        elapsed_secs
+                    );
+                    notifier.update_progress(
+                        &mut progress_handle,
+                        &progress_title,
+                        &progress_body,
+                        progress_val,
+                    );
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     break Err(anyhow::anyhow!("{}", t("err_unexpected_exit")));
@@ -813,13 +965,29 @@ fn main() -> anyhow::Result<()> {
             0,
         );
 
+        let batch_start = std::time::Instant::now();
         let batch_result =
             converter::convert_batch_with_progress(&files, &opts, |curr, total, file, percent| {
                 let file_name = file.file_name().and_then(|s| s.to_str()).unwrap_or("file");
-                let summary = format!("Konvert: [{}/{}] Converting ({}%)", curr, total, percent);
+                let elapsed = batch_start.elapsed().as_secs_f64();
+                let eta_str = if curr > 0 && curr < total {
+                    let avg = elapsed / curr as f64;
+                    let rem_secs = (avg * (total - curr) as f64).round() as u64;
+                    if rem_secs < 60 {
+                        format!(" - ETA: {}s", rem_secs)
+                    } else {
+                        format!(" - ETA: {}m {}s", rem_secs / 60, rem_secs % 60)
+                    }
+                } else {
+                    String::new()
+                };
+                let summary = format!("Konvert: [{}/{}] ({}%{})", curr, total, percent, eta_str);
                 let body = file_name.to_string();
                 notifier.update_progress(&mut progress_handle, &summary, &body, percent);
-                println!("[{}/{}] {} ({}%)", curr, total, file_name, percent);
+                println!(
+                    "[{}/{}] {} ({}%{})",
+                    curr, total, file_name, percent, eta_str
+                );
             });
 
         remove_pid_lock();

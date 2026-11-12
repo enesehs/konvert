@@ -53,9 +53,21 @@ pub struct Cli {
     #[arg(long = "target-size")]
     pub target_size: Option<String>,
 
-    /// Conversion profile preset (web, balanced, archive, lossless)
-    #[arg(long = "profile", value_parser = ["web", "balanced", "archive", "lossless"])]
+    /// Conversion profile preset (web, balanced, archive, lossless, or custom)
+    #[arg(long = "profile")]
     pub profile: Option<String>,
+
+    /// Save current CLI settings as a named preset profile in config
+    #[arg(long = "save-profile")]
+    pub save_profile: Option<String>,
+
+    /// List all available conversion profiles (built-in and custom)
+    #[arg(long = "list-profiles")]
+    pub list_profiles: bool,
+
+    /// Check for online updates from GitHub releases
+    #[arg(long = "check-update")]
+    pub check_update: bool,
 
     /// Strip EXIF, GPS, and privacy metadata
     #[arg(long = "strip-metadata")]

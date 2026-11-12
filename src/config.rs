@@ -4,6 +4,16 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct ProfileConfig {
+    pub quality: Option<u8>,
+    pub crf: Option<u8>,
+    pub preset: Option<String>,
+    pub bitrate: Option<String>,
+    pub dpi: Option<u32>,
+    pub lossless: Option<bool>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     pub general: GeneralConfig,
@@ -12,6 +22,8 @@ pub struct Config {
     pub video: VideoConfig,
     pub audio: AudioConfig,
     pub document: DocumentConfig,
+    #[serde(default)]
+    pub profiles: std::collections::HashMap<String, ProfileConfig>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -79,11 +91,52 @@ impl Default for Config {
                 bitrate: "320k".into(),
             },
             document: DocumentConfig { pdf_dpi: 300 },
+            profiles: std::collections::HashMap::new(),
         }
     }
 }
 
 impl Config {
+    pub fn get_profile(&self, name: &str) -> Option<ProfileConfig> {
+        if let Some(custom) = self.profiles.get(name) {
+            return Some(custom.clone());
+        }
+        match name {
+            "web" => Some(ProfileConfig {
+                quality: Some(80),
+                crf: Some(28),
+                preset: Some("fast".into()),
+                bitrate: Some("128k".into()),
+                dpi: Some(150),
+                lossless: Some(false),
+            }),
+            "balanced" => Some(ProfileConfig {
+                quality: Some(85),
+                crf: Some(23),
+                preset: Some("medium".into()),
+                bitrate: Some("192k".into()),
+                dpi: Some(300),
+                lossless: Some(false),
+            }),
+            "archive" => Some(ProfileConfig {
+                quality: Some(95),
+                crf: Some(18),
+                preset: Some("slow".into()),
+                bitrate: Some("320k".into()),
+                dpi: Some(600),
+                lossless: Some(false),
+            }),
+            "lossless" => Some(ProfileConfig {
+                quality: None,
+                crf: Some(0),
+                preset: None,
+                bitrate: Some("320k".into()),
+                dpi: None,
+                lossless: Some(true),
+            }),
+            _ => None,
+        }
+    }
     pub fn config_path() -> Option<PathBuf> {
         let proj_dirs = ProjectDirs::from("", "", "konvert")?;
         Some(proj_dirs.config_dir().join("config.toml"))
@@ -178,5 +231,27 @@ mod tests {
     fn test_config_language_is_optional() {
         let cfg: Config = toml::from_str(&minimal_toml("")).unwrap();
         assert_eq!(cfg.general.language, None);
+    }
+
+    #[test]
+    fn test_config_profiles_builtins_and_custom() {
+        let mut cfg = Config::default();
+        let web_profile = cfg.get_profile("web").expect("web profile must exist");
+        assert_eq!(web_profile.quality, Some(80));
+        assert_eq!(web_profile.crf, Some(28));
+
+        // Custom override or new profile
+        cfg.profiles.insert(
+            "custom_photo".into(),
+            ProfileConfig {
+                quality: Some(99),
+                ..Default::default()
+            },
+        );
+        let custom = cfg
+            .get_profile("custom_photo")
+            .expect("custom_photo must exist");
+        assert_eq!(custom.quality, Some(99));
+        assert!(cfg.get_profile("non_existent").is_none());
     }
 }
