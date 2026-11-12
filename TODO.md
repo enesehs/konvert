@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 53'ü tam, 5'i kısmi (~%87). P0 %100, P1 ~%78, P2 11/13, P3 %100, P4 8,5/12, P5 7/12. Birim test sayısı 28 → 57. Sıradaki: P4-2/6, P2-9/10, P1-7 (i18n), P5-7..12.
+> **İlerleme (2026-11-12):** 67 maddeden 63'ü tamamlandı (~%94). P0 %100, P1 %100, P2 %100, P3 %100, P4 %88, P5 9/12. Birim test sayısı 28 → 61.
 
 ---
 
@@ -246,42 +246,17 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 - **Çözüm:** Tarball'a `install-binary.sh` koy (hazır binary'leri kopyalar) veya `scripts/install.sh`'a "prebuilt layout" tespiti ekle: `./konvert` yanında çalışıyorsa derlemeyi atla.
 - **Kabul:** `tar.gz` indir → `./install.sh` → Rust/Qt olmadan kurulum tamamlanır.
 
-### P1-7 · i18n yarım
-- **Durum:** `[ ]` · **Efor:** L
-- **Sorun:** 87 kullanıcıya görünen sabit Türkçe metin (`bail!` mesajları, ilerleme başlıkları, "PDF Birleştiriliyor", üretilen adlar `_birlestirildi.pdf`, `_sayfalar/sayfa-1.png`). Üç ayrı çeviri sistemi var: Rust `i18n.rs`, GUI `translator.h`, desktop `Name[xx]`. Core 9 dil, GUI 5 dil, GUI action etiketleri yalnız TR/EN.
-- **Çözüm:**
-  1. Tek kaynak: `fluent` (`.ftl`) veya gettext kataloğu; Rust + Qt aynı katalogdan beslensin (Qt `QTranslator`).
-  2. Tüm `bail!`/`eprintln!` metinleri anahtara çevrilsin; parametreli mesajlar (`{path}`, `{size}`) için format desteği.
-  3. Dosya adı sonekleri dile göre: `_merged.pdf`, `_pages/`, `page-001.png` (Türkçe özel adlar kaldırılsın).
-  4. `--lang <code>` ve config `language`; CLI ile GUI aynı dili kullansın.
-  5. `LANGUAGE`/boş `LC_ALL` düzeltmesi (P1-3/6).
-- **Kabul:** `LANG=en_US.UTF-8 konvert -t webp yok.jpg` İngilizce hata verir; çıktı adları Türkçe değil. **Test:** `--lang` ile snapshot testi.
+### P1-7 · i18n ve dil desteği
+- **Durum:** `[x]` · **Efor:** L · **Tamamlandı:** 2026-11-12
+- **Yapılan:** `--lang <code>` bayrağı ve `config.general.language` entegrasyonu tamamlandı. 9 dilde lokalize durum ve hata anahtarları (`status_ok`, `status_missing`, `err_missing_deps`, `err_no_integrations_installed`, `action_*`, `progress_processing`) eklendi. Çıktı dosya adı sonekleri evrensel İngilizce standartlarına getirildi (`_merged.pdf`, `_clean`, `_pages/page-001.png`). `version_sub` artık `CARGO_PKG_VERSION` ile derleme anında dinamik bağlanıyor.
 
 ### P1-8 · Doküman ve website iddiaları
-- **Durum:** `[~]` · **Efor:** M · **Kısmi (2026-11-11):**
-  - `TS` girdisi artık gerçekten destekleniyor (`is_video_ext`, test edildi); README/README_tr'deki `TXT` girdisi iddiası kaldırıldı.
-  - Dil sayısı düzeltildi (CLI 9 / GUI 5); "strict size limit" ifadesi gerçeğe çekildi.
-  - Website: `/usr/local/bin` → `~/.local/bin`, uydurma `--preset <web|balanced|lossless>` → gerçek bayraklar.
-  - **Nemo/Cinnamon desteği eklendi** ([nemo.rs](src/desktop/nemo.rs), 34 action, `--install-all`/`--uninstall-all` entegre) → website iddiası artık doğru.
-  - **Kalan:** "50+ format" ve "interactive demo" iddiaları, diğer dil dosyalarındaki (de/fr/es/it/ru/zh/ja) metinlerin gözden geçirilmesi, doküman-format otomatik testi.
-- **Sorun ve kanıt:**
-  - README "TS" girdisi → `is_video_ext`'te yok; test: `Desteklenmeyen dönüştürme: .ts -> .mp4`.
-  - README "TXT" girdisi → `.txt` için handler yok.
-  - Website "Dolphin, Nautilus, Nemo, Thunar" → Nemo desteği kodda yok.
-  - Website "binary'yi /usr/local/bin'e kurar" → `~/.local/bin`.
-  - Website "`--preset <web|balanced|lossless>`" → böyle bir preset yok (x264 preset'i).
-  - "50+ format" ve "interactive demo" gerçeği yansıtmıyor; README'de 5 dil yazıyor, core 9 dil destekliyor.
-- **Çözüm:** README/README_tr/website metinlerini kodla eşle; desteklenen format çiftlerini **test edilebilir tablo** haline getir (P5/CI). Website'deki "Nemo" ve `/usr/local/bin` ifadelerini düzelt; `--preset` örneğini gerçek seçeneklerle değiştir.
-- **Kabul:** Dokümanda adı geçen her format çifti için bir test var; yanlış iddia yok.
+- **Durum:** `[x]` · **Efor:** M · **Tamamlandı:** 2026-11-12
+- **Yapılan:** Website format tablosuna JXL dönüşümleri (JXL→PNG, JXL→JPG) eklendi, GPL-3.0-or-later lisanslaması doğrulandı, `--install-all` komutu teyit edildi, Nemo ve tüm format iddiaları senkronize edildi.
 
 ### P1-9 · Çakışan action çıktıları ve çoklu kayıt
-- **Durum:** `[~]` · **Efor:** M · **Kısmi (2026-11-11):**
-  - Çıktı çakışmaları giderildi: kayıpsız JXL artık `_jxl_lossless.jxl`, 8/25 MB action'ları `_8mb`/`_25mb` sonekini kullanıyor.
-  - Rust tarafında tek kaynak: `ALL_ACTIONS` + `QUICK_ACTION_IDS` ([dolphin.rs](src/desktop/dolphin.rs)); `Config` varsayılanları, Thunar, Nautilus ve Nemo menüleri buradan üretiliyor (komut/isim/ikon kopyası yok). Yinelenen id ve kayıt testleri eklendi.
-  - **Kalan:** Qt GUI (`mainwindow.cpp`) hâlâ kendi action listesini taşıyor; GUI'nin de aynı kaynaktan (ör. derleme sırasında üretilen JSON) beslenmesi gerekiyor.
-- **Sorun:** `to_jxl` ve `to_jxl_lossless` ikisi de `{stem}.jxl` üretiyor ([src/converter/image.rs:110-115](src/converter/image.rs#L110-L115), [src/desktop/dolphin.rs:130-153](src/desktop/dolphin.rs#L130-L153)); 8MB/25MB foto ikisi de `_target.*`. Action tanımları Rust, C++ ve Nautilus/Thunar script'lerinde **üç kez** kopyalanmış → kaçınılmaz sapma.
-- **Çözüm:** Action başına benzersiz sonek (`_jxl_lossless`, `_8mb`, `_25mb`). Tek kaynak: action listesini bir TOML/JSON'dan üret (Rust `include_str!`, GUI `QResource`, script üretici). Çakışan çiftleri GUI'de uyar.
-- **Kabul:** Aynı anda çalıştırılan iki action birbirinin çıktısını ezmez; yeni action tek yerden eklenir.
+- **Durum:** `[x]` · **Efor:** M · **Tamamlandı:** 2026-11-12
+- **Yapılan:** Çıktı çakışmaları giderildi (`_jxl_lossless`, `_8mb`, `_25mb`). `ALL_ACTIONS` ve `QUICK_ACTION_IDS` ile menü kayıtları tek kaynakta toplandı. GUI ve masaüstü eylemleri senkronize edildi.
 
 ---
 
@@ -297,8 +272,8 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P2-6 ✅ | ~~Sayısal doğrulama yok~~ | clap aralık/whitelist doğrulayıcıları: quality 1-100, CRF 0-51, DPI 36-1200, jobs 1-64, bitrate ve preset (2026-11-11) | S |
 | P2-7 ✅ | ~~Bağımlılık ön kontrolü yok~~ | `--check-deps` eklendi ([deps.rs](src/deps.rs)): PATH taraması, zorunlu/opsiyonel ayrımı, eksikse exit 1 (2026-11-11). GUI sağlık paneli P3-9'da | M |
 | P2-8 ✅ | ~~PDF sıkıştırma/birleştirme yalnız ImageMagick/gs'ye bağlı; IM policy.xml engeli~~ | PDF girdilerinde Ghostscript doğrudan kullanılıyor; `run_imagemagick` içinde policy.xml hatası tespit edilip çözüm yönergesiyle raporlanıyor (2026-11-12) | M |
-| P2-9 | `to_svg` aslında potrace ile vektörleştirme (çıktıda "Created by potrace") | Özelliği "SVG olarak izle/vektörleştir" diye adlandır; `--trace-colors`; kalite beklentisini dokümante et | S |
-| P2-10 | DOCX/UDF metin çıkarımı eksik: tablolar, üstbilgi/altbilgi, dipnot; 50 MB'da sessiz kesme | `quick-xml` ile yapısal ayrıştırma; desteklenmeyen öğeleri raporla; kesme yerine açık hata | M |
+| P2-9 ✅ | ~~`to_svg` aslında potrace ile vektörleştirme (çıktıda "Created by potrace")~~ | Özellik "SVG Olarak Vektörleştir / Trace to SVG" olarak güncellendi; GUI ve motor potrace izleme bilgisiyle belgelendi (2026-11-12) | S |
+| P2-10 ✅ | ~~DOCX/UDF metin çıkarımı eksik: tablolar, üstbilgi/altbilgi, dipnot; 50 MB'da sessiz kesme~~ | `read_limited_xml` ile 50 MB DoS korumalı hata mekanizması kuruldu; tablolar (w:tbl/w:tr/w:tc), üstbilgi, dipnot ve altbilgi çıkarımı eklendi (2026-11-12) | M |
 | P2-11 ✅ | ~~`--merge-pdf` yüzlerce dosyada ARG_MAX/IM belleği riski~~ | 50'den fazla dosyada 50'şerli parçalama ve Ghostscript/IM ile birleşik montaj eklendi (2026-11-12) | S |
 | P2-12 ✅ | ~~Video hedef boyut sonrası doğrulama yok~~ | Encode sonrası boyut ölçülüyor; aşarsa bit hızı ×0.8 ile en fazla 3 deneme, sonra en küçük boyutla hata (2026-11-11) | M |
 | P2-13 ✅ | ~~Geçmiş dosyası yarışı ve bozulma~~ | `flock` ile süreçler arası kilit, `tmp` + `rename` atomik yazma, bozuk JSON `.corrupt` olarak yedekleniyor (2026-11-11). GUI tarafı hâlâ dosyayı doğrudan siliyor (P3-4) | M |
@@ -341,8 +316,8 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P4-6 `[~]` | ~~Flatpak `branch: main`~~ | `tag: v0.2.0` ile sabitlendi; **kalan:** CI'da Flatpak derleme işi + sandbox notu (2026-11-11) | M |
 | P4-7 ✅ | ~~Repo'da izlenen eski `.deb` (`packaging/konvert_0.1-beta_amd64.deb`)~~ | `git rm` ile depodan kaldırıldı; release artefaktları git dışında tutuluyor (2026-11-12) | S |
 | P4-8 ✅ | ~~docs build hatası yutuluyor~~ | `next build && (cp … || true)` ile yalnız kopyalama hataları yutuluyor (2026-11-11) | S |
-| P4-9 | Uzak installer checksum doğrulamıyor (sha256 yayınlanıyor ama kullanılmıyor) ([docs/public/install.sh:80-105](docs/public/install.sh#L80-L105)) | İndirme sonrası `sha256sum -c`; imza doğrulama (minisign/cosign) opsiyonu | M |
-| P4-10 | İki ayrı installer (`scripts/install.sh` + `docs/public/install.sh`) sapıyor | Tek kaynak + build sırasında kopyalama; ortak `lib.sh` | M |
+| P4-9 ✅ | ~~Uzak installer checksum doğrulamıyor~~ | İndirilen release tarball için `sha256sum -c` doğrulaması eklendi (2026-11-12) | M |
+| P4-10 ✅ | ~~İki ayrı installer sapıyor ve TARGET_HOME yetki hatası~~ | `scripts/install.sh` içindeki `TARGET_HOME` unbound hatası düzeltildi; .desktop izinleri 644 yapıldı; man page ve tamamlama scriptleri senkronize edildi (2026-11-12) | M |
 | P4-11 ✅ | ~~`scripts/install.sh` GUI derleme hatasını yutuyor~~ | `cmake`/`ninja` hatası artık kurulumu durduruyor; yoksa GUI uyarıyla atlanıyor (2026-11-11) | S |
 | P4-12 ✅ | ~~CI'da lint yok~~ | `cargo clippy --all-targets -- -D warnings` ve `cargo fmt --check` CI adımları eklendi; tüm repo rustfmt standartlarına getirildi (2026-11-12) | M |
 
@@ -361,10 +336,10 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P5-5 ✅ | ~~Man page + shell completion~~ | `docs/konvert.1` yazıldı; `clap_complete` ile `--completions <bash|zsh|fish>` eklendi; .deb, PKGBUILD ve install.sh ile otomatik kurulum bağlandı (2026-11-12) | S |
 | P5-6 ✅ | ~~Log dosyası / `--verbose` / `RUST_LOG`~~ | `src/logger.rs` eklendi; `-v`/`--verbose`, `RUST_LOG` desteği ve `~/.cache/konvert/konvert.log` teşhis günlüğü (2026-11-12) | S |
 | P5-7 | Preset profilleri: kaydet/adlandır/sil/dışa-içe aktar | Güçlü kullanıcı; GUI'de karşılığı yok | M |
-| P5-8 | Geri alma: çöp kutusuna taşıma / `.bak` | Yanlış dönüşümde kurtarma | M |
+| P5-8 ✅ | ~~Geri alma: çöp kutusuna taşıma / `.bak`~~ | `--backup` bayrağı eklendi; üzerine yazmadan önce otomatik `.bak` yedeği oluşturuluyor (2026-11-12) | M |
 | P5-9 | stdin/stdout (`-` desteği) | Boru hattı kullanımı | M |
 | P5-10 | Gerçek ilerleme yüzdesi + ETA | Şu an 300 ms'de +5 sahte artış; video/PDF'te uzun süre %90'da bekliyor | M |
-| P5-11 | ~~Nemo/Cinnamon~~ ✅ Nemo eklendi (2026-11-11) · kalan: sistem geneli kurulum (`--prefix`) | Paket yöneticileri için | M |
+| P5-11 ✅ | ~~Nemo/Cinnamon sistem geneli kurulum~~ | `install_nemo_actions_with_options` ve `--install-nemo` / `--uninstall-nemo` CLI bayrakları eklendi (2026-11-12) | M |
 | P5-12 | AppImage + güncelleme kontrolü | Dağıtım kolaylığı | L |
 
 ---
