@@ -42,6 +42,22 @@
     <category>KDE</category>
   </categories>
 
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Convert files from the Dolphin right-click menu</caption>
+      <image type="source">https://raw.githubusercontent.com/enesehs/konvert/main/assets/screenshots/screenshot_context_menu.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Conversion history with savings and previews</caption>
+      <image type="source">https://raw.githubusercontent.com/enesehs/konvert/main/assets/screenshots/screenshot_history.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Settings: per-file-manager context menu actions</caption>
+      <image type="source">https://raw.githubusercontent.com/enesehs/konvert/main/assets/screenshots/screenshot_convert.png</image>
+    </screenshot>
+  </screenshots>
+
   <content_rating type="oars-1.1"/>
 
   <releases>

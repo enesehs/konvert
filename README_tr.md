@@ -51,7 +51,7 @@
 * **Sıfır Telemetri & %100 Gizlilik:** Dosyalarınız cihazınızdan asla ayrılmaz. İnternet bağlantısı gerekmez; tüm işlemler yerel donanımınızın çoklu çekirdek gücüyle çalışır.
 * **Sağ Tık (KIO ServiceMenu) Rahatlığı:** Dolphin içinde bir veya yüzlerce dosyayı seçip sağ tıklayarak saniyeler içinde dönüştürün.
 * **Canlı Plasma İlerleme Bildirimi:** Tekil ve toplu dönüşümlerde Plasma 6 bildirim merkezinde animasyonlu ilerleme çubuğu (`progress bar`) gösterilir.
-* **Akıllı Hedef Boyutlandırma:** Discord (8 MB) ve E-posta (25 MB) sınırlarına uygun otomatik bit hızı ve video sıkıştırması.
+* **Akıllı Hedef Boyutlandırma:** Discord (8 MB) ve E-posta (25 MB) hedeflerine yönelik otomatik bit hızı hesabı; görsel/PDF çıktılarında boyut doğrulaması.
 * **Önizlemeli İşlem Günlüğü:** Yapılan tüm işlemlerin boyut tasarruflarını takip edin, önizleme küçük resimlerine (thumbnail) bakın ve doğrudan Dolphin'de açın.
 
 ---
@@ -99,7 +99,7 @@
 | **Akıllı Hedef Boyutlandırma** | `discord_8mb`, `email_25mb` ve `web_opt` profilleri ile otomatik matematiksel bit hızı hesabı. |
 | **Yerel D-Bus İlerleme Çubuğu** | İşlemleri tek bir bildirim penceresinde canlı günceller (`in-place`), toast kirliliği yapmaz. |
 | **Gelişmiş Belge ve Medya Araçları** | UDF (UYAP) belgelerini doğrudan PDF'e çevirme, görselleri tek PDF'te birleştirme, EXIF temizleme ve videodan ses ayıklama. |
-| **Çok Dilli (i18n) Destek** | Otomatik sistem dili algılama, Türkçe, English, Deutsch, Français ve Español seçenekleri. |
+| **Çok Dilli (i18n) Destek** | Otomatik sistem dili algılama; CLI'da 9 dil (TR, EN, DE, FR, ES, IT, RU, ZH, JA), ayar arayüzünde 5 dil. |
 
 ---
 
@@ -201,7 +201,7 @@ konvert -s                            # Qt6 Ayarlar arayüzünü aç
 | **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Temizleme, %50 ve 1080p Boyutlandırma, PDF Birleştirme |
 | **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord (8 MB), E-Posta (25 MB), Kareleri Klasöre Aktarma, Sesi Ayıklama |
 | **Sesler** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP4 Dalga Formu (Waveform Video) Üretimi |
-| **Belgeler** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Sayfa Ayrıştırma (DPI Ayarlı), UDF Metin ve PDF Çıktısı |
+| **Belgeler** | UDF (UYAP), DOCX, PDF | PDF, PNG, JPG, TXT | Sayfa Ayrıştırma (DPI Ayarlı), UDF Metin ve PDF Çıktısı |
 
 ---
 

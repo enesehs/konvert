@@ -1,12 +1,16 @@
 use anyhow::{bail, Context, Result};
-use image::{codecs::jpeg::JpegEncoder, imageops, DynamicImage, GenericImageView, ImageFormat};
+use image::{
+    codecs::jpeg::JpegEncoder, imageops, DynamicImage, GenericImageView, ImageDecoder,
+    ImageFormat,
+};
 use std::fs::{self, File};
-use std::io::{BufWriter, Write};
+use std::io::{BufRead, Seek};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 pub use crate::converter::{
-    determine_output_path, determine_suffixed_output_path, ensure_parent_dir, get_output_dir,
+    claim_output_path, determine_output_path, determine_suffixed_output_path, ensure_parent_dir,
+    get_output_dir,
 };
 
 pub fn is_supported_image_target(target: &str) -> bool {
@@ -76,11 +80,13 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "SVG raster çıktısı bellekten okunamadı")
     } else if ext == "heic" || ext == "heif" {
         let output = Command::new("magick")
+            .arg("-auto-orient")
             .arg(input_path)
             .arg("png:-")
             .output()
             .or_else(|_| {
                 Command::new("convert")
+                    .arg("-auto-orient")
                     .arg(input_path)
                     .arg("png:-")
                     .output()
@@ -94,9 +100,33 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
         image::load_from_memory(&output.stdout)
             .with_context(|| "HEIC/HEIF çıktısı bellekten okunamadı")
     } else {
-        image::open(input_path)
+        let file = File::open(input_path)
+            .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))?;
+        decode_with_orientation(std::io::BufReader::new(file))
             .with_context(|| format!("Görsel açılamadı: {}", input_path.display()))
     }
+}
+
+/// EXIF yön etiketini uygulayarak görseli çözer.
+///
+/// `image` crate yön etiketini otomatik uygulamaz; uygulanmazsa telefon
+/// fotoğrafları 90° yanlış görünür. Yön, çözücüden okunup piksele gömülür.
+fn decode_with_orientation<R>(reader: R) -> Result<DynamicImage>
+where
+    R: BufRead + Seek,
+{
+    let reader = image::ImageReader::new(reader)
+        .with_guessed_format()
+        .context("Görsel formatı tanınamadı")?;
+    let mut decoder = reader
+        .into_decoder()
+        .context("Görsel çözücü başlatılamadı")?;
+    let orientation = decoder
+        .orientation()
+        .unwrap_or(image::metadata::Orientation::NoTransforms);
+    let mut img = DynamicImage::from_decoder(decoder).context("Görsel çözülemedi")?;
+    img.apply_orientation(orientation);
+    Ok(img)
 }
 
 pub fn convert_image(
@@ -107,37 +137,47 @@ pub fn convert_image(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     let target_lower = target_ext.to_lowercase();
-    let output_path = determine_output_path(input_path, &target_lower, custom_output_dir);
-    ensure_parent_dir(&output_path)?;
 
-    // JPEG XL (.jxl)
+    // JPEG XL (.jxl): kayıpsız ve kayıplı action'lar aynı adı üretmesin.
     if target_lower == "jxl" {
+        let candidate = if lossless {
+            determine_suffixed_output_path(input_path, "jxl_lossless", "jxl", custom_output_dir)
+        } else {
+            determine_output_path(input_path, &target_lower, custom_output_dir)
+        };
+        let output_path = claim_output_path(candidate);
         return convert_to_jxl(input_path, &output_path, quality, lossless);
     }
 
+    let output_path =
+        claim_output_path(determine_output_path(input_path, &target_lower, custom_output_dir));
+    ensure_parent_dir(&output_path)?;
+
     // SVG (.svg)
     if target_lower == "svg" {
+        let pending = crate::converter::PendingOutput::new(&output_path);
         let status = crate::converter::run_imagemagick(&[
             input_path.as_os_str(),
-            output_path.as_os_str(),
+            pending.path().as_os_str(),
         ]);
-        if status.is_ok() && output_path.exists() {
-            return Ok(output_path);
+        if status.is_ok() && pending.path().exists() {
+            return pending.commit();
         }
         bail!("SVG formatına dönüştürülemedi: {}", input_path.display());
     }
 
     // HEIC / HEIF (.heic, .heif)
     if target_lower == "heic" || target_lower == "heif" {
+        let pending = crate::converter::PendingOutput::new(&output_path);
         let q_str = quality.unwrap_or(85).to_string();
         let status = crate::converter::run_imagemagick(&[
             input_path.as_os_str(),
             std::ffi::OsStr::new("-quality"),
             std::ffi::OsStr::new(&q_str),
-            output_path.as_os_str(),
+            pending.path().as_os_str(),
         ]);
-        if status.is_ok() && output_path.exists() {
-            return Ok(output_path);
+        if status.is_ok() && pending.path().exists() {
+            return pending.commit();
         }
         bail!("HEIC formatına dönüştürülemedi: {}", input_path.display());
     }
@@ -149,77 +189,90 @@ pub fn convert_image(
     match format {
         ImageFormat::Jpeg => {
             let q = quality.unwrap_or(85).clamp(1, 100);
-            let file = File::create(&output_path)
-                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
-            let mut writer = BufWriter::with_capacity(64 * 1024, file);
-            let rgb = img.to_rgb8(); // RGBA verilerini güvenli RGB8 formatına dönüştür (çökmeyi önler)
-            let mut encoder = JpegEncoder::new_with_quality(&mut writer, q);
-            encoder.encode_image(&rgb)
-                .with_context(|| "JPEG kodlama hatası")?;
-            writer.flush().with_context(|| "JPEG tamponu yazılamadı")?;
+            let rgb = img.to_rgb8(); // RGBA verilerini güvenli RGB8 formatına dönüştür
+            crate::converter::write_file_atomic(&output_path, |writer| {
+                let mut encoder = JpegEncoder::new_with_quality(writer, q);
+                encoder
+                    .encode_image(&rgb)
+                    .context("JPEG kodlama hatası")?;
+                Ok(())
+            })?;
         }
         ImageFormat::WebP => {
             if !lossless {
+                let pending = crate::converter::PendingOutput::new(&output_path);
                 let q_str = quality.unwrap_or(82).to_string();
                 if crate::converter::run_imagemagick(&[
                     input_path.as_os_str(),
                     std::ffi::OsStr::new("-auto-orient"),
                     std::ffi::OsStr::new("-quality"),
                     std::ffi::OsStr::new(&q_str),
-                    output_path.as_os_str(),
-                ]).is_ok() {
-                    return Ok(output_path);
+                    pending.path().as_os_str(),
+                ])
+                .is_ok()
+                    && pending.path().exists()
+                {
+                    return pending.commit();
                 }
             }
-            let file = File::create(&output_path)
-                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
-            let mut writer = BufWriter::with_capacity(64 * 1024, file);
-            img.write_to(&mut writer, ImageFormat::WebP)
-                .with_context(|| "WebP kaydetme hatası")?;
-            writer.flush().with_context(|| "WebP tamponu yazılamadı")?;
+            crate::converter::write_file_atomic(&output_path, |writer| {
+                img.write_to(writer, ImageFormat::WebP)
+                    .context("WebP kaydetme hatası")?;
+                Ok(())
+            })?;
         }
         ImageFormat::Ico => {
+            let pending = crate::converter::PendingOutput::new(&output_path);
             if crate::converter::run_imagemagick(&[
                 input_path.as_os_str(),
                 std::ffi::OsStr::new("-resize"),
                 std::ffi::OsStr::new("256x256>"),
-                output_path.as_os_str(),
-            ]).is_ok() && output_path.exists() {
-                return Ok(output_path);
+                pending.path().as_os_str(),
+            ])
+            .is_ok()
+                && pending.path().exists()
+            {
+                return pending.commit();
             }
             let resized = if img.width() > 256 || img.height() > 256 {
                 img.resize(256, 256, image::imageops::FilterType::Lanczos3)
             } else {
                 img
             };
-            let file = File::create(&output_path)
-                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
-            let mut writer = BufWriter::with_capacity(64 * 1024, file);
-            resized.write_to(&mut writer, ImageFormat::Ico)
-                .with_context(|| format!("ICO formatında kaydedilemedi: {}", output_path.display()))?;
-            writer.flush().with_context(|| "ICO tamponu yazılamadı")?;
+            crate::converter::write_file_atomic(&output_path, |writer| {
+                resized
+                    .write_to(writer, ImageFormat::Ico)
+                    .with_context(|| {
+                        format!("ICO formatında kaydedilemedi: {}", output_path.display())
+                    })?;
+                Ok(())
+            })?;
         }
         ImageFormat::Bmp => {
+            let pending = crate::converter::PendingOutput::new(&output_path);
             if crate::converter::run_imagemagick(&[
                 input_path.as_os_str(),
-                output_path.as_os_str(),
-            ]).is_ok() && output_path.exists() {
-                return Ok(output_path);
+                pending.path().as_os_str(),
+            ])
+            .is_ok()
+                && pending.path().exists()
+            {
+                return pending.commit();
             }
-            let file = File::create(&output_path)
-                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
-            let mut writer = BufWriter::with_capacity(64 * 1024, file);
-            img.write_to(&mut writer, ImageFormat::Bmp)
-                .with_context(|| format!("BMP formatında kaydedilemedi: {}", output_path.display()))?;
-            writer.flush().with_context(|| "BMP tamponu yazılamadı")?;
+            crate::converter::write_file_atomic(&output_path, |writer| {
+                img.write_to(writer, ImageFormat::Bmp).with_context(|| {
+                    format!("BMP formatında kaydedilemedi: {}", output_path.display())
+                })?;
+                Ok(())
+            })?;
         }
         _ => {
-            let file = File::create(&output_path)
-                .with_context(|| format!("Dosya oluşturulamadı: {}", output_path.display()))?;
-            let mut writer = BufWriter::with_capacity(64 * 1024, file);
-            img.write_to(&mut writer, format)
-                .with_context(|| format!("Görsel kaydedilemedi: {}", output_path.display()))?;
-            writer.flush().with_context(|| "Görsel tamponu yazılamadı")?;
+            crate::converter::write_file_atomic(&output_path, |writer| {
+                img.write_to(writer, format).with_context(|| {
+                    format!("Görsel kaydedilemedi: {}", output_path.display())
+                })?;
+                Ok(())
+            })?;
         }
     }
 
@@ -233,8 +286,9 @@ fn convert_to_jxl(
     lossless: bool,
 ) -> Result<PathBuf> {
     ensure_parent_dir(output_path)?;
+    let pending = crate::converter::PendingOutput::new(output_path);
     let mut cmd = Command::new("cjxl");
-    cmd.arg(input_path).arg(output_path);
+    cmd.arg(input_path).arg(pending.path());
 
     if lossless {
         cmd.arg("-d").arg("0");
@@ -248,7 +302,7 @@ fn convert_to_jxl(
         bail!("cjxl ile JPEG XL dönüştürme başarısız oldu");
     }
 
-    Ok(output_path.to_path_buf())
+    pending.commit()
 }
 
 pub fn encode_webp_optimized(
@@ -257,32 +311,36 @@ pub fn encode_webp_optimized(
     custom_output_dir: Option<&Path>,
     suffix: &str,
 ) -> Result<PathBuf> {
-    let output_path = determine_suffixed_output_path(
+    let output_path = claim_output_path(determine_suffixed_output_path(
         input_path,
         suffix,
         "webp",
         custom_output_dir,
-    );
+    ));
     ensure_parent_dir(&output_path)?;
 
     let q_str = quality.unwrap_or(82).to_string();
+    let pending = crate::converter::PendingOutput::new(&output_path);
     if crate::converter::run_imagemagick(&[
         input_path.as_os_str(),
         std::ffi::OsStr::new("-auto-orient"),
         std::ffi::OsStr::new("-strip"),
         std::ffi::OsStr::new("-quality"),
         std::ffi::OsStr::new(&q_str),
-        output_path.as_os_str(),
-    ]).is_ok() {
-        return Ok(output_path);
+        pending.path().as_os_str(),
+    ])
+    .is_ok()
+        && pending.path().exists()
+    {
+        return pending.commit();
     }
 
     // Yerel WebP yedeği
     let img = open_dynamic_image(input_path)?;
-    let file = File::create(&output_path)?;
-    let mut writer = BufWriter::with_capacity(64 * 1024, file);
-    img.write_to(&mut writer, ImageFormat::WebP)?;
-    writer.flush()?;
+    crate::converter::write_file_atomic(&output_path, |writer| {
+        img.write_to(writer, ImageFormat::WebP)?;
+        Ok(())
+    })?;
 
     Ok(output_path)
 }
@@ -309,7 +367,12 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
         .unwrap_or("png")
         .to_lowercase();
 
-    let output_path = determine_suffixed_output_path(input_path, "clean", &ext, custom_output_dir);
+    let output_path = claim_output_path(determine_suffixed_output_path(
+        input_path,
+        "clean",
+        &ext,
+        custom_output_dir,
+    ));
     ensure_parent_dir(&output_path)?;
 
     if ext == "jxl" {
@@ -317,35 +380,37 @@ pub fn strip_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     }
 
     // ImageMagick ile -auto-orient uygulayarak EXIF yönünü piksele göm, ardından tüm etiketleri temizle!
+    let pending = crate::converter::PendingOutput::new(&output_path);
     if crate::converter::run_imagemagick(&[
         input_path.as_os_str(),
         std::ffi::OsStr::new("-auto-orient"),
         std::ffi::OsStr::new("-strip"),
-        output_path.as_os_str(),
-    ]).is_ok() {
-        return Ok(output_path);
+        pending.path().as_os_str(),
+    ])
+    .is_ok()
+        && pending.path().exists()
+    {
+        return pending.commit();
     }
 
     // Yedek: Yerel bellek içi kodlama
-    if let Ok(img) = open_dynamic_image(input_path)
-        && let Ok(file) = File::create(&output_path)
-    {
-        let mut writer = BufWriter::with_capacity(64 * 1024, file);
-        let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
-        let write_res = match fmt {
+    let img = open_dynamic_image(input_path)?;
+    let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
+    crate::converter::write_file_atomic(&output_path, |writer| {
+        match fmt {
             ImageFormat::Jpeg => {
                 let rgb = img.to_rgb8();
-                let mut encoder = JpegEncoder::new_with_quality(&mut writer, 95);
-                encoder.encode_image(&rgb)
+                let mut encoder = JpegEncoder::new_with_quality(writer, 95);
+                encoder.encode_image(&rgb)?;
             }
-            _ => img.write_to(&mut writer, fmt),
-        };
-        if write_res.is_ok() && writer.flush().is_ok() {
-            return Ok(output_path);
+            _ => {
+                img.write_to(writer, fmt)?;
+            }
         }
-    }
+        Ok(())
+    })?;
 
-    bail!("Metadata temizleme işlemi başarısız oldu")
+    Ok(output_path)
 }
 
 pub fn resize_image(
@@ -359,7 +424,12 @@ pub fn resize_image(
         .unwrap_or("png")
         .to_lowercase();
 
-    let output_path = determine_suffixed_output_path(input_path, "resized", &ext, custom_output_dir);
+    let output_path = claim_output_path(determine_suffixed_output_path(
+        input_path,
+        "resized",
+        &ext,
+        custom_output_dir,
+    ));
     ensure_parent_dir(&output_path)?;
 
     let img = open_dynamic_image(input_path)?;
@@ -397,28 +467,36 @@ pub fn resize_image(
     let resized = img.resize(new_w, new_h, imageops::FilterType::Lanczos3);
 
     if ext == "jxl" {
-        // Resized görseli geçici PNG yapıp cjxl ile dönüştür
-        let temp_png = std::env::temp_dir().join(format!("resize_temp_{}.png", std::process::id()));
+        // Resized görseli geçici PNG yapıp cjxl ile dönüştür.
+        // Sayaç, paralel batch'te aynı PID'nin dosyayı ezmesini engeller.
+        static RESIZE_TEMP_COUNTER: std::sync::atomic::AtomicUsize =
+            std::sync::atomic::AtomicUsize::new(0);
+        let counter = RESIZE_TEMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let temp_png = std::env::temp_dir().join(format!(
+            "konvert_resize_{}_{}.png",
+            std::process::id(),
+            counter
+        ));
         resized.save_with_format(&temp_png, ImageFormat::Png)?;
         let jxl_res = convert_to_jxl(&temp_png, &output_path, None, false);
-        let _ = fs::remove_file(temp_png);
+        let _ = fs::remove_file(&temp_png);
         return jxl_res;
     }
 
     let fmt = parse_image_format(&ext).unwrap_or(ImageFormat::Png);
-    let file = File::create(&output_path)?;
-    let mut writer = BufWriter::with_capacity(64 * 1024, file);
-    match fmt {
-        ImageFormat::Jpeg => {
-            let rgb = resized.to_rgb8();
-            let mut encoder = JpegEncoder::new_with_quality(&mut writer, 90);
-            encoder.encode_image(&rgb)?;
+    crate::converter::write_file_atomic(&output_path, |writer| {
+        match fmt {
+            ImageFormat::Jpeg => {
+                let rgb = resized.to_rgb8();
+                let mut encoder = JpegEncoder::new_with_quality(writer, 90);
+                encoder.encode_image(&rgb)?;
+            }
+            _ => {
+                resized.write_to(writer, fmt)?;
+            }
         }
-        _ => {
-            resized.write_to(&mut writer, fmt)?;
-        }
-    }
-    writer.flush()?;
+        Ok(())
+    })?;
 
     Ok(output_path)
 }
@@ -434,23 +512,25 @@ pub fn merge_images_to_pdf(
     let first_stem = images[0]
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("gorseller");
+        .unwrap_or("images");
 
     let target_dir = get_output_dir(&images[0], custom_output_dir);
-    let output_path = target_dir.join(format!("{}_birlestirildi.pdf", first_stem));
+    let output_path =
+        claim_output_path(target_dir.join(format!("{}_merged.pdf", first_stem)));
     ensure_parent_dir(&output_path)?;
 
-    let mut args: Vec<&std::ffi::OsStr> = Vec::with_capacity(images.len() + 2);
-    for img in images {
-        args.push(img.as_os_str());
-    }
-    args.push(std::ffi::OsStr::new("-auto-orient"));
-    args.push(output_path.as_os_str());
+    let pending = crate::converter::PendingOutput::new(&output_path);
+    let mut args: Vec<std::ffi::OsString> = images
+        .iter()
+        .map(|img| img.as_os_str().to_os_string())
+        .collect();
+    args.push(std::ffi::OsStr::new("-auto-orient").to_os_string());
+    args.push(pending.path().as_os_str().to_os_string());
 
     crate::converter::run_imagemagick(&args)
         .with_context(|| "Görseller PDF olarak birleştirilemedi")?;
 
-    Ok(output_path)
+    pending.commit()
 }
 
 pub fn compress_image_to_size(
@@ -489,50 +569,56 @@ pub fn compress_image_to_size(
         &ext
     };
 
-    let output_path = determine_suffixed_output_path(input_path, "target", target_ext, custom_output_dir);
+    let suffix = match target_bytes {
+        bytes if bytes == 8 * 1024 * 1024 => "8mb",
+        bytes if bytes == 25 * 1024 * 1024 => "25mb",
+        _ => "target",
+    };
+    let output_path = claim_output_path(determine_suffixed_output_path(
+        input_path,
+        suffix,
+        target_ext,
+        custom_output_dir,
+    ));
     ensure_parent_dir(&output_path)?;
 
     // Kademeli sıkıştırma ve ölçekleme döngüsü (hedef boyutu kesin garanti altına alır)
     let qualities = ["82", "65", "50", "35"];
     let scales = ["100%", "75%", "50%", "35%"];
+    let pending = crate::converter::PendingOutput::new(&output_path);
 
     for scale in &scales {
         for quality in &qualities {
-            let mut args = vec![
-                input_path.as_os_str(),
-                std::ffi::OsStr::new("-auto-orient"),
-                std::ffi::OsStr::new("-strip"),
+            let mut args: Vec<std::ffi::OsString> = vec![
+                input_path.as_os_str().to_os_string(),
+                std::ffi::OsStr::new("-auto-orient").to_os_string(),
+                std::ffi::OsStr::new("-strip").to_os_string(),
             ];
             if *scale != "100%" {
-                args.push(std::ffi::OsStr::new("-resize"));
-                args.push(std::ffi::OsStr::new(scale));
+                args.push(std::ffi::OsStr::new("-resize").to_os_string());
+                args.push(std::ffi::OsStr::new(scale).to_os_string());
             }
-            args.push(std::ffi::OsStr::new("-quality"));
-            args.push(std::ffi::OsStr::new(quality));
-            args.push(output_path.as_os_str());
+            args.push(std::ffi::OsStr::new("-quality").to_os_string());
+            args.push(std::ffi::OsStr::new(quality).to_os_string());
+            args.push(pending.path().as_os_str().to_os_string());
 
             if crate::converter::run_imagemagick(&args).is_ok()
-                && let Ok(meta) = fs::metadata(&output_path)
+                && let Ok(meta) = fs::metadata(pending.path())
                 && meta.len() <= target_bytes
             {
-                return Ok(output_path);
+                return pending.commit();
             }
         }
     }
 
-    if let Ok(meta) = fs::metadata(&output_path)
-        && meta.len() <= target_bytes
-    {
-        Ok(output_path)
-    } else {
-        let reached_size = fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0);
-        let _ = fs::remove_file(&output_path);
-        bail!(
-            "Görsel hedef boyuta ({:.1} MB) sıkıştırılamadı. Ulaşılan en küçük boyut: {:.1} MB",
-            target_bytes as f64 / (1024.0 * 1024.0),
-            reached_size as f64 / (1024.0 * 1024.0)
-        );
-    }
+    // Hedefe ulaşılamadı: geçici dosya drop ile silinir, mevcut çıktı (varsa) korunur.
+    let reached_size = fs::metadata(pending.path()).map(|m| m.len()).unwrap_or(0);
+    drop(pending);
+    bail!(
+        "Görsel hedef boyuta ({:.1} MB) sıkıştırılamadı. Ulaşılan en küçük boyut: {:.1} MB",
+        target_bytes as f64 / (1024.0 * 1024.0),
+        reached_size as f64 / (1024.0 * 1024.0)
+    );
 }
 
 #[cfg(test)]
@@ -587,6 +673,14 @@ mod tests {
         let rgb = dyn_img.to_rgb8();
         assert_eq!(rgb.width(), 10);
         assert_eq!(rgb.height(), 10);
+    }
+
+    #[test]
+    fn test_decode_applies_exif_orientation() {
+        // 200x100, Orientation=6 (90° CW) -> piksel boyutu 100x200 olmalı.
+        let bytes = include_bytes!("../../tests/fixtures/orientation_6.jpg");
+        let img = decode_with_orientation(std::io::Cursor::new(&bytes[..])).unwrap();
+        assert_eq!(img.dimensions(), (100, 200));
     }
 
     #[test]

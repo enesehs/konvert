@@ -13,6 +13,7 @@ pub fn convert_pdf_to_images(
     input_path: &Path,
     img_format: &str,
     dpi: u32,
+    max_pages: u32,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     let file_stem = input_path
@@ -21,10 +22,12 @@ pub fn convert_pdf_to_images(
         .unwrap_or("pdf_pages");
 
     let base_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
-    let pages_dir = base_dir.join(format!("{}_sayfalar", file_stem));
+    let pages_dir = crate::converter::claim_output_path(
+        base_dir.join(format!("{}_pages", file_stem)),
+    );
     fs::create_dir_all(&pages_dir)?;
 
-    let output_prefix = pages_dir.join("sayfa");
+    let output_prefix = pages_dir.join("page");
 
     let mut cmd = Command::new("pdftoppm");
     if img_format.eq_ignore_ascii_case("png") {
@@ -32,10 +35,14 @@ pub fn convert_pdf_to_images(
     } else {
         cmd.arg("-jpeg");
     }
-    cmd.arg("-r")
-        .arg(dpi.to_string())
-        .arg(input_path)
-        .arg(output_prefix);
+    cmd.arg("-r").arg(dpi.to_string());
+
+    // Sayfa sayısı sınırsız büyümesin: 0 = sınırsız, aksi halde ilk N sayfa.
+    if max_pages > 0 {
+        cmd.arg("-l").arg(max_pages.to_string());
+    }
+
+    cmd.arg(input_path).arg(output_prefix);
 
     let status = cmd.status().with_context(|| "pdftoppm bulunamadı")?;
     if !status.success() {
@@ -111,8 +118,9 @@ pub fn write_html_document(
         header_html,
         paragraphs
     );
-    fs::write(output_path, html)?;
-    Ok(output_path.to_path_buf())
+    let pending = crate::converter::PendingOutput::new(output_path);
+    fs::write(pending.path(), html)?;
+    pending.commit()
 }
 
 pub fn convert_udf(
@@ -120,10 +128,12 @@ pub fn convert_udf(
     target_format: &str,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
-    let output_path = crate::converter::determine_output_path(
-        input_path,
-        target_format,
-        custom_output_dir,
+    let output_path = crate::converter::claim_output_path(
+        crate::converter::determine_output_path(
+            input_path,
+            target_format,
+            custom_output_dir,
+        ),
     );
     crate::converter::ensure_parent_dir(&output_path)?;
 
@@ -155,8 +165,9 @@ pub fn convert_udf(
             &output_path,
         ),
         "txt" | "text" => {
-            fs::write(&output_path, text_content)?;
-            Ok(output_path)
+            let pending = crate::converter::PendingOutput::new(&output_path);
+            fs::write(pending.path(), text_content)?;
+            pending.commit()
         }
         "pdf" => {
             let target_dir = crate::converter::get_output_dir(input_path, custom_output_dir);
@@ -200,10 +211,12 @@ pub fn convert_docx(
     target_format: &str,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
-    let output_path = crate::converter::determine_output_path(
-        input_path,
-        target_format,
-        custom_output_dir,
+    let output_path = crate::converter::claim_output_path(
+        crate::converter::determine_output_path(
+            input_path,
+            target_format,
+            custom_output_dir,
+        ),
     );
     crate::converter::ensure_parent_dir(&output_path)?;
 
@@ -230,8 +243,9 @@ pub fn convert_docx(
     match target_format.to_lowercase().as_str() {
         "html" => write_html_document("Doküman", None, &text_content, &output_path),
         "txt" | "text" => {
-            fs::write(&output_path, text_content)?;
-            Ok(output_path)
+            let pending = crate::converter::PendingOutput::new(&output_path);
+            fs::write(pending.path(), text_content)?;
+            pending.commit()
         }
         _ => {
             bail!("DOCX dosyası için desteklenmeyen hedef format: .{}", target_format);
@@ -370,6 +384,43 @@ pub fn extract_text_from_xml(xml: &str) -> String {
         .join("\n\n")
 }
 
+fn run_ghostscript_pdf(
+    input_path: &Path,
+    output_path: &Path,
+    setting: &str,
+    downsample_dpi: Option<u32>,
+) -> Result<()> {
+    let mut cmd = Command::new("gs");
+    cmd.arg("-sDEVICE=pdfwrite")
+        .arg("-dCompatibilityLevel=1.4")
+        .arg(setting)
+        .arg("-dNOPAUSE")
+        .arg("-dQUIET")
+        .arg("-dBATCH");
+
+    if let Some(dpi) = downsample_dpi {
+        cmd.arg("-dDownsampleColorImages=true")
+            .arg("-dColorImageDownsampleType=/Bicubic")
+            .arg(format!("-dColorImageResolution={}", dpi))
+            .arg("-dDownsampleGrayImages=true")
+            .arg("-dGrayImageDownsampleType=/Bicubic")
+            .arg(format!("-dGrayImageResolution={}", dpi))
+            .arg("-dDownsampleMonoImages=true")
+            .arg(format!("-dMonoImageResolution={}", dpi.max(150)));
+    }
+
+    cmd.arg(format!("-sOutputFile={}", output_path.display()))
+        .arg(input_path);
+
+    let status = cmd
+        .status()
+        .with_context(|| "ghostscript (gs) çalıştırılamadı; PDF sıkıştırma için kurulu olmalı")?;
+    if !status.success() {
+        bail!("ghostscript PDF sıkıştırma başarısız oldu (çıkış kodu 0 değil)");
+    }
+    Ok(())
+}
+
 pub fn compress_pdf_to_size(
     input_path: &Path,
     target_bytes: u64,
@@ -393,67 +444,98 @@ pub fn compress_pdf_to_size(
         );
     }
 
-    let output_path = crate::converter::determine_suffixed_output_path(
-        input_path,
-        "compressed",
-        "pdf",
-        custom_output_dir,
+    let output_path = crate::converter::claim_output_path(
+        crate::converter::determine_suffixed_output_path(
+            input_path,
+            "compressed",
+            "pdf",
+            custom_output_dir,
+        ),
     );
     crate::converter::ensure_parent_dir(&output_path)?;
 
-    let setting = if target_bytes < 10 * 1024 * 1024 {
-        "-dPDFSETTINGS=/screen" // 72 dpi, en yüksek sıkıştırma
-    } else {
-        "-dPDFSETTINGS=/ebook"  // 150 dpi, standart sıkıştırma
-    };
+    // Hedefe ulaşana kadar kademeli olarak daha agresif ayarlar dene.
+    // (Sonuç her adımda ölçülür; "başarılı" demek için gerçekten ≤ hedef olmalı.)
+    let ladder: [(&str, Option<u32>); 4] = [
+        ("-dPDFSETTINGS=/screen", None),
+        ("-dPDFSETTINGS=/screen", Some(48)),
+        ("-dPDFSETTINGS=/screen", Some(36)),
+        ("-dPDFSETTINGS=/ebook", Some(72)),
+    ];
 
-    let gs_status = Command::new("gs")
-        .arg("-sDEVICE=pdfwrite")
-        .arg("-dCompatibilityLevel=1.4")
-        .arg(setting)
-        .arg("-dNOPAUSE")
-        .arg("-dQUIET")
-        .arg("-dBATCH")
-        .arg(format!("-sOutputFile={}", output_path.display()))
-        .arg(input_path)
-        .status();
+    let scratch = output_path.with_file_name(format!(
+        "{}.candidate.pdf",
+        output_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("konvert")
+    ));
 
-    if let Ok(st) = gs_status
-        && st.success()
-        && output_path.exists()
-    {
-        return Ok(output_path);
+    if Command::new("gs").arg("--version").output().is_err() {
+        bail!(
+            "PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı"
+        );
     }
 
-    compress_pdf(input_path, custom_output_dir)
+    let mut best_size: Option<u64> = None;
+
+    for (setting, dpi) in ladder {
+        if let Err(err) = run_ghostscript_pdf(input_path, &scratch, setting, dpi) {
+            eprintln!("PDF sıkıştırma adımı başarısız ({}): {:#}", setting, err);
+            continue;
+        }
+
+        let Ok(meta) = fs::metadata(&scratch) else {
+            continue;
+        };
+        let size = meta.len();
+
+        if size <= target_bytes {
+            fs::rename(&scratch, &output_path)
+                .with_context(|| format!("Sıkıştırılmış PDF taşınamadı: {}", output_path.display()))?;
+            return Ok(output_path);
+        }
+
+        // Hedefe ulaşmasa da en küçük boyutu hatırla; mevcut hedef dosyaya dokunma.
+        if best_size.is_none_or(|best| size < best) {
+            best_size = Some(size);
+        }
+    }
+
+    let _ = fs::remove_file(&scratch);
+
+    if let Some(size) = best_size {
+        bail!(
+            "PDF hedef boyuta ({}) sıkıştırılamadı. Ulaşılan en küçük boyut: {}",
+            crate::history::format_bytes(target_bytes),
+            crate::history::format_bytes(size)
+        );
+    }
+
+    bail!(
+        "PDF hedef boyuta sıkıştırılamadı: ghostscript (gs) çalıştırılamadı veya hiçbir ayar sonuç üretmedi"
+    )
 }
 
 pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
-    let output_path = crate::converter::determine_suffixed_output_path(
-        input_path,
-        "compressed",
-        "pdf",
-        custom_output_dir,
+    let output_path = crate::converter::claim_output_path(
+        crate::converter::determine_suffixed_output_path(
+            input_path,
+            "compressed",
+            "pdf",
+            custom_output_dir,
+        ),
     );
     crate::converter::ensure_parent_dir(&output_path)?;
 
-    let gs_status = Command::new("gs")
-        .arg("-sDEVICE=pdfwrite")
-        .arg("-dCompatibilityLevel=1.4")
-        .arg("-dPDFSETTINGS=/ebook")
-        .arg("-dNOPAUSE")
-        .arg("-dQUIET")
-        .arg("-dBATCH")
-        .arg(format!("-sOutputFile={}", output_path.display()))
-        .arg(input_path)
-        .status();
-
-    if let Ok(st) = gs_status
-        && st.success()
-        && output_path.exists()
+    let pending = crate::converter::PendingOutput::new(&output_path);
+    if run_ghostscript_pdf(input_path, pending.path(), "-dPDFSETTINGS=/ebook", None).is_ok()
+        && pending.path().exists()
     {
-        return Ok(output_path);
+        return pending.commit();
     }
+    // gs başarısız oldu: geçici dosya drop ile silinir, ImageMagick yedeğine geç.
+    let pending = crate::converter::PendingOutput::new(&output_path);
 
     let fb_status = Command::new("magick")
         .arg("-density")
@@ -461,7 +543,7 @@ pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Resu
         .arg(input_path)
         .arg("-quality")
         .arg("80")
-        .arg(&output_path)
+        .arg(pending.path())
         .status()
         .or_else(|_| {
             Command::new("convert")
@@ -470,7 +552,7 @@ pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Resu
                 .arg(input_path)
                 .arg("-quality")
                 .arg("80")
-                .arg(&output_path)
+                .arg(pending.path())
                 .status()
         })
         .with_context(|| "PDF sıkıştırıcı (gs veya magick) çalıştırılamadı")?;
@@ -479,7 +561,7 @@ pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Resu
         bail!("PDF sıkıştırma başarısız oldu");
     }
 
-    Ok(output_path)
+    pending.commit()
 }
 
 mod html_escape {

@@ -6,12 +6,14 @@ pkgdesc="Fast, lightweight, native right-click file converter and optimizer for 
 arch=('x86_64' 'aarch64')
 url="https://github.com/enesehs/konvert"
 license=('GPL-3.0-or-later')
-depends=('qt6-base' 'ffmpeg')
+depends=('qt6-base' 'ffmpeg' 'imagemagick')
 makedepends=('cargo' 'cmake' 'ninja' 'qt6-tools')
 optdepends=(
     'dolphin: KDE Plasma file manager context menu integration'
     'libjxl: JPEG XL (cjxl/djxl) support'
     'poppler: PDF page rendering to images'
+    'ghostscript: PDF compression'
+    'libreoffice-fresh: DOCX/UDF to PDF conversion'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
@@ -32,6 +34,8 @@ package() {
     install -Dm644 "assets/logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/konvert.svg"
     install -Dm644 "assets/logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg"
     install -Dm644 assets/icons/*.svg -t "$pkgdir/usr/share/icons/hicolor/scalable/actions/"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    install -Dm644 docs/konvert.1 "$pkgdir/usr/share/man/man1/konvert.1"
 
     # Install system-wide Dolphin servicemenus
     mkdir -p "$pkgdir/usr/share/kio/servicemenus"

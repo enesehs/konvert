@@ -40,6 +40,9 @@ jobs:
       - name: Build Rust CLI (konvert)
         run: cargo build --release
 
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: Run Tests
         run: cargo test --release
 
@@ -72,6 +75,8 @@ jobs:
           cp io.github.enesehs.konvert.desktop "${PKG_NAME}/"
           cp -r assets "${PKG_NAME}/"
           cp -r packaging "${PKG_NAME}/"
+          mkdir -p "${PKG_NAME}/docs"
+          cp docs/konvert.1 "${PKG_NAME}/docs/"
           cp README.md "${PKG_NAME}/"
           if [ -f LICENSE ]; then cp LICENSE "${PKG_NAME}/"; fi
 

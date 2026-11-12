@@ -13,6 +13,7 @@ public:
 
     // General
     bool notificationEnabled = true;
+    QString outputDirectory; // boş = giriş dosyasının klasörü
     QString language = "auto";
 
     // Context Menu Actions

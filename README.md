@@ -50,7 +50,7 @@ Tired of uploading confidential files to random online converter websites, openi
 * **Zero Telemetry & 100% Privacy:** Your files never leave your computer. No network connection required; everything is processed locally across multiple CPU cores.
 * **Seamless Dolphin Context Menu (KIO ServiceMenus):** Select one or hundreds of files in Dolphin, right-click, and convert in seconds without opening any heavy app.
 * **Live In-Place Plasma Notifications:** Track single or batch conversion progress with an animated progress bar inside the native KDE notification center.
-* **Target Size Profiles:** Compress videos and images to strict file size limits (Discord 8 MB, Email 25 MB) with intelligent mathematical bitrate calculation.
+* **Target Size Profiles:** Compress videos, images and PDFs toward target file size limits (Discord 8 MB, Email 25 MB) with automatic bitrate calculation and post-encode size checks.
 * **History with Thumbnail Previews:** Review conversion savings, inspect 80x80 thumbnail previews, open output files, or reveal them in Dolphin with one click.
 
 ---
@@ -98,7 +98,7 @@ Tired of uploading confidential files to random online converter websites, openi
 | **Smart Target Sizing** | Automatic bitrate math for `discord_8mb`, `email_25mb`, and `web_opt` profiles. |
 | **In-Place D-Bus Progress Notifications** | Updates progress dynamically in a single notification bubble without notification spam. |
 | **Advanced Document & Media Utilities** | Direct UDF (UYAP) to PDF conversion, multi-image merge to PDF, EXIF stripping, and audio extraction. |
-| **Multi-Language (i18n) Support** | Auto-detects desktop locale; supports English, Turkish, German, French, and Spanish. |
+| **Multi-Language (i18n) Support** | Auto-detects desktop locale; 9 languages in the CLI (EN, TR, DE, FR, ES, IT, RU, ZH, JA) and 5 in the settings GUI. |
 
 ---
 
@@ -200,7 +200,7 @@ konvert -s                            # Open Qt6 Settings GUI
 | **Photos** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Stripping, 50% & 1080p Resizing, Multi-Image PDF Merge |
 | **Videos** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, Email 25 MB, Frame Extraction, Audio Extraction |
 | **Music** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Waveform Video (MP4) Generation |
-| **Documents** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Multi-DPI Page Rendering, UDF to PDF/Text |
+| **Documents** | UDF (UYAP), DOCX, PDF | PDF, PNG, JPG, TXT | Multi-DPI Page Rendering, UDF to PDF/Text |
 
 ---
 

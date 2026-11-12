@@ -244,7 +244,7 @@ export const en: Translations = {
       uninstall: "konvert --uninstall-all\n# or via remote script:\ncurl -fsSL https://enesehs.dev/konvert/uninstall.sh | bash",
     },
     captions: {
-      script: "Checks dependencies, installs binary to /usr/local/bin, and binds FreeDesktop actions to your active managers.",
+      script: "Downloads the prebuilt release, installs binaries to ~/.local/bin, and binds FreeDesktop actions to your active managers.",
       arch: "Precompiled binary package via the AUR. Keeps up to date with regular system upgrades.",
       debian: "Official .deb repository for Debian 12+ and Ubuntu in preparation. Script installer available now.",
       fedora: "Official RPM package via Fedora COPR in preparation. Script installer available now.",

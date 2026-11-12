@@ -2,8 +2,23 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# İki yerleşim desteklenir:
+#   1) Kaynak ağacı:  <repo>/scripts/install.sh   (ROOT = repo kökü)
+#   2) Release tarball: <paket>/install.sh + hazır binary'ler (ROOT = paket dizini)
+if [ -f "${SCRIPT_DIR}/Cargo.toml" ]; then
+  ROOT_DIR="${SCRIPT_DIR}"
+elif [ -f "${SCRIPT_DIR}/../Cargo.toml" ]; then
+  ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  ROOT_DIR="${SCRIPT_DIR}"
+fi
 cd "${ROOT_DIR}"
+
+PREBUILT=0
+if [ -x "${SCRIPT_DIR}/konvert" ] && [ -x "${SCRIPT_DIR}/konvert-settings" ]; then
+  PREBUILT=1
+fi
 
 # Detect execution context (root / sudo vs standard user)
 if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
@@ -14,16 +29,19 @@ else
   REAL_HOME="${HOME}"
 fi
 
-echo "==> 1. Building Rust Core Engine (konvert)..."
-cargo build --release
+if [ "${PREBUILT}" -eq 1 ]; then
+  echo "==> 1. Using prebuilt binaries from ${SCRIPT_DIR} (no compilation needed)."
+else
+  echo "==> 1. Building Rust Core Engine (konvert)..."
+  cargo build --release
 
-echo "==> 2. Building Qt6 / KDE Settings GUI (konvert-settings)..."
-if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
-  mkdir -p gui/build
-  cd gui/build
-  cmake -GNinja .. || true
-  ninja || true
-  cd "${ROOT_DIR}"
+  echo "==> 2. Building Qt6 / KDE Settings GUI (konvert-settings)..."
+  if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
+    cmake -B gui/build -S gui -GNinja -DCMAKE_BUILD_TYPE=Release
+    ninja -C gui/build
+  else
+    echo "Warning: cmake/ninja not found; the settings GUI will not be installed." >&2
+  fi
 fi
 
 INSTALL_DIR="${REAL_HOME}/.local/bin"
@@ -40,11 +58,18 @@ mkdir -p "${SERVICEMENU_DIR}"
 echo "==> Copying binaries to ${INSTALL_DIR}..."
 # Remove existing targets first to avoid ETXTBSY (Text file busy) or root-owned permission lockouts
 rm -f "${INSTALL_DIR}/konvert" 2>/dev/null || sudo rm -f "${INSTALL_DIR}/konvert" 2>/dev/null || true
-install -m 755 target/release/konvert "${INSTALL_DIR}/konvert"
 
-if [ -f gui/build/konvert-settings ]; then
+if [ "${PREBUILT}" -eq 1 ]; then
+  install -m 755 "${SCRIPT_DIR}/konvert" "${INSTALL_DIR}/konvert"
   rm -f "${INSTALL_DIR}/konvert-settings" 2>/dev/null || sudo rm -f "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
-  install -m 755 gui/build/konvert-settings "${INSTALL_DIR}/konvert-settings"
+  install -m 755 "${SCRIPT_DIR}/konvert-settings" "${INSTALL_DIR}/konvert-settings"
+else
+  install -m 755 target/release/konvert "${INSTALL_DIR}/konvert"
+
+  if [ -f gui/build/konvert-settings ]; then
+    rm -f "${INSTALL_DIR}/konvert-settings" 2>/dev/null || sudo rm -f "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
+    install -m 755 gui/build/konvert-settings "${INSTALL_DIR}/konvert-settings"
+  fi
 fi
 
 echo "==> Installing system icons (KDE & Hicolor) & Lucide action icons..."
@@ -82,7 +107,13 @@ fi
 echo "==> Installing desktop launcher and AppStream metainfo..."
 cp -f io.github.enesehs.konvert.desktop "${DESKTOP_DIR}/"
 cp -f packaging/io.github.enesehs.konvert.metainfo.xml "${METAINFO_DIR}/"
-chmod 755 "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" 2>/dev/null || true
+chmod 644 "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" 2>/dev/null || true
+
+MAN_DIR="${REAL_HOME}/.local/share/man/man1"
+if [ -f "${ROOT_DIR}/docs/konvert.1" ]; then
+  mkdir -p "${MAN_DIR}"
+  cp -f "${ROOT_DIR}/docs/konvert.1" "${MAN_DIR}/konvert.1"
+fi
 
 echo "==> Synchronizing Dolphin right-click context menus..."
 rm -f "${SERVICEMENU_DIR}/konvert.desktop" 2>/dev/null || true

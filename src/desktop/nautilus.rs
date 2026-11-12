@@ -30,28 +30,26 @@ pub fn install_nautilus_scripts(custom_exec: Option<&str>) -> Result<PathBuf> {
             .unwrap_or_else(|_| "konvert".to_string()),
     };
 
-    let actions = [
-        ("WebP'ye Dönüştür", "webp"),
-        ("PNG'ye Dönüştür", "png"),
-        ("JPG'ye Dönüştür", "jpg"),
-        ("AVIF'e Dönüştür", "avif"),
-        ("MP3'e Dönüştür", "mp3"),
-        ("GIF'e Dönüştür", "gif"),
-    ];
+    use crate::desktop::dolphin::{find_action, QUICK_ACTION_IDS};
 
-    for (name, format) in actions {
-        let script_path = dir.join(name);
+    for id in QUICK_ACTION_IDS {
+        let Some(action) = find_action(id) else {
+            continue;
+        };
+        // Script'e dosya listesi "$@" ile geçilir; action tanımındaki %F yer tutucusu atılır.
+        let args = action.cmd_args.trim_end_matches(" %F");
+        let script_path = dir.join(action.name_en);
         let content = format!(
             r#"#!/usr/bin/env bash
 if [ $# -gt 0 ]; then
-    "{exec}" -t {format} "$@"
-elif [ -n "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS" ]; then
-    mapfile -t files <<< "$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS"
-    "{exec}" -t {format} "${{files[@]}}"
+    "{exec}" {args} "$@"
+elif [ -n "${{NAUTILUS_SCRIPT_SELECTED_FILE_PATHS}}" ]; then
+    mapfile -t files <<< "${{NAUTILUS_SCRIPT_SELECTED_FILE_PATHS}}"
+    "{exec}" {args} "${{files[@]}}"
 fi
 "#,
             exec = exec,
-            format = format
+            args = args
         );
         fs::write(&script_path, content)?;
 

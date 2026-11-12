@@ -1,11 +1,13 @@
 mod cli;
 mod config;
 mod converter;
+mod deps;
 mod desktop;
 mod history;
 mod i18n;
 mod notification;
 
+use anyhow::bail;
 use clap::Parser;
 use cli::Cli;
 use config::Config;
@@ -21,7 +23,25 @@ fn pid_file_path() -> Option<PathBuf> {
         .map(|p| p.cache_dir().join("running.pid"))
 }
 
+/// İşlem, terminale bağlı değilse (sağ tık menüsü, .desktop, servis) kendi
+/// süreç grubunun lideri olur. Böylece `--cancel` sırasında ffmpeg/gs gibi
+/// alt süreçler de tek sinyalle sonlandırılabilir.
+#[cfg(unix)]
+fn detach_process_group() {
+    unsafe {
+        if libc::isatty(libc::STDIN_FILENO) == 0 {
+            // Zaten grup lideri ise setsid başarısız olur; yok sayılır.
+            let _ = libc::setsid();
+        }
+    }
+}
+
+#[cfg(not(unix))]
+fn detach_process_group() {}
+
 fn write_pid_lock() {
+    detach_process_group();
+    converter::cleanup_recorded_temps();
     if let Some(p) = pid_file_path() {
         if let Some(parent) = p.parent() {
             let _ = fs::create_dir_all(parent);
@@ -36,28 +56,124 @@ fn remove_pid_lock() {
     }
 }
 
+/// PID dosyasındaki sürecin gerçekten Konvert olup olmadığını doğrular.
+/// Bayat kayıt (PID yeniden kullanımı) durumunda ilgisiz süreç öldürülmesini önler.
+fn process_is_konvert(pid: i32) -> bool {
+    let comm = fs::read_to_string(format!("/proc/{}/comm", pid)).unwrap_or_default();
+    if comm.trim() == "konvert" {
+        return true;
+    }
+    match fs::read_link(format!("/proc/{}/exe", pid)) {
+        Ok(exe) => exe
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("konvert")),
+        Err(_) => false,
+    }
+}
+
+fn process_alive(pid: i32) -> bool {
+    unsafe { libc::kill(pid, 0) == 0 }
+}
+
+/// Önce SIGTERM (varsa tüm süreç grubuna), sonra gerekirse SIGKILL.
+/// Süreç gerçekten sonlandırıldıysa `true` döner.
+fn terminate_process(pid: i32) -> bool {
+    #[cfg(unix)]
+    unsafe {
+        if !process_alive(pid) {
+            return false;
+        }
+
+        // Süreç kendi grubunun lideriyse grubu, değilse sadece kendisini hedefle.
+        let is_group_leader = libc::getpgid(pid) == pid;
+        let target = if is_group_leader { -pid } else { pid };
+
+        let mut sent = libc::kill(target, libc::SIGTERM);
+        if sent != 0 && is_group_leader {
+            sent = libc::kill(pid, libc::SIGTERM);
+        }
+        if sent != 0 {
+            return false;
+        }
+
+        for _ in 0..20 {
+            if !process_alive(pid) {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+
+        let _ = libc::kill(target, libc::SIGKILL);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        true
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
+        false
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config = Config::load();
+    i18n::init(config.general.language.as_deref());
 
     let notifier = Notifier::new(config.general.notification_enabled && !cli.no_notify);
 
+    converter::set_force_overwrite(cli.force);
+
     if cli.cancel {
-        if let Some(p) = pid_file_path()
-            && p.exists()
-            && let Ok(content) = fs::read_to_string(&p)
-            && let Ok(pid) = content.trim().parse::<i32>()
-        {
-            #[cfg(unix)]
-            unsafe {
-                libc::kill(pid, libc::SIGTERM);
-            }
-            let _ = fs::remove_file(&p);
-            println!("Active Konvert process cancelled (PID: {}).", pid);
-            notifier.success("Konvert", "Conversion process cancelled.");
+        let Some(path) = pid_file_path() else {
+            println!("No active conversion process found.");
+            return Ok(());
+        };
+        let Some(pid) = fs::read_to_string(&path)
+            .ok()
+            .and_then(|content| content.trim().parse::<i32>().ok())
+        else {
+            let _ = fs::remove_file(&path);
+            println!("No active conversion process found.");
+            return Ok(());
+        };
+
+        // Bayat/ilgisiz PID kaydını temizle, yabancı sürece dokunma.
+        if !process_is_konvert(pid) {
+            let _ = fs::remove_file(&path);
+            println!(
+                "No active Konvert process found (stale lock for PID {} cleaned).",
+                pid
+            );
             return Ok(());
         }
-        println!("No active conversion process found.");
+
+        if terminate_process(pid) {
+            converter::cleanup_recorded_temps();
+            let _ = fs::remove_file(&path);
+            println!("Active Konvert process cancelled (PID: {}).", pid);
+            notifier.success("Konvert", "Conversion process cancelled.");
+        } else {
+            let _ = fs::remove_file(&path);
+            println!("Conversion process already finished (PID: {}).", pid);
+        }
+        return Ok(());
+    }
+
+    if cli.check_deps {
+        let mut missing_required = false;
+        for (tool, found, required, purpose) in deps::check() {
+            let status = if found { "OK" } else { "EKSİK" };
+            let role = if required { "gerekli" } else { "opsiyonel" };
+            println!("{:<10} {:<8} ({}) - {}", tool, status, role, purpose);
+            if !found && required {
+                missing_required = true;
+            }
+        }
+        if missing_required {
+            bail!("Zorunlu bağımlılıklar eksik; video/ses dönüşümleri çalışmaz.");
+        }
         return Ok(());
     }
 
@@ -81,69 +197,82 @@ fn main() -> anyhow::Result<()> {
 
     if cli.sync_menu {
         let menu_exec = cli.menu_exec.as_deref();
-        match desktop::dolphin::install_dolphin_service_with_options(
-            &crate::config::Config::load().context_menu.enabled_actions,
+        let path = desktop::dolphin::install_dolphin_service_with_options(
+            &config.context_menu.enabled_actions,
             menu_exec,
             cli.menu_dir,
-        ) {
-            Ok(path) => {
-                println!("Context menu synchronized with config: {}", path.display());
-            }
-            Err(e) => {
-                eprintln!("Failed to sync context menu: {}", e);
-            }
-        }
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to sync context menu: {:#}", e))?;
+        println!("Context menu synchronized with config: {}", path.display());
         return Ok(());
     }
 
     if cli.install_all {
-        match desktop::detector::install_all() {
-            Ok(installed) => {
-                for item in &installed {
-                    println!("Installed: {}", item);
-                }
-                notifier.success(
-                    t("notify_integ_title"),
-                    &format!("Integrations installed for {} desktop managers.", installed.len()),
-                );
-            }
-            Err(e) => {
-                eprintln!("Installation error: {}", e);
-                notifier.error(t("notify_failed"), &format!("Installation failed: {}", e));
-            }
+        let report = desktop::detector::install_all();
+        for item in &report.affected {
+            println!("Installed: {}", item);
+        }
+        for (name, err) in &report.failed {
+            eprintln!("Installation failed ({}): {}", name, err);
+        }
+        if report.affected.is_empty() {
+            notifier.error(t("notify_failed"), "No desktop integration could be installed.");
+            bail!(
+                "Hiçbir masaüstü entegrasyonu kurulamadı ({} hata)",
+                report.failed.len()
+            );
+        }
+        if report.failed.is_empty() {
+            notifier.success(
+                t("notify_integ_title"),
+                &format!(
+                    "Integrations installed for {} desktop managers.",
+                    report.affected.len()
+                ),
+            );
+        } else {
+            notifier.error(
+                t("notify_failed"),
+                &format!(
+                    "{} integration(s) installed, {} failed.",
+                    report.affected.len(),
+                    report.failed.len()
+                ),
+            );
         }
         return Ok(());
     }
 
     if cli.install_dolphin {
-        match desktop::dolphin::install_dolphin_service(None) {
-            Ok(path) => {
-                println!("Dolphin service menu installed: {}", path.display());
-                notifier.success(t("notify_integ_title"), "Dolphin context menu installed.");
-            }
-            Err(e) => {
-                eprintln!("Dolphin installation error: {}", e);
-                notifier.error(t("notify_failed"), &format!("Installation failed: {}", e));
-            }
-        }
+        let path = desktop::dolphin::install_dolphin_service(None)
+            .map_err(|e| anyhow::anyhow!("Dolphin installation error: {:#}", e))?;
+        println!("Dolphin service menu installed: {}", path.display());
+        notifier.success(t("notify_integ_title"), "Dolphin context menu installed.");
         return Ok(());
     }
 
     if cli.uninstall_all {
-        match desktop::detector::uninstall_all() {
-            Ok(removed) => {
-                for item in &removed {
-                    println!("Removed: {}", item);
-                }
-                notifier.success(
-                    t("notify_integ_title"),
-                    &format!("Integrations removed for {} desktop managers.", removed.len()),
-                );
-            }
-            Err(e) => {
-                eprintln!("Removal error: {}", e);
-                notifier.error(t("notify_failed"), &format!("Removal failed: {}", e));
-            }
+        let report = desktop::detector::uninstall_all();
+        for item in &report.affected {
+            println!("Removed: {}", item);
+        }
+        for (name, err) in &report.failed {
+            eprintln!("Removal failed ({}): {}", name, err);
+        }
+        if report.affected.is_empty() && !report.failed.is_empty() {
+            notifier.error(t("notify_failed"), "No integration could be removed.");
+            bail!("Hiçbir entegrasyon kaldırılamadı ({} hata)", report.failed.len());
+        }
+        if report.affected.is_empty() {
+            println!("No integrations were installed.");
+        } else {
+            notifier.success(
+                t("notify_integ_title"),
+                &format!(
+                    "Integrations removed for {} desktop managers.",
+                    report.affected.len()
+                ),
+            );
         }
         return Ok(());
     }
@@ -158,8 +287,8 @@ fn main() -> anyhow::Result<()> {
                 println!("Dolphin service menu was not installed.");
             }
             Err(e) => {
-                eprintln!("Dolphin removal error: {}", e);
                 notifier.error(t("notify_failed"), &format!("Removal failed: {}", e));
+                return Err(anyhow::anyhow!("Dolphin removal error: {:#}", e));
             }
         }
         return Ok(());
@@ -223,7 +352,7 @@ fn main() -> anyhow::Result<()> {
         match merge_res {
             Ok(out_pdf) => {
                 remove_pid_lock();
-                let out_bytes = out_pdf.metadata().map(|m| m.len()).unwrap_or(0);
+                let out_bytes = history::path_size_bytes(&out_pdf);
                 let out_name = out_pdf.file_name().and_then(|s| s.to_str()).unwrap_or("merged.pdf");
                 let msg = format!(
                     "{} images merged into single PDF:\n{}\n({} ➔ {})",
@@ -276,14 +405,9 @@ fn main() -> anyhow::Result<()> {
     let target = if let Some(r) = &cli.resize {
         format!("resize_{}", r)
     } else if let Some(ts) = &cli.target_size {
-        let clean = ts.to_lowercase();
-        if clean.contains("8") {
-            "discord_8mb".to_string()
-        } else if clean.contains("25") {
-            "email_25mb".to_string()
-        } else {
-            format!("target_{}", clean)
-        }
+        // Alt-dize eşlemesi YOK: "18mb" 18 MB olmalı, 8 MB değil.
+        // Ayrıştırma ve birim dönüşümü TargetAction::parse içinde yapılır.
+        format!("target_{}", ts.trim().to_lowercase())
     } else if cli.strip_metadata {
         "strip-metadata".to_string()
     } else if cli.extract_frames {
@@ -298,19 +422,34 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
+    let files: Vec<PathBuf> = cli.files;
+    let total_count = files.len();
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    let jobs = cli
+        .jobs
+        .filter(|count| *count > 0)
+        .unwrap_or_else(|| cores.min(4))
+        .min(total_count.max(1));
+    converter::set_job_count(jobs);
+
     let opts = ConvertOptions {
+        jobs,
         target: target.clone(),
         quality: cli.quality.or(Some(config.image.quality)),
-        lossless: cli.lossless || config.image.lossless,
+        image_lossless: cli.lossless || config.image.lossless,
+        video_lossless: cli.lossless || config.video.lossless,
         crf: cli.crf.or(Some(config.video.crf)),
         preset: cli.preset.or(Some(config.video.preset.clone())),
         bitrate: cli.bitrate.or(Some(config.audio.bitrate.clone())),
         dpi: cli.dpi.or(Some(config.document.pdf_dpi)),
+        gif_duration: cli.gif_duration.unwrap_or(15.0),
+        gif_fps: cli.gif_fps.unwrap_or(15),
+        max_pages: cli.max_pages.unwrap_or(200),
         custom_output_dir,
     };
 
-    let files: Vec<PathBuf> = cli.files;
-    let total_count = files.len();
     write_pid_lock();
 
     let orig_total_bytes: u64 = files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
@@ -328,6 +467,8 @@ fn main() -> anyhow::Result<()> {
             "Web Optimize".to_string()
         } else if target.starts_with("resize_") {
             format!("Boyutlandırma ({})", target.trim_start_matches("resize_"))
+        } else if let Some(raw_size) = target.strip_prefix("target_") {
+            format!("Hedef Boyut ({})", raw_size.to_uppercase())
         } else if target == "strip-metadata" {
             "Metadata Temizleme".to_string()
         } else {
@@ -375,7 +516,7 @@ fn main() -> anyhow::Result<()> {
         match convert_res {
             Ok(output) => {
                 remove_pid_lock();
-                let out_bytes = output.metadata().map(|m| m.len()).unwrap_or(0);
+                let out_bytes = history::path_size_bytes(&output);
                 let savings_str = calculate_savings_str(orig_total_bytes, out_bytes);
                 let out_name = output.file_name().and_then(|s| s.to_str()).unwrap_or("output");
 
@@ -442,7 +583,11 @@ fn main() -> anyhow::Result<()> {
         let success_count = batch_result.succeeded.len();
         let fail_count = batch_result.failed.len();
 
-        let out_total_bytes: u64 = batch_result.succeeded.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
+        let out_total_bytes: u64 = batch_result
+        .succeeded
+        .iter()
+        .map(|path| history::path_size_bytes(path))
+        .sum();
         let savings_str = calculate_savings_str(orig_total_bytes, out_total_bytes);
         let savings_pct = calculate_savings_pct(orig_total_bytes, out_total_bytes);
 

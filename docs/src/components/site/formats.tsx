@@ -179,7 +179,7 @@ export function Formats() {
               {t.formats.profilesTitle}
             </span>
             <span className="text-muted-foreground/70 font-normal">
-              CLI: --preset &lt;web|balanced|lossless&gt;
+              CLI: --quality / --crf / --lossless
             </span>
           </div>
 

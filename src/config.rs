@@ -18,6 +18,9 @@ pub struct Config {
 pub struct GeneralConfig {
     pub notification_enabled: bool,
     pub output_directory: Option<String>,
+    /// GUI'de seçilen arayüz dili (ör. "tr", "en"). Boşsa sistem yereli kullanılır.
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -54,44 +57,14 @@ impl Default for Config {
             general: GeneralConfig {
                 notification_enabled: true,
                 output_directory: None,
+                language: None,
             },
             context_menu: ContextMenuConfig {
-                enabled_actions: vec![
-                    "compress_photo".into(),
-                    "to_webp".into(),
-                    "to_png".into(),
-                    "to_jpg".into(),
-                    "to_svg".into(),
-                    "to_ico".into(),
-                    "to_heic".into(),
-                    "to_bmp".into(),
-                    "to_avif".into(),
-                    "to_jxl".into(),
-                    "to_jxl_lossless".into(),
-                    "merge_to_pdf".into(),
-                    "strip_metadata".into(),
-                    "resize_50".into(),
-                    "resize_1080p".into(),
-                    "web_opt".into(),
-                    "discord_8mb_photo".into(),
-                    "email_25mb_photo".into(),
-                    "compress_video".into(),
-                    "to_mp4".into(),
-                    "to_mkv".into(),
-                    "to_webm".into(),
-                    "to_gif".into(),
-                    "extract_frames".into(),
-                    "extract_audio".into(),
-                    "discord_8mb_video".into(),
-                    "email_25mb_video".into(),
-                    "to_mp3".into(),
-                    "to_wav".into(),
-                    "audio_to_video".into(),
-                    "compress_doc".into(),
-                    "udf_to_pdf".into(),
-                    "udf_to_txt".into(),
-                    "pdf_to_images".into(),
-                ],
+                // Tek kaynak: desktop::dolphin::ALL_ACTIONS
+                enabled_actions: crate::desktop::dolphin::ALL_ACTIONS
+                    .iter()
+                    .map(|action| action.id.to_string())
+                    .collect(),
             },
             image: ImageConfig {
                 quality: 85,
@@ -121,11 +94,31 @@ impl Config {
     pub fn load() -> Self {
         if let Some(path) = Self::config_path()
             && path.exists()
-            && let Ok(content) = fs::read_to_string(&path)
-            && let Ok(cfg) = toml::from_str(&content)
         {
-            return cfg;
+            match fs::read_to_string(&path) {
+                Ok(content) => match toml::from_str::<Config>(&content) {
+                    Ok(cfg) => return cfg,
+                    Err(err) => {
+                        // Bozuk ayar dosyasını sessizce ezmek yerine yedekle.
+                        eprintln!(
+                            "Uyarı: {} ayrıştırılamadı ({}). Yedekleniyor: {}",
+                            path.display(),
+                            err,
+                            path.with_extension("toml.bak").display()
+                        );
+                        let _ = fs::rename(&path, path.with_extension("toml.bak"));
+                    }
+                },
+                Err(err) => {
+                    eprintln!(
+                        "Uyarı: {} okunamadı ({}). Varsayılan ayarlar kullanılacak.",
+                        path.display(),
+                        err
+                    );
+                }
+            }
         }
+
         let default_config = Self::default();
         let _ = default_config.save();
         default_config
@@ -137,8 +130,55 @@ impl Config {
                 fs::create_dir_all(parent)?;
             }
             let toml_str = toml::to_string_pretty(self)?;
-            fs::write(path, toml_str)?;
+            let tmp = path.with_extension("toml.tmp");
+            fs::write(&tmp, toml_str)?;
+            fs::rename(&tmp, &path)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn minimal_toml(extra_general: &str) -> String {
+        format!(
+            "[general]\nnotification_enabled = true\n{extra_general}\n\
+             [context_menu]\nenabled_actions = []\n\
+             [image]\nquality = 85\nlossless = false\n\
+             [video]\ncrf = 23\npreset = \"medium\"\nlossless = false\n\
+             [audio]\nbitrate = \"320k\"\n\
+             [document]\npdf_dpi = 300\n"
+        )
+    }
+
+    #[test]
+    fn test_config_parses_language_and_output_directory() {
+        let raw = minimal_toml("language = \"de\"\noutput_directory = \"/tmp/out\"");
+        let cfg: Config = toml::from_str(&raw).unwrap();
+        assert_eq!(cfg.general.language.as_deref(), Some("de"));
+        assert_eq!(cfg.general.output_directory.as_deref(), Some("/tmp/out"));
+    }
+
+    #[test]
+    fn test_default_actions_exist_in_registry() {
+        let cfg = Config::default();
+        assert_eq!(
+            cfg.context_menu.enabled_actions.len(),
+            crate::desktop::dolphin::ALL_ACTIONS.len()
+        );
+        for id in &cfg.context_menu.enabled_actions {
+            assert!(
+                crate::desktop::dolphin::find_action(id).is_some(),
+                "kayıtta olmayan varsayılan action: {id}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_config_language_is_optional() {
+        let cfg: Config = toml::from_str(&minimal_toml("")).unwrap();
+        assert_eq!(cfg.general.language, None);
     }
 }

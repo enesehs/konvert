@@ -5,6 +5,8 @@
 #include <QTextStream>
 #include <QStandardPaths>
 #include <QProcess>
+#include <QCoreApplication>
+#include <QDebug>
 
 ConfigManager::ConfigManager() {
     enabledActions = {
@@ -73,6 +75,10 @@ bool ConfigManager::load() {
         } else if (currentSection == "general") {
             if (line.startsWith("notification_enabled")) {
                 notificationEnabled = line.contains("true");
+            } else if (line.startsWith("output_directory")) {
+                // Rust çekirdeğinin kullandığı çıktı klasörünü koru (GUI'de henüz seçici yok).
+                outputDirectory = line.section('=', 1).trimmed();
+                outputDirectory.remove('"');
             } else if (line.startsWith("language")) {
                 language = line.section('=', 1).trimmed();
                 language.remove('"');
@@ -125,6 +131,9 @@ bool ConfigManager::save() {
 
     out << "[general]\n";
     out << "notification_enabled = " << (notificationEnabled ? "true" : "false") << "\n";
+    if (!outputDirectory.isEmpty()) {
+        out << "output_directory = \"" << outputDirectory << "\"\n";
+    }
     out << "language = \"" << language << "\"\n\n";
 
     out << "[context_menu]\n";
@@ -156,5 +165,15 @@ bool ConfigManager::save() {
 }
 
 void ConfigManager::syncContextMenu() {
-    QProcess::startDetached("konvert", QStringList() << "--sync-menu");
+    // Geliştirme kurulumunda `konvert` PATH'te olmayabilir: önce kardeş binary'yi dene.
+    QString program = "konvert";
+    const QFileInfo sibling(QDir(QCoreApplication::applicationDirPath()).filePath("konvert"));
+    if (sibling.exists() && sibling.isExecutable()) {
+        program = sibling.absoluteFilePath();
+    }
+
+    const bool started = QProcess::startDetached(program, QStringList() << "--sync-menu");
+    if (!started) {
+        qWarning("Konvert: context menu could not be synchronized (%s)", qPrintable(program));
+    }
 }

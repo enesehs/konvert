@@ -36,6 +36,7 @@ mkdir -p "${BUILD_DIR}/usr/bin"
 mkdir -p "${BUILD_DIR}/usr/share/applications"
 mkdir -p "${BUILD_DIR}/usr/share/metainfo"
 mkdir -p "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps"
+mkdir -p "${BUILD_DIR}/usr/share/man/man1"
 
 # 1. İkili dosyaları kopyala
 cp "${ROOT_DIR}/target/release/konvert" "${BUILD_DIR}/usr/bin/"
@@ -46,6 +47,8 @@ chmod 755 "${BUILD_DIR}/usr/bin/konvert-settings"
 # 2. Desktop, AppStream ve Dolphin ServiceMenu dosyaları
 cp "${ROOT_DIR}/io.github.enesehs.konvert.desktop" "${BUILD_DIR}/usr/share/applications/"
 cp "${ROOT_DIR}/packaging/io.github.enesehs.konvert.metainfo.xml" "${BUILD_DIR}/usr/share/metainfo/"
+cp "${ROOT_DIR}/docs/konvert.1" "${BUILD_DIR}/usr/share/man/man1/konvert.1"
+chmod 644 "${BUILD_DIR}/usr/share/man/man1/konvert.1"
 chmod 644 "${BUILD_DIR}/usr/share/applications/io.github.enesehs.konvert.desktop"
 chmod 644 "${BUILD_DIR}/usr/share/metainfo/io.github.enesehs.konvert.metainfo.xml"
 
@@ -86,7 +89,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: enesehs <enesehs@protonmail.com>
 Depends: libc6, libqt6core6, libqt6gui6, libqt6widgets6, libqt6svg6, ffmpeg, imagemagick
-Recommends: poppler-utils, libjxl-tools
+Recommends: poppler-utils, ghostscript, libreoffice, libjxl-tools
 Homepage: https://github.com/enesehs/konvert
 Description: High performance file converter and optimizer for Linux and KDE Plasma
  Konvert is an ultra-fast, offline, multi-threaded file conversion and optimization

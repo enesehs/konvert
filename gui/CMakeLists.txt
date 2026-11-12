@@ -17,6 +17,11 @@ endif()
 
 add_compile_definitions(KONVERT_APP_VERSION="${APP_VERSION}")
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # Yalnızca geliştirme derlemelerinde: --screenshot-all
+    add_compile_definitions(KONVERT_DEBUG)
+endif()
+
 find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Svg)
 
 add_executable(konvert-settings

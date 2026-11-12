@@ -13,20 +13,21 @@ pub fn convert_audio_to_video(
     input_path: &Path,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
-    let output_path = crate::converter::determine_output_path(
+    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
         input_path,
         "mp4",
         custom_output_dir,
-    );
+    ));
     crate::converter::ensure_parent_dir(&output_path)?;
+    let pending = crate::converter::PendingOutput::new(&output_path);
 
     let status = Command::new("ffmpeg")
         .arg("-nostdin")
         .arg("-y")
-        .arg("-threads")
-        .arg("2")
         .arg("-i")
         .arg(input_path)
+        .arg("-threads")
+        .arg(crate::converter::ffmpeg_threads().to_string())
         .arg("-filter_complex")
         .arg("[0:a]showwaves=s=1280x720:mode=line:colors=0x3daee9[v]")
         .arg("-map")
@@ -40,7 +41,7 @@ pub fn convert_audio_to_video(
         .arg("-c:a")
         .arg("aac")
         .arg("-shortest")
-        .arg(&output_path)
+        .arg(pending.path())
         .status()
         .with_context(|| "ffmpeg çalıştırılamadı (ses -> video)")?;
 
@@ -48,7 +49,7 @@ pub fn convert_audio_to_video(
         bail!("Sesten video oluşturma başarısız oldu");
     }
 
-    Ok(output_path)
+    pending.commit()
 }
 
 pub fn convert_audio(
@@ -58,20 +59,21 @@ pub fn convert_audio(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     let target = target_ext.to_lowercase();
-    let output_path = crate::converter::determine_output_path(
+    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
         input_path,
         &target,
         custom_output_dir,
-    );
+    ));
     crate::converter::ensure_parent_dir(&output_path)?;
+    let pending = crate::converter::PendingOutput::new(&output_path);
 
     let mut cmd = Command::new("ffmpeg");
     cmd.arg("-nostdin")
         .arg("-y")
-        .arg("-threads")
-        .arg("2")
         .arg("-i")
         .arg(input_path)
+        .arg("-threads")
+        .arg(crate::converter::ffmpeg_threads().to_string())
         .arg("-vn"); // Gömülü kapak resimlerini yoksay (ses codec hatalarını önler)
 
     let default_bitrate = match target.as_str() {
@@ -93,14 +95,14 @@ pub fn convert_audio(
         _ => {}
     }
 
-    cmd.arg(&output_path);
+    cmd.arg(pending.path());
 
     let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı (ses dönüştürme)")?;
     if !status.success() {
         bail!("Ses dönüştürme işlemi başarısız oldu: {}", output_path.display());
     }
 
-    Ok(output_path)
+    pending.commit()
 }
 
 pub fn strip_audio_metadata(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
@@ -109,27 +111,30 @@ pub fn strip_audio_metadata(input_path: &Path, custom_output_dir: Option<&Path>)
         .and_then(|e| e.to_str())
         .unwrap_or("mp3")
         .to_lowercase();
-    let output_path = crate::converter::determine_suffixed_output_path(
-        input_path,
-        "clean",
-        &ext,
-        custom_output_dir,
+    let output_path = crate::converter::claim_output_path(
+        crate::converter::determine_suffixed_output_path(
+            input_path,
+            "clean",
+            &ext,
+            custom_output_dir,
+        ),
     );
     crate::converter::ensure_parent_dir(&output_path)?;
+    let pending = crate::converter::PendingOutput::new(&output_path);
 
     let status = Command::new("ffmpeg")
         .arg("-nostdin")
         .arg("-y")
-        .arg("-threads")
-        .arg("2")
         .arg("-i")
         .arg(input_path)
+        .arg("-threads")
+        .arg(crate::converter::ffmpeg_threads().to_string())
         .arg("-vn")
         .arg("-map_metadata")
         .arg("-1")
         .arg("-c")
         .arg("copy")
-        .arg(&output_path)
+        .arg(pending.path())
         .status()
         .with_context(|| "ffmpeg çalıştırılamadı (ses metadata temizleme)")?;
 
@@ -137,5 +142,5 @@ pub fn strip_audio_metadata(input_path: &Path, custom_output_dir: Option<&Path>)
         bail!("Ses metadata temizleme başarısız oldu");
     }
 
-    Ok(output_path)
+    pending.commit()
 }

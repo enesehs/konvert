@@ -435,6 +435,14 @@ pub const ALL_ACTIONS: &[ActionDef] = &[
     },
 ];
 
+/// Nautilus/Thunar gibi basit entegrasyonlarda sunulan ortak action kümesi.
+/// Tek kaynak: `ALL_ACTIONS` (isim, ikon ve komutlar oradan gelir).
+pub const QUICK_ACTION_IDS: &[&str] = &["to_webp", "to_png", "to_jpg", "to_avif", "to_mp3", "to_gif"];
+
+pub fn find_action(id: &str) -> Option<&'static ActionDef> {
+    ALL_ACTIONS.iter().find(|action| action.id == id)
+}
+
 pub fn get_service_menus_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Kullanıcı ev dizini bulunamadı")?;
     let path = base_dirs
@@ -620,4 +628,25 @@ pub fn uninstall_dolphin_service() -> Result<bool> {
     }
 
     Ok(removed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_quick_actions_exist_in_registry() {
+        for id in QUICK_ACTION_IDS {
+            assert!(find_action(id).is_some(), "kayıtta olmayan action: {id}");
+        }
+    }
+
+    #[test]
+    fn test_all_action_ids_are_unique() {
+        let mut ids: Vec<&str> = ALL_ACTIONS.iter().map(|action| action.id).collect();
+        let total = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), total, "yinelenen action id'si var");
+    }
 }

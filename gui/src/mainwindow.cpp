@@ -24,6 +24,10 @@
 #include <QFileIconProvider>
 #include <QFileInfo>
 #include <QSysInfo>
+#include <QFile>
+#include <QMessageBox>
+#include <QCloseEvent>
+#include <QImageReader>
 
 #ifndef KONVERT_APP_VERSION
 #define KONVERT_APP_VERSION "v0.1-beta"
@@ -33,6 +37,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setupUi();
+
+    // Slider her tik'te config yazıp menü senkronu başlatmasın: 400 ms debounce.
+    m_saveTimer = new QTimer(this);
+    m_saveTimer->setSingleShot(true);
+    m_saveTimer->setInterval(400);
+    connect(m_saveTimer, &QTimer::timeout, this, &MainWindow::saveSettingsNow);
     setWindowTitle("Konvert");
     setWindowIcon(QIcon(":/logo.svg"));
     resize(700, 740);
@@ -137,8 +147,15 @@ void MainWindow::setupUi() {
 
     const QString lang = currentLanguage();
     m_rootTabWidget->addTab(createConvertTab(), QIcon::fromTheme("document-edit-symbolic"), trKey("tab_convert", lang));
-    m_rootTabWidget->addTab(createHistoryTab(), QIcon::fromTheme("view-history-symbolic"), trKey("tab_history", lang));
+    const int historyTabIndex = m_rootTabWidget->addTab(createHistoryTab(), QIcon::fromTheme("view-history-symbolic"), trKey("tab_history", lang));
     m_rootTabWidget->addTab(createAboutTab(), QIcon::fromTheme("help-about-symbolic"), trKey("tab_about", lang));
+
+    // CLI'den yapılan dönüşümler sekme açılınca görünsün.
+    connect(m_rootTabWidget, &QTabWidget::currentChanged, this, [this, historyTabIndex](int index) {
+        if (index == historyTabIndex) {
+            loadHistoryData();
+        }
+    });
 
     mainLayout->addWidget(m_rootTabWidget);
     setCentralWidget(central);
@@ -493,6 +510,9 @@ QWidget* MainWindow::createVideosTab() {
 
     m_videoPresetCombo = new QComboBox(compWidget);
     m_videoPresetCombo->addItems({"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"});
+    if (m_videoPresetCombo->findText(m_config.videoPreset) < 0 && !m_config.videoPreset.isEmpty()) {
+        m_videoPresetCombo->addItem(m_config.videoPreset);
+    }
     m_videoPresetCombo->setCurrentText(m_config.videoPreset);
     connect(m_videoPresetCombo, &QComboBox::currentTextChanged, this, [this](const QString &text) {
         m_config.videoPreset = text;
@@ -569,7 +589,12 @@ QWidget* MainWindow::createMusicTab() {
 
     m_audioBitrateCombo = new QComboBox(audioWidget);
     m_audioBitrateCombo->addItems({"128k", "192k", "256k", "320k"});
-    m_audioBitrateCombo->setCurrentText(m_config.audioBitrate.contains("320") ? "320k" : m_config.audioBitrate);
+    const QString configuredBitrate =
+        m_config.audioBitrate.contains("320") ? "320k" : m_config.audioBitrate;
+    if (m_audioBitrateCombo->findText(configuredBitrate) < 0 && !configuredBitrate.isEmpty()) {
+        m_audioBitrateCombo->addItem(configuredBitrate);
+    }
+    m_audioBitrateCombo->setCurrentText(configuredBitrate);
     connect(m_audioBitrateCombo, &QComboBox::currentTextChanged, this, [this](const QString &text) {
         m_config.audioBitrate = text;
         saveSettings();
@@ -821,9 +846,8 @@ void MainWindow::loadHistoryData() {
         QString status = obj["status"].toString();
 
         totalFiles += fileCount;
-        if (origSize > outSize) {
-            totalSavedBytes += (origSize - outSize);
-        }
+        // Büyüyen dönüşümler toplamdan düşülür (imzalı delta).
+        totalSavedBytes += (origSize - outSize);
 
         QString outPath = obj["output_path"].toString();
         auto *timeItem = new QTableWidgetItem(timestamp);
@@ -843,8 +867,12 @@ void MainWindow::loadHistoryData() {
         m_historyTable->setItem(i, 5, savingsItem);
 
         auto *statusItem = new QTableWidgetItem(status);
-        if (status == "Tamamlandı" || status == "Completed" || status == "Başarılı") {
+        const QString normalizedStatus = status.trimmed().toLower();
+        if (normalizedStatus == "success" || normalizedStatus == "completed"
+            || normalizedStatus == "tamamlandı" || normalizedStatus == "başarılı") {
             statusItem->setForeground(QColor(46, 170, 70));
+        } else if (normalizedStatus == "partial" || normalizedStatus == "kısmi") {
+            statusItem->setForeground(QColor(210, 150, 40));
         } else {
             statusItem->setForeground(QColor(220, 80, 70));
         }
@@ -915,9 +943,16 @@ void MainWindow::onHistorySelectionChanged() {
 
     // Thumbnail Preview
     if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webp" || ext == "avif" || ext == "bmp" || ext == "svg") {
-        QPixmap pix(m_selectedOutputPath);
-        if (!pix.isNull()) {
-            m_previewThumbLabel->setPixmap(pix.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        // Tam boy görseli UI thread'inde çözmek yerine hedef boyutta oku.
+        QImageReader reader(m_selectedOutputPath);
+        reader.setAutoTransform(true);
+        const QSize originalSize = reader.size();
+        if (originalSize.isValid()) {
+            reader.setScaledSize(originalSize.scaled(QSize(72, 72), Qt::KeepAspectRatio));
+        }
+        const QImage thumb = reader.read();
+        if (!thumb.isNull()) {
+            m_previewThumbLabel->setPixmap(QPixmap::fromImage(thumb));
         } else {
             QFileIconProvider prov;
             m_previewThumbLabel->setPixmap(prov.icon(fi).pixmap(52, 52));
@@ -932,10 +967,26 @@ void MainWindow::onHistorySelectionChanged() {
 }
 
 void MainWindow::clearHistoryData() {
+    const QString lang = currentLanguage();
+    const auto answer = QMessageBox::question(
+        this,
+        lang == "tr" ? "Geçmişi temizle" : "Clear history",
+        lang == "tr" ? "Tüm dönüşüm geçmişi silinecek. Emin misiniz?"
+                     : "All conversion history will be deleted. Continue?",
+        QMessageBox::Yes | QMessageBox::No,
+        QMessageBox::No);
+    if (answer != QMessageBox::Yes) {
+        return;
+    }
+
     QString dataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     QString historyFile = QDir(dataDir).filePath("konvert/history.json");
-    if (QFile::exists(historyFile)) {
-        QFile::remove(historyFile);
+    if (QFile::exists(historyFile) && !QFile::remove(historyFile)) {
+        QMessageBox::warning(
+            this,
+            lang == "tr" ? "Hata" : "Error",
+            lang == "tr" ? "Geçmiş dosyası silinemedi." : "Could not delete the history file.");
+        return;
     }
     loadHistoryData();
     onHistorySelectionChanged();
@@ -1232,5 +1283,28 @@ void MainWindow::onLanguageChanged(int index) {
 }
 
 void MainWindow::saveSettings() {
-    m_config.save();
+    if (m_saveTimer) {
+        m_saveTimer->start();
+    } else {
+        saveSettingsNow();
+    }
+}
+
+void MainWindow::saveSettingsNow() {
+    if (!m_config.save()) {
+        const QString lang = currentLanguage();
+        QMessageBox::warning(
+            this,
+            lang == "tr" ? "Ayarlar kaydedilemedi" : "Could not save settings",
+            lang == "tr" ? "Ayar dosyası yazılamadı. Disk izinlerini kontrol edin."
+                         : "The settings file could not be written. Check file permissions.");
+    }
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    if (m_saveTimer && m_saveTimer->isActive()) {
+        m_saveTimer->stop();
+        saveSettingsNow();
+    }
+    QMainWindow::closeEvent(event);
 }

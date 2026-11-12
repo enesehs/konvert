@@ -20,33 +20,55 @@ impl Language {
         *CURRENT_LANG.get_or_init(Self::detect_from_env)
     }
 
-    fn detect_from_env() -> Self {
-        let lang = std::env::var("LC_ALL")
-            .or_else(|_| std::env::var("LC_MESSAGES"))
-            .or_else(|_| std::env::var("LANG"))
-            .unwrap_or_default()
-            .to_lowercase();
+    /// Ayar dosyasındaki dili (varsa) uygular; yoksa sistem yerelini kullanır.
+    /// İlk çağrıdan sonra yapılan çağrılar yok sayılır (OnceLock).
+    pub fn init(language_code: Option<&str>) {
+        let lang = language_code
+            .and_then(Self::from_code)
+            .unwrap_or_else(Self::detect_from_env);
+        let _ = CURRENT_LANG.set(lang);
+    }
 
-        if lang.starts_with("tr") {
-            Language::Tr
-        } else if lang.starts_with("de") {
-            Language::De
-        } else if lang.starts_with("fr") {
-            Language::Fr
-        } else if lang.starts_with("es") {
-            Language::Es
-        } else if lang.starts_with("it") {
-            Language::It
-        } else if lang.starts_with("ru") {
-            Language::Ru
-        } else if lang.starts_with("zh") {
-            Language::Zh
-        } else if lang.starts_with("ja") {
-            Language::Ja
-        } else {
-            Language::En
+    fn from_code(code: &str) -> Option<Self> {
+        let code = code.trim().to_lowercase();
+        let code = code.split([':', '.', '@']).next().unwrap_or("");
+        let code = code.split(['_', '-']).next().unwrap_or("");
+        match code {
+            "tr" => Some(Language::Tr),
+            "de" => Some(Language::De),
+            "fr" => Some(Language::Fr),
+            "es" => Some(Language::Es),
+            "it" => Some(Language::It),
+            "ru" => Some(Language::Ru),
+            "zh" => Some(Language::Zh),
+            "ja" => Some(Language::Ja),
+            "en" => Some(Language::En),
+            _ => None,
         }
     }
+
+    fn detect_from_env() -> Self {
+        // GNU sırası: LANGUAGE > LC_ALL > LC_MESSAGES > LANG.
+        // Boş tanımlı değişkenler atlanır (ör. LC_ALL="" yaygın).
+        for key in ["LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"] {
+            let Ok(value) = std::env::var(key) else {
+                continue;
+            };
+            let value = value.trim();
+            if value.is_empty() {
+                continue;
+            }
+            if let Some(lang) = Self::from_code(value) {
+                return lang;
+            }
+        }
+        Language::En
+    }
+}
+
+/// Ayar dosyasındaki dili uygular (varsa). `t()` çağrılarından önce çağrılmalı.
+pub fn init(language_code: Option<&str>) {
+    Language::init(language_code);
 }
 
 pub fn t(key: &str) -> &'static str {
@@ -376,5 +398,22 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("action_to_gif", _) => "Convert to GIF",
 
         _ => "",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_language_from_code() {
+        assert_eq!(Language::from_code("tr_TR.UTF-8"), Some(Language::Tr));
+        assert_eq!(Language::from_code("de_DE"), Some(Language::De));
+        assert_eq!(Language::from_code("zh_CN"), Some(Language::Zh));
+        assert_eq!(Language::from_code("ja"), Some(Language::Ja));
+        assert_eq!(Language::from_code("tr:de"), Some(Language::Tr));
+        assert_eq!(Language::from_code("en_US"), Some(Language::En));
+        assert_eq!(Language::from_code("xx_YY"), None);
+        assert_eq!(Language::from_code(""), None);
     }
 }

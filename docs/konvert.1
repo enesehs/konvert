@@ -1,0 +1,110 @@
+.TH KONVERT 1 "2026-11-12" "konvert 0.2.0" "User Commands"
+.SH NAME
+konvert \- fast, offline file converter and optimizer for Linux
+.SH SYNOPSIS
+.B konvert
+[\fIOPTIONS\fR] \fIFILE\fR...
+.SH DESCRIPTION
+.B konvert
+converts images, video, audio and documents locally, without uploading files.
+It is usually invoked from the Dolphin/Nautilus/Nemo/Thunar context menu or the
+.B konvert-settings
+GUI.
+.SH OPTIONS
+.TP
+.BR \-t ", " \-\-target " " \fIFORMAT\fR
+Target format (webp, png, jpg, jxl, avif, mp4, mkv, webm, gif, mp3, wav, pdf, txt, ...).
+.TP
+.BR \-q ", " \-\-quality " " \fI1\-100\fR
+Lossy quality for images.
+.TP
+.BR \-l ", " \-\-lossless
+Lossless mode (images and video).
+.TP
+.BR \-f ", " \-\-force
+Overwrite existing outputs instead of creating \fIname_2.ext\fR.
+.TP
+.BR \-j ", " \-\-jobs " " \fIN\fR
+Maximum parallel conversions (1\-64, default: CPU cores capped at 4).
+.TP
+.BR \-o ", " \-\-output\-dir " " \fIDIR\fR
+Output directory (default: input file's directory).
+.TP
+.BR \-\-target\-size " " \fISIZE\fR
+Compress toward a size limit, e.g. \fB8mb\fR, \fB25mb\fR, \fB1.5gb\fR.
+.TP
+.BR \-\-merge\-pdf
+Merge the given images into a single PDF.
+.TP
+.BR \-\-strip\-metadata
+Remove EXIF/GPS metadata (images, video, audio).
+.TP
+.BR \-\-resize " " \fISPEC\fR
+Resize images: \fB50%\fR, \fB30\fR, \fB1080p\fR, \fB720p\fR.
+.TP
+.BR \-\-extract\-frames
+Extract one PNG frame per second into \fI<name>_frames/\fR.
+.TP
+.BR \-\-gif\-duration " " \fISECONDS\fR
+GIF length; \fB0\fR means the whole video (default: 15).
+.TP
+.BR \-\-gif\-fps " " \fIFPS\fR
+GIF frame rate (1\-60, default: 15).
+.TP
+.BR \-\-max\-pages " " \fIN\fR
+Maximum pages rendered from a PDF (0 = unlimited, default: 200).
+.TP
+.BR \-\-crf " " \fI0\-51\fR
+Video CRF value.
+.TP
+.BR \-\-preset " " \fINAME\fR
+x264 preset (ultrafast ... veryslow).
+.TP
+.BR \-\-bitrate " " \fIRATE\fR
+Audio bitrate, e.g. \fB192k\fR.
+.TP
+.BR \-\-dpi " " \fIN\fR
+PDF rendering DPI (36\-1200, default: 300).
+.TP
+.B \-\-cancel
+Stop the running conversion (validated by PID; kills the process group).
+.TP
+.B \-\-check\-deps
+Report whether ffmpeg, ImageMagick, ghostscript, poppler, LibreOffice,
+cjxl/djxl are available.
+.TP
+.B \-\-install\-all
+Install context menus for Dolphin, Nautilus, Nemo and Thunar.
+.TP
+.B \-\-uninstall\-all
+Remove all installed context menus.
+.TP
+.B \-\-sync\-menu
+Regenerate the Dolphin service menus from the config.
+.TP
+.BR \-s ", " \-\-settings
+Open the Qt6 settings GUI.
+.SH EXAMPLES
+.nf
+konvert \-t webp photo.png
+konvert \-t mp4 \-\-target\-size 8mb video.mov
+konvert \-\-merge\-pdf page1.png page2.png
+konvert \-t mp3 video.mp4
+konvert \-\-check\-deps
+.fi
+.SH FILES
+.TP
+.I ~/.config/konvert/config.toml
+User configuration (created on first run).
+.TP
+.I ~/.local/share/konvert/history.json
+Last 100 conversions.
+.TP
+.I ~/.cache/konvert/running.pid
+PID of the active conversion, used by \fB\-\-cancel\fR.
+.SH EXIT STATUS
+0 on success, 1 on conversion/installation failure.
+.SH SEE ALSO
+.BR ffmpeg (1),
+.BR magick (1),
+.BR gs (1)

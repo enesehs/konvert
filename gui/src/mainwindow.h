@@ -13,6 +13,8 @@
 #include <QHeaderView>
 #include "configmanager.h"
 
+#include <QTimer>
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
@@ -26,6 +28,10 @@ private slots:
     void onLanguageChanged(int index);
     void onHistorySelectionChanged();
     void saveSettings();
+    void saveSettingsNow();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     void setupUi();
@@ -80,4 +86,5 @@ private:
     QCheckBox *m_notifyCheck = nullptr;
     QComboBox *m_langCombo = nullptr;
     QTabWidget *m_rootTabWidget = nullptr;
+    QTimer *m_saveTimer = nullptr;
 };
