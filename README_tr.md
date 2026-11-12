@@ -55,29 +55,30 @@
 
 ## <img src="assets/icons/konvert-monitor.svg" width="22" height="22" align="absmiddle" /> Ekran Görüntüleri
 
+<div align="center">
+  <sub><b>Masaüstü Sağ Tık Bağlam Menüsü Entegrasyonu</b></sub><br>
+  <a href="assets/screenshots/screenshot_context_menu.png">
+    <img src="assets/screenshots/screenshot_context_menu.png" alt="Masaüstü Sağ Tık Bağlam Menüsü" width="90%" />
+  </a>
+</div>
+
+<br>
+
 <table align="center" width="100%">
   <tr>
-    <td width="50%" align="center" valign="top">
-      <sub><b>Masaüstü Sağ Tık Bağlam Menüsü</b></sub><br>
-      <a href="assets/screenshots/screenshot_context_menu.png">
-        <img src="assets/screenshots/screenshot_context_menu.png" alt="Bağlam Menüsü" width="100%" />
-      </a>
-    </td>
-    <td width="50%" align="center" valign="top">
+    <td width="33.3%" align="center" valign="top">
       <sub><b>Qt6 & Breeze Ayarlar Arayüzü</b></sub><br>
       <a href="assets/screenshots/screenshot_convert.png">
         <img src="assets/screenshots/screenshot_convert.png" alt="Ayarlar Arayüzü" width="100%" />
       </a>
     </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
+    <td width="33.3%" align="center" valign="top">
       <sub><b>Dönüşüm Geçmişi ve Tasarruf Paneli</b></sub><br>
       <a href="assets/screenshots/screenshot_history.png">
         <img src="assets/screenshots/screenshot_history.png" alt="Geçmiş Paneli" width="100%" />
       </a>
     </td>
-    <td width="50%" align="center" valign="top">
+    <td width="33.3%" align="center" valign="top">
       <sub><b>KDE Geliştirici Hakkında Paneli</b></sub><br>
       <a href="assets/screenshots/screenshot_about.png">
         <img src="assets/screenshots/screenshot_about.png" alt="Hakkında Paneli" width="100%" />

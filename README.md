@@ -55,29 +55,30 @@ Tired of uploading confidential files to random online converter websites, openi
 
 ## <img src="assets/icons/konvert-monitor.svg" width="22" height="22" align="absmiddle" /> Screenshots
 
+<div align="center">
+  <sub><b>Desktop Right-Click Context Menu Integration</b></sub><br>
+  <a href="assets/screenshots/screenshot_context_menu.png">
+    <img src="assets/screenshots/screenshot_context_menu.png" alt="Desktop Context Menu Integration" width="90%" />
+  </a>
+</div>
+
+<br>
+
 <table align="center" width="100%">
   <tr>
-    <td width="50%" align="center" valign="top">
-      <sub><b>Desktop Context Menu Integration</b></sub><br>
-      <a href="assets/screenshots/screenshot_context_menu.png">
-        <img src="assets/screenshots/screenshot_context_menu.png" alt="Context Menu" width="100%" />
-      </a>
-    </td>
-    <td width="50%" align="center" valign="top">
+    <td width="33.3%" align="center" valign="top">
       <sub><b>Qt6 & Breeze Settings GUI</b></sub><br>
       <a href="assets/screenshots/screenshot_convert.png">
         <img src="assets/screenshots/screenshot_convert.png" alt="Settings UI" width="100%" />
       </a>
     </td>
-  </tr>
-  <tr>
-    <td width="50%" align="center" valign="top">
+    <td width="33.3%" align="center" valign="top">
       <sub><b>Conversion History & Disk Savings</b></sub><br>
       <a href="assets/screenshots/screenshot_history.png">
         <img src="assets/screenshots/screenshot_history.png" alt="History & Previews" width="100%" />
       </a>
     </td>
-    <td width="50%" align="center" valign="top">
+    <td width="33.3%" align="center" valign="top">
       <sub><b>KDE Developer About Dialog</b></sub><br>
       <a href="assets/screenshots/screenshot_about.png">
         <img src="assets/screenshots/screenshot_about.png" alt="About Dialog" width="100%" />
