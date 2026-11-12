@@ -134,6 +134,7 @@ fn main() -> anyhow::Result<()> {
     let notifier = Notifier::new(config.general.notification_enabled && !cli.no_notify);
 
     converter::set_force_overwrite(cli.force);
+    converter::set_create_backup(cli.backup);
 
     if cli.cancel {
         let Some(path) = pid_file_path() else {

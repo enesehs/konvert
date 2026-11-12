@@ -29,6 +29,10 @@ pub struct Cli {
     #[arg(short = 'f', long = "force")]
     pub force: bool,
 
+    /// Create a .bak backup before overwriting existing files
+    #[arg(long = "backup")]
+    pub backup: bool,
+
     /// Preview conversion plan and output destinations without modifying disk
     #[arg(long = "dry-run")]
     pub dry_run: bool,

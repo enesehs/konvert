@@ -354,6 +354,7 @@ fn collect_dir_recursive(dir: &Path, target_action: Option<&TargetAction>, out: 
 }
 
 static FORCE_OVERWRITE: AtomicBool = AtomicBool::new(false);
+static CREATE_BACKUP: AtomicBool = AtomicBool::new(false);
 static JOB_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
 /// `--force` verildiğinde mevcut çıktıların üzerine yazılır; aksi halde
@@ -364,6 +365,15 @@ pub fn set_force_overwrite(enabled: bool) {
 
 pub fn force_overwrite() -> bool {
     FORCE_OVERWRITE.load(Ordering::Relaxed)
+}
+
+/// `--backup` verildiğinde üzerine yazılacak mevcut dosyanın `.bak` kopyası oluşturulur.
+pub fn set_create_backup(enabled: bool) {
+    CREATE_BACKUP.store(enabled, Ordering::Relaxed);
+}
+
+pub fn create_backup_enabled() -> bool {
+    CREATE_BACKUP.load(Ordering::Relaxed)
 }
 
 /// Aynı anda çalışacak dönüşüm sayısını ayarlar (ffmpeg iş parçacığı bütçesi için).
@@ -559,6 +569,10 @@ impl PendingOutput {
     }
 
     pub fn commit(mut self) -> Result<PathBuf> {
+        if self.final_path.exists() && create_backup_enabled() {
+            let backup_path = PathBuf::from(format!("{}.bak", self.final_path.to_string_lossy()));
+            let _ = fs::copy(&self.final_path, &backup_path);
+        }
         fs::rename(&self.temp, &self.final_path).with_context(|| {
             format!(
                 "Geçici çıktı hedefe taşınamadı: {} -> {}",
@@ -1132,6 +1146,35 @@ mod tests {
         assert_eq!(forced, candidate, "--force ile üzerine yazılmalı");
         set_force_overwrite(false);
 
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_pending_output_creates_backup_when_enabled() {
+        let dir = std::env::temp_dir().join(format!(
+            "konvert_backup_test_{}_{}",
+            std::process::id(),
+            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("file.txt");
+        std::fs::write(&target, b"original content").unwrap();
+
+        set_create_backup(true);
+        let pending = PendingOutput::new(&target);
+        std::fs::write(pending.path(), b"new content").unwrap();
+        let committed = pending.commit().unwrap();
+        assert_eq!(committed, target);
+
+        let backup = dir.join("file.txt.bak");
+        assert!(backup.exists(), "yedek dosyası oluşturulmalı");
+        assert_eq!(
+            std::fs::read_to_string(&backup).unwrap(),
+            "original content"
+        );
+        assert_eq!(std::fs::read_to_string(&target).unwrap(), "new content");
+
+        set_create_backup(false);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
