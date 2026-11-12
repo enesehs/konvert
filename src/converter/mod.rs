@@ -196,6 +196,88 @@ pub fn determine_suffixed_output_path(
     }
 }
 
+/// Dönüşüm öncesinde bir girdi dosyasının hedef yolunu ve çakışma durumunu hesaplar.
+/// `(tahmini_yol, cakisma_var_mi)` ikilisi döndürür.
+pub fn plan_output_path(
+    input_path: &Path,
+    opts: &ConvertOptions,
+    force: bool,
+) -> Result<(PathBuf, bool)> {
+    let action = TargetAction::parse(&opts.target)?;
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let out_dir = opts.custom_output_dir.as_deref();
+
+    let candidate = match action {
+        TargetAction::StripMetadata => {
+            determine_suffixed_output_path(input_path, "clean", &ext, out_dir)
+        }
+        TargetAction::Resize(_) => {
+            determine_suffixed_output_path(input_path, "resized", &ext, out_dir)
+        }
+        TargetAction::Compress => {
+            if is_image_ext(&ext) {
+                determine_suffixed_output_path(input_path, "compressed", "webp", out_dir)
+            } else if ext == "pdf" {
+                determine_suffixed_output_path(input_path, "compressed", "pdf", out_dir)
+            } else {
+                determine_suffixed_output_path(input_path, "compressed", &ext, out_dir)
+            }
+        }
+        TargetAction::TargetSize(bytes) => {
+            let suffix = if bytes == 8 * 1024 * 1024 {
+                "8mb"
+            } else if bytes == 25 * 1024 * 1024 {
+                "25mb"
+            } else {
+                "target"
+            };
+            determine_suffixed_output_path(input_path, suffix, &ext, out_dir)
+        }
+        TargetAction::WebOpt => {
+            if is_image_ext(&ext) {
+                determine_suffixed_output_path(input_path, "web", "webp", out_dir)
+            } else {
+                determine_suffixed_output_path(input_path, "web", &ext, out_dir)
+            }
+        }
+        TargetAction::ExtractAudio => determine_output_path(input_path, "mp3", out_dir),
+        TargetAction::Frames => {
+            let stem = input_path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("video");
+            get_output_dir(input_path, out_dir).join(format!("{}_frames", stem))
+        }
+        TargetAction::Gif => determine_output_path(input_path, "gif", out_dir),
+        TargetAction::AudioToVideo => determine_output_path(input_path, "mp4", out_dir),
+        TargetAction::Convert(target_fmt) => {
+            if ext == "pdf" && (target_fmt == "png" || target_fmt == "jpg" || target_fmt == "jpeg")
+            {
+                let stem = input_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("document");
+                get_output_dir(input_path, out_dir).join(format!("{}_pages", stem))
+            } else {
+                determine_output_path(input_path, &target_fmt, out_dir)
+            }
+        }
+    };
+
+    let exists = candidate.exists();
+    let final_path = if !force && exists {
+        next_free_path(&candidate, |p| p.exists())
+    } else {
+        candidate
+    };
+
+    Ok((final_path, exists))
+}
+
 static FORCE_OVERWRITE: AtomicBool = AtomicBool::new(false);
 static JOB_COUNT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(1);
 
@@ -946,5 +1028,43 @@ mod tests {
             }
         }
         let _ = fs::remove_file(test_img);
+    }
+
+    #[test]
+    fn test_plan_output_path_detects_collision() {
+        let temp_dir = std::env::temp_dir();
+        let in_file = temp_dir.join("konvert_dry_input.png");
+        let existing_out = temp_dir.join("konvert_dry_input.webp");
+        fs::write(&in_file, b"test").unwrap();
+        fs::write(&existing_out, b"exists").unwrap();
+
+        let opts = ConvertOptions {
+            target: "webp".to_string(),
+            quality: None,
+            image_lossless: false,
+            video_lossless: false,
+            jobs: 1,
+            gif_duration: 15.0,
+            gif_fps: 15,
+            max_pages: 200,
+            crf: None,
+            preset: None,
+            bitrate: None,
+            dpi: None,
+            custom_output_dir: None,
+        };
+
+        // force = false -> collision detected, new name predicted
+        let (pred, exists) = plan_output_path(&in_file, &opts, false).unwrap();
+        assert!(exists);
+        assert_eq!(pred, temp_dir.join("konvert_dry_input_2.webp"));
+
+        // force = true -> collision detected, but keeps original name for overwrite
+        let (pred_force, exists_force) = plan_output_path(&in_file, &opts, true).unwrap();
+        assert!(exists_force);
+        assert_eq!(pred_force, existing_out);
+
+        let _ = fs::remove_file(in_file);
+        let _ = fs::remove_file(existing_out);
     }
 }

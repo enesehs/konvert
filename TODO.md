@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 43'ü tam, 7'si kısmi (~%70). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 2/12. Birim test sayısı 28 → 52. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-13/14, P5-3.
+> **İlerleme (2026-11-12):** 67 maddeden 45'i tam, 7'si kısmi (~%73). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 4/12. Birim test sayısı 28 → 53. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-13/14, P5-2/6.
 
 ---
 
@@ -356,8 +356,8 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 |---|---|---|---|
 | P5-1 ✅ | ~~Tek görsel → PDF~~ | `image_to_pdf` eklendi (`-t pdf photo.png` → `photo.pdf`); ImageMagick `-auto-orient` + `PendingOutput` korumalı (2026-11-12) | S |
 | P5-2 | Klasör / recursive toplu dönüşüm (`-r`) | Kullanıcı klasör seçemiyor; dosya dosya gezmek zorunda | M |
-| P5-3 | `--dry-run` | Ne üretileceğini önceden göster; çakışmaları raporla | S |
-| P5-4 | `--jobs` (P1-4 ile birlikte) | Kaynak kontrolü | S |
+| P5-3 ✅ | ~~`--dry-run`~~ | `--dry-run` eklendi; `plan_output_path` ile çıktı hedefleri, çakışma ve üzerine yazma durumları simüle ediliyor (2026-11-12) | S |
+| P5-4 ✅ | ~~`--jobs`~~ | P1-4 kapsamında eklendi; clap range doğrulayıcısı ve thread budget ile tamamlandı (2026-11-11) | S |
 | P5-5 `[~]` | ~~Man page + shell completion~~ | `docs/konvert.1` yazıldı; PKGBUILD, .deb ve installer'a kurulum eklendi (2026-11-12). **Kalan:** shell completion (`clap_complete`) | S |
 | P5-6 | Log dosyası / `--verbose` / `RUST_LOG` | Destek ve teşhis; panic=abort'ta iz yok | S |
 | P5-7 | Preset profilleri: kaydet/adlandır/sil/dışa-içe aktar | Güçlü kullanıcı; GUI'de karşılığı yok | M |

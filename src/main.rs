@@ -309,6 +309,23 @@ fn main() -> anyhow::Result<()> {
 
     // 1. Merge images into single PDF
     if cli.merge_pdf {
+        if cli.dry_run {
+            println!("[Dry Run] Planning merge into single PDF ({} input files):", cli.files.len());
+            let first_stem = cli.files.first()
+                .and_then(|f| f.file_stem())
+                .and_then(|s| s.to_str())
+                .unwrap_or("images");
+            let target_dir = converter::get_output_dir(&cli.files[0], custom_output_dir.as_deref());
+            let out_pdf = target_dir.join(format!("{}_merged.pdf", first_stem));
+            for (i, f) in cli.files.iter().enumerate() {
+                println!("  {:2}. {}", i + 1, f.display());
+            }
+            println!("  ➔ Output: {}", out_pdf.display());
+            println!("  ➔ Collision: {}", if out_pdf.exists() { "yes (file exists)" } else { "none" });
+            println!("[Dry Run] Completed: 1 output file planned, 0 written.");
+            return Ok(());
+        }
+
         write_pid_lock();
         let orig_bytes: u64 = cli.files.iter().map(|f| f.metadata().map(|m| m.len()).unwrap_or(0)).sum();
         let mut progress_handle = notifier.start_progress(
@@ -449,6 +466,45 @@ fn main() -> anyhow::Result<()> {
         max_pages: cli.max_pages.unwrap_or(200),
         custom_output_dir,
     };
+
+    if cli.dry_run {
+        println!("[Dry Run] Planning conversion for {} file(s):", files.len());
+        println!("  Target Action : {}", opts.target);
+        println!("  Parallel Jobs : {}", opts.jobs);
+        if let Some(dir) = &opts.custom_output_dir {
+            println!("  Output Folder : {}", dir.display());
+        }
+        println!();
+
+        let mut collisions = 0;
+        for (i, file) in files.iter().enumerate() {
+            match converter::plan_output_path(file, &opts, cli.force) {
+                Ok((predicted, exists)) => {
+                    let status = if exists {
+                        collisions += 1;
+                        if cli.force {
+                            "(overwriting existing)"
+                        } else {
+                            "(collision resolved with new name)"
+                        }
+                    } else {
+                        "(new file)"
+                    };
+                    println!("  {:2}. {} ➔ {} {}", i + 1, file.display(), predicted.display(), status);
+                }
+                Err(err) => {
+                    println!("  {:2}. {} ➔ [Hata: {}]", i + 1, file.display(), err);
+                }
+            }
+        }
+        println!();
+        println!(
+            "[Dry Run] Completed: {} file(s) planned, {} collision(s), 0 files modified.",
+            files.len(),
+            collisions
+        );
+        return Ok(());
+    }
 
     write_pid_lock();
 

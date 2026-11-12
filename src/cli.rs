@@ -29,6 +29,10 @@ pub struct Cli {
     #[arg(short = 'f', long = "force")]
     pub force: bool,
 
+    /// Preview conversion plan and output destinations without modifying disk
+    #[arg(long = "dry-run")]
+    pub dry_run: bool,
+
     /// Maximum number of files converted in parallel (default: CPU cores, capped at 4)
     #[arg(short = 'j', long = "jobs", value_name = "N", value_parser = parse_jobs)]
     pub jobs: Option<usize>,
