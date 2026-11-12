@@ -526,13 +526,26 @@ where
     I: IntoIterator<Item = S> + Clone,
     S: AsRef<std::ffi::OsStr>,
 {
-    let status = Command::new("magick")
+    let output = Command::new("magick")
         .args(args.clone())
-        .status()
-        .or_else(|_| Command::new("convert").args(args).status())
+        .output()
+        .or_else(|_| Command::new("convert").args(args).output())
         .with_context(|| "ImageMagick (magick veya convert) çalıştırılamadı")?;
 
-    if !status.success() {
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let trimmed_err = stderr.trim();
+        if trimmed_err.contains("not authorized") || trimmed_err.contains("policy") {
+            bail!(
+                "ImageMagick güvenlik politikası (policy.xml) engeline takıldı.\n\
+                 Çözüm: /etc/ImageMagick-*/policy.xml dosyasındaki PDF kuralını düzenleyin ('<policy domain=\"coder\" rights=\"read|write\" pattern=\"PDF\" />') veya Ghostscript kullanın.\n\
+                 Detay: {}",
+                trimmed_err
+            );
+        }
+        if !trimmed_err.is_empty() {
+            bail!("ImageMagick komutu başarısız oldu: {}", trimmed_err);
+        }
         bail!("ImageMagick komutu başarısız oldu (çıkış kodu 0 değil)");
     }
     Ok(())

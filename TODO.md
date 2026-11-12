@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 46'sı tam, 6'sı kısmi (~%75). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 4/12. Birim test sayısı 28 → 53. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-14, P5-2/6.
+> **İlerleme (2026-11-12):** 67 maddeden 48'i tam, 6'sı kısmi (~%78). P0 %100, P1 ~%78, P2 11/13, P3 14/15, P4 7,5/12, P5 4/12. Birim test sayısı 28 → 54. Sıradaki: P4-2/6/12, P2-9/10, P1-7 (i18n), P3-14, P5-2/6.
 
 ---
 
@@ -296,10 +296,10 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P2-5 ✅ | ~~JXL resize geçici dosyası `resize_temp_{pid}.png` — paralel batch'te yarış~~ | Atomik sayaç + `konvert_resize_<pid>_<n>.png`; hata yolunda sil (2026-11-11) | S |
 | P2-6 ✅ | ~~Sayısal doğrulama yok~~ | clap aralık/whitelist doğrulayıcıları: quality 1-100, CRF 0-51, DPI 36-1200, jobs 1-64, bitrate ve preset (2026-11-11) | S |
 | P2-7 ✅ | ~~Bağımlılık ön kontrolü yok~~ | `--check-deps` eklendi ([deps.rs](src/deps.rs)): PATH taraması, zorunlu/opsiyonel ayrımı, eksikse exit 1 (2026-11-11). GUI sağlık paneli P3-9'da | M |
-| P2-8 | PDF sıkıştırma/birleştirme yalnız ImageMagick/gs'ye bağlı; IM'nin dağıtım politikası PDF'i yasaklayabiliyor | `merge-pdf` için gs tabanlı alternatif; IM hatasında net "policy.xml" yönlendirmesi | M |
+| P2-8 ✅ | ~~PDF sıkıştırma/birleştirme yalnız ImageMagick/gs'ye bağlı; IM policy.xml engeli~~ | PDF girdilerinde Ghostscript doğrudan kullanılıyor; `run_imagemagick` içinde policy.xml hatası tespit edilip çözüm yönergesiyle raporlanıyor (2026-11-12) | M |
 | P2-9 | `to_svg` aslında potrace ile vektörleştirme (çıktıda "Created by potrace") | Özelliği "SVG olarak izle/vektörleştir" diye adlandır; `--trace-colors`; kalite beklentisini dokümante et | S |
 | P2-10 | DOCX/UDF metin çıkarımı eksik: tablolar, üstbilgi/altbilgi, dipnot; 50 MB'da sessiz kesme | `quick-xml` ile yapısal ayrıştırma; desteklenmeyen öğeleri raporla; kesme yerine açık hata | M |
-| P2-11 | `--merge-pdf` yüzlerce dosyada ARG_MAX/IM belleği riski | Girdileri parçalara böl (ör. 50'şer) ve birleştir; `--max-inputs` uyarısı | S |
+| P2-11 ✅ | ~~`--merge-pdf` yüzlerce dosyada ARG_MAX/IM belleği riski~~ | 50'den fazla dosyada 50'şerli parçalama ve Ghostscript/IM ile birleşik montaj eklendi (2026-11-12) | S |
 | P2-12 ✅ | ~~Video hedef boyut sonrası doğrulama yok~~ | Encode sonrası boyut ölçülüyor; aşarsa bit hızı ×0.8 ile en fazla 3 deneme, sonra en küçük boyutla hata (2026-11-11) | M |
 | P2-13 ✅ | ~~Geçmiş dosyası yarışı ve bozulma~~ | `flock` ile süreçler arası kilit, `tmp` + `rename` atomik yazma, bozuk JSON `.corrupt` olarak yedekleniyor (2026-11-11). GUI tarafı hâlâ dosyayı doğrudan siliyor (P3-4) | M |
 

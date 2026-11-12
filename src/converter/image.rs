@@ -520,6 +520,90 @@ pub fn merge_images_to_pdf(
     ensure_parent_dir(&output_path)?;
 
     let pending = crate::converter::PendingOutput::new(&output_path);
+
+    // Girdilerin tamamı PDF ise ImageMagick yerine doğrudan Ghostscript kullan (policy.xml engeline takılmaz).
+    let all_pdf = images.iter().all(|f| {
+        f.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("pdf"))
+            .unwrap_or(false)
+    });
+
+    if all_pdf && crate::deps::command_exists("gs") {
+        let mut cmd = Command::new("gs");
+        cmd.args(["-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"]);
+        cmd.arg(format!("-sOutputFile={}", pending.path().display()));
+        for pdf in images {
+            cmd.arg(pdf);
+        }
+        let status = cmd.status().with_context(|| "Ghostscript (gs) çalıştırılamadı")?;
+        if !status.success() {
+            bail!("Ghostscript ile PDF dosyaları birleştirilemedi");
+        }
+        return pending.commit();
+    }
+
+    // Yüzlerce dosya varsa ARG_MAX ve ImageMagick bellek sınırını aşmamak için 50'şerli parçalar halinde birleştir.
+    if images.len() > 50 {
+        eprintln!(
+            "Konvert: {} dosya tespit edildi; bellek ve argüman sınırını korumak için 50'şerli parçalar halinde birleştiriliyor...",
+            images.len()
+        );
+        static CHUNK_DIR_COUNTER: std::sync::atomic::AtomicUsize =
+            std::sync::atomic::AtomicUsize::new(0);
+        let chunk_id = CHUNK_DIR_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let temp_path = std::env::temp_dir().join(format!(
+            "konvert_merge_chunks_{}_{}",
+            std::process::id(),
+            chunk_id
+        ));
+        std::fs::create_dir_all(&temp_path).context("Geçici klasör oluşturulamadı")?;
+
+        struct TempChunkDir(PathBuf);
+        impl Drop for TempChunkDir {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _guard = TempChunkDir(temp_path.clone());
+
+        let mut chunk_pdfs = Vec::new();
+        for (i, chunk) in images.chunks(50).enumerate() {
+            let chunk_pdf = temp_path.join(format!("chunk_{:04}.pdf", i));
+            let mut chunk_args: Vec<std::ffi::OsString> = chunk
+                .iter()
+                .map(|img| img.as_os_str().to_os_string())
+                .collect();
+            chunk_args.push(std::ffi::OsStr::new("-auto-orient").to_os_string());
+            chunk_args.push(chunk_pdf.as_os_str().to_os_string());
+            crate::converter::run_imagemagick(&chunk_args)
+                .with_context(|| format!("{}. parça PDF'e dönüştürülemedi", i + 1))?;
+            chunk_pdfs.push(chunk_pdf);
+        }
+
+        if crate::deps::command_exists("gs") {
+            let mut cmd = Command::new("gs");
+            cmd.args(["-dBATCH", "-dNOPAUSE", "-q", "-sDEVICE=pdfwrite"]);
+            cmd.arg(format!("-sOutputFile={}", pending.path().display()));
+            for pdf in &chunk_pdfs {
+                cmd.arg(pdf);
+            }
+            let status = cmd.status().with_context(|| "Ghostscript çalıştırılamadı")?;
+            if !status.success() {
+                bail!("Ghostscript ile parçalar birleştirilemedi");
+            }
+        } else {
+            let mut final_args: Vec<std::ffi::OsString> = chunk_pdfs
+                .iter()
+                .map(|p| p.as_os_str().to_os_string())
+                .collect();
+            final_args.push(pending.path().as_os_str().to_os_string());
+            crate::converter::run_imagemagick(&final_args)
+                .with_context(|| "Parça PDF'leri birleştirilemedi")?;
+        }
+        return pending.commit();
+    }
+
     let mut args: Vec<std::ffi::OsString> = images
         .iter()
         .map(|img| img.as_os_str().to_os_string())
@@ -724,6 +808,34 @@ mod tests {
             }
         }
         let _ = fs::remove_file(test_img);
+    }
+
+    #[test]
+    fn test_merge_pdfs_via_gs_when_all_inputs_are_pdf() {
+        if !crate::deps::command_exists("gs") {
+            return;
+        }
+        let temp_dir = std::env::temp_dir();
+        let img1 = temp_dir.join("konvert_test_merge_a.png");
+        let img2 = temp_dir.join("konvert_test_merge_b.png");
+        let _ = ::image::DynamicImage::new_rgb8(10, 10).save(&img1);
+        let _ = ::image::DynamicImage::new_rgb8(10, 10).save(&img2);
+
+        if crate::deps::imagemagick_available() {
+            let pdf1 = image_to_pdf(&img1, None).unwrap();
+            let pdf2 = image_to_pdf(&img2, None).unwrap();
+
+            let merged = merge_images_to_pdf(&[pdf1.clone(), pdf2.clone()], None).unwrap();
+            assert!(merged.exists());
+            assert_eq!(merged.extension().and_then(|e| e.to_str()), Some("pdf"));
+
+            let _ = fs::remove_file(merged);
+            let _ = fs::remove_file(pdf1);
+            let _ = fs::remove_file(pdf2);
+        }
+
+        let _ = fs::remove_file(img1);
+        let _ = fs::remove_file(img2);
     }
 
     #[test]
