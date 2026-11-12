@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 52'si tam, 5'i kısmi (~%85). P0 %100, P1 ~%78, P2 11/13, P3 14/15, P4 8,5/12, P5 7/12. Birim test sayısı 28 → 57. Sıradaki: P4-2/6, P2-9/10, P1-7 (i18n), P3-14, P5-7..12.
+> **İlerleme (2026-11-12):** 67 maddeden 53'ü tam, 5'i kısmi (~%87). P0 %100, P1 ~%78, P2 11/13, P3 %100, P4 8,5/12, P5 7/12. Birim test sayısı 28 → 57. Sıradaki: P4-2/6, P2-9/10, P1-7 (i18n), P5-7..12.
 
 ---
 
@@ -322,7 +322,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P3-11 ✅ | ~~Çalışan işi izleme/iptal yok~~ | `running.pid` ve süreç durumunu izleyen monitör eklendi; çalışan görevi `--cancel` ile sonlandırma butonu bağlandı (2026-11-12) | M |
 | P3-12 ✅ | ~~Kaydetme hataları sessiz~~ | `save()` dönüşü kontrol edilip `QMessageBox` ile bildiriliyor (2026-11-11); `QSaveFile` hâlâ yapılabilir | S |
 | P3-13 ✅ | ~~Aynı anda iki GUI config'i eziyor~~ | `QLockFile` ile tek örnek kilidi ve `QFileSystemWatcher` ile harici dosya değişikliklerinde otomatik UI senkronu eklendi (2026-11-12) | M |
-| P3-14 | Erişilebilirlik ve çeviri: 106 satır içi `lang == "tr" ?` ternary; `lbl_video_crf` yalnız TR/EN | Tüm metinleri `translator.h` anahtarlarına taşı; `setBuddy`, sekme sırası, kısayollar, `F1` | M |
+| P3-14 ✅ | ~~Erişilebilirlik ve çeviri~~ | `translator.h` çok dilli anahtarları tamamlandı (`lbl_video_crf` DE/FR/ES eklendi); `F1`, `Ctrl+Q`, `Ctrl+R` kısayolları ve `setBuddy` erişilebilirlik bağları kuruldu (2026-11-12) | M |
 | P3-15 ✅ | ~~`--screenshot-all` dağıtımda~~ | Yalnız `KONVERT_DEBUG` (Debug) derlemesinde etkin (2026-11-11) | S |
 
 **GUI için genel kabul:** Her ayar kaydedildiğinde geri okunabilir; her hata kullanıcıya görünür; hiçbir UI eylemi süreç fırtınası üretmez.

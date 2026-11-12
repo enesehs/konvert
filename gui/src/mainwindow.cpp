@@ -29,6 +29,7 @@
 #include <QCloseEvent>
 #include <QImageReader>
 #include <QFileDialog>
+#include <QShortcut>
 
 #ifndef KONVERT_APP_VERSION
 #define KONVERT_APP_VERSION "v0.1-beta"
@@ -104,6 +105,24 @@ MainWindow::MainWindow(QWidget *parent)
     m_processMonitorTimer->start();
 
     setupConfigWatcher();
+
+    // Shortcuts & Accessibility (P3-14)
+    auto *f1Shortcut = new QShortcut(QKeySequence::HelpContents, this);
+    connect(f1Shortcut, &QShortcut::activated, this, [this]() {
+        if (m_rootTabWidget) m_rootTabWidget->setCurrentIndex(3);
+    });
+
+    auto *quitShortcut = new QShortcut(QKeySequence::Quit, this);
+    connect(quitShortcut, &QShortcut::activated, this, &QWidget::close);
+
+    auto *closeShortcut = new QShortcut(QKeySequence::Close, this);
+    connect(closeShortcut, &QShortcut::activated, this, &QWidget::close);
+
+    auto *refreshShortcut = new QShortcut(QKeySequence::Refresh, this);
+    connect(refreshShortcut, &QShortcut::activated, this, [this]() {
+        loadHistoryData();
+        updateProcessMonitor();
+    });
 
     setWindowTitle("Konvert");
     setWindowIcon(QIcon(":/logo.svg"));
@@ -418,6 +437,7 @@ QWidget* MainWindow::createPhotosTab() {
     sliderRow->addWidget(sliderLabel);
 
     m_photoQualitySlider = new QSlider(Qt::Horizontal, qualityWidget);
+    sliderLabel->setBuddy(m_photoQualitySlider);
     m_photoQualitySlider->setRange(1, 100);
     m_photoQualitySlider->setValue(m_config.imageQuality);
     m_photoQualitySlider->setToolTip("1-100");
@@ -552,6 +572,7 @@ QWidget* MainWindow::createVideosTab() {
     crfRow->addWidget(crfLabel);
 
     m_videoCrfSlider = new QSlider(Qt::Horizontal, compWidget);
+    crfLabel->setBuddy(m_videoCrfSlider);
     m_videoCrfSlider->setRange(0, 51);
     m_videoCrfSlider->setValue(m_config.videoCrf);
     m_videoCrfSlider->setToolTip("CRF (0-51)");
@@ -574,6 +595,7 @@ QWidget* MainWindow::createVideosTab() {
     presetRow->addWidget(presetLabel);
 
     m_videoPresetCombo = new QComboBox(compWidget);
+    presetLabel->setBuddy(m_videoPresetCombo);
     m_videoPresetCombo->addItems({"ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow"});
     if (m_videoPresetCombo->findText(m_config.videoPreset) < 0 && !m_config.videoPreset.isEmpty()) {
         m_videoPresetCombo->addItem(m_config.videoPreset);
@@ -653,6 +675,7 @@ QWidget* MainWindow::createMusicTab() {
     bitrateRow->addWidget(bitrateLabel);
 
     m_audioBitrateCombo = new QComboBox(audioWidget);
+    bitrateLabel->setBuddy(m_audioBitrateCombo);
     m_audioBitrateCombo->addItems({"128k", "192k", "256k", "320k"});
     const QString configuredBitrate =
         m_config.audioBitrate.contains("320") ? "320k" : m_config.audioBitrate;
@@ -732,6 +755,7 @@ QWidget* MainWindow::createDocumentsTab() {
     dpiRow->addWidget(dpiLabel);
 
     m_pdfDpiSpin = new QSpinBox(docWidget);
+    dpiLabel->setBuddy(m_pdfDpiSpin);
     m_pdfDpiSpin->setRange(72, 1200);
     m_pdfDpiSpin->setValue(m_config.pdfDpi);
     connect(m_pdfDpiSpin, &QSpinBox::valueChanged, this, [this](int val) {
@@ -1299,6 +1323,7 @@ QWidget* MainWindow::createSettingsTab() {
     langRow->addWidget(lblLang);
 
     m_langCombo = new QComboBox(genWidget);
+    lblLang->setBuddy(m_langCombo);
     m_langCombo->addItem(lang == "tr" ? "Otomatik Algıla (Sistem Dili)" : "Auto Detect (System)", "auto");
     m_langCombo->addItem("Türkçe", "tr");
     m_langCombo->addItem("English", "en");
@@ -1336,6 +1361,7 @@ QWidget* MainWindow::createSettingsTab() {
 
     auto *outDirRow = new QHBoxLayout();
     m_outputDirEdit = new QLineEdit(genWidget);
+    outDirLabel->setBuddy(m_outputDirEdit);
     m_outputDirEdit->setReadOnly(true);
     m_outputDirEdit->setPlaceholderText(trKey("lbl_output_dir_default", lang));
     m_outputDirEdit->setText(m_config.outputDirectory);
