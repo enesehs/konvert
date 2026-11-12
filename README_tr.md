@@ -8,78 +8,147 @@
 
   [English](README.md) • **Türkçe** • [Deutsch](README_de.md) • [Français](README_fr.md) • [Español](README_es.md) • [Italiano](README_it.md) • [Русский](README_ru.md) • [中文](README_zh.md) • [日本語](README_ja.md)
 
-  <br>
-
-  [![Web Sitesi](https://img.shields.io/badge/Web%20Sitesi-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.3.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
-  [![Lisans](https://img.shields.io/badge/Lisans-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
-  [![Rust](https://img.shields.io/badge/Rust-2024%20Edition-e05d44?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
-  [![Qt 6](https://img.shields.io/badge/Qt-6%20Widgets%20(Breeze)-41CD52?style=for-the-badge&logo=qt)](https://www.qt.io/)
-  [![Platform](https://img.shields.io/badge/Platform-Linux%20%2F%20KDE%20Plasma%206-1793d1?style=for-the-badge&logo=kde)](https://kde.org/)
-  [![Gizlilik](https://img.shields.io/badge/Gizlilik-%25100%20%C3%87evrimd%C4%B1%C5%9F%C4%B1%20%26%20Telemetrisiz-7158e2?style=for-the-badge)](https://github.com/enesehs/konvert)
-
-  <br>
+  <br><br>
 
   <p align="center">
-    <b>Linux ve tüm büyük masaüstü dosya yöneticileri için ultra hızlı, hafif, %100 çevrimdışı yerel sağ tık dosya dönüştürücüsü ve optimize edicisi.</b>
+    <b>Sağ tıkla, çevir. Dosyaların bilgisayarından hiç çıkmasın.</b>
   </p>
 
   <p align="center">
-    <a href="#neden-konvert">Neden Konvert?</a> •
-    <a href="#ekran-görüntüleri">Ekran Görüntüleri</a> •
-    <a href="#özellikler">Özellikler</a> •
-    <a href="#kurulum">Kurulum</a> •
-    <a href="#cli-kullanımı-ve-profiller">CLI Kullanımı</a> •
-    <a href="#desteklenen-formatlar">Desteklenen Formatlar</a> •
-    <a href="#mimari">Mimari</a>
+    <a href="https://github.com/enesehs/konvert/releases"><img src="https://img.shields.io/github/v/release/enesehs/konvert?style=flat-square&color=3daee9&label=sürüm" alt="Sürüm" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/lisans-GPL--3.0-2ecc71.svg?style=flat-square" alt="Lisans" /></a>
+    <a href="https://kde.org"><img src="https://img.shields.io/badge/platform-Linux%20%2F%20KDE-1793d1.svg?style=flat-square" alt="Platform" /></a>
+    <a href="https://enesehs.dev/konvert"><img src="https://img.shields.io/badge/web%20sitesi-enesehs.dev-blueviolet?style=flat-square" alt="Web Sitesi" /></a>
+  </p>
+
+  <p align="center">
+    <a href="assets/screenshots/screenshot_context_menu.png">
+      <img src="assets/screenshots/screenshot_context_menu.png" alt="Konvert Bağlam Menüsü Gösterimi" width="92%" />
+    </a>
+    <br>
+    <sub><i>Dolphin, Nemo, Thunar veya Nautilus üzerinde tek ya da yüzlerce dosya seçin. Gerçek zamanlı ilerleme çubuğu. Bitti.</i></sub>
   </p>
 
 </div>
 
 ---
 
-## <img src="assets/icons/konvert-shield.svg" width="22" height="22" align="absmiddle" /> Neden Konvert?
+## Neden Konvert?
 
-İnternetteki güvensiz web sitelerine gizli dosyalarınızı yüklemekten, sıradan bir dönüştürme için tarayıcı açmaktan veya hantal Electron uygulamalarının dakikalarca açılmasını beklemekten yoruldunuz mu?
+Çevrim içi dönüştürücüler kişisel ve gizli dosyalarınızı üçüncü taraf sunuculara maruz bırakır, gigabaytlarca dosya yüklerken kotanızı ve vaktinizi tüketir. Handbrake veya Converseen gibi büyük masaüstü uygulamalarının ise sıradan bir format değişimi için açılması saniyeler sürer. Doğrudan `ffmpeg` komutları ise onlarca karmaşık terminal parametresini ezberlemeyi zorunlu kılar.
 
-**Konvert**, modern Linux masaüstleri için sıfırdan geliştirilmiş olup ultra hızlı **Rust 2024** motorunu yerel **Qt6 & KDE Breeze** ayarlar arayüzü ile birleştirir:
-
-* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Sıfır Telemetri & %100 Gizlilik:** Dosyalarınız cihazınızdan asla ayrılmaz. Bulut yüklemesi, ağ bağımlılığı ve arka plan izleyicisi yoktur.
-* <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Kusursuz Bağlam Menüsü:** **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar** ve **GNOME Nautilus** üzerinde doğrudan sağ tıklayarak dönüştürün.
-* <img src="assets/icons/konvert-monitor.svg" width="16" height="16" align="absmiddle" /> **Canlı D-Bus İlerlemesi ve Dinamik ETA:** Yerel masaüstü bildirim merkezinde animasyonlu ilerleme çubuğu ve gerçek kalan süre (`ETA: Xs`) tahmini.
-* <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Hassas Hedef Boyutlandırma:** Discord (8 MB), E-posta (25 MB) ve özel limitler için dinamik ayar merdiveni ve boyut koruma mekanizması.
-* <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rayon Çok Çekirdekli Paralellik:** Akıllı işlemci bütçelemesi (`--jobs`) ile yüzlerce dosyayı aynı anda paralel işleyin.
-* <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **İşlem Günlüğü ve Önizlemeler:** Yerel disk alanı tasarrufunu izleyin, 80×80 küçük resim önizlemelerine bakın ve çıktıları tek tıkla dosya yöneticisinde gösterin.
+**Konvert** tam bu noktada devreye girer:
+- **Anında:** Dosya yöneticinizde (Dolphin, Nemo, Thunar, Nautilus) sağ tıklayın ve saniyeler içinde dönüştürün.
+- **%100 Gizli & Çevrimdışı:** Sıfır telemetri, bulut hesabı yok, internet bağımlılığı yok. Her şey yerel işlemcinizde (CPU) koşar.
+- **Ultra Hızlı:** Rayon iş parçacığı havuzuyla masaüstünüzü kilitlemeden tüm işlemci çekirdeklerinizi sonuna kadar kullanan Rust 2024 motoru.
+- **Hassas Hedef Boyutlandırma:** 8 MB Discord klibi veya 25 MB e-posta eki mi lazım? Konvert dinamik bit hızı merdiveni ve kodlama sonrası doğrulama ile boyutu garantiler.
 
 ---
 
-## <img src="assets/icons/konvert-monitor.svg" width="22" height="22" align="absmiddle" /> Ekran Görüntüleri
+## Performans Testleri
 
-<div align="center">
-  <sub><b>Masaüstü Sağ Tık Bağlam Menüsü Entegrasyonu</b></sub><br>
-  <a href="assets/screenshots/screenshot_context_menu.png">
-    <img src="assets/screenshots/screenshot_context_menu.png" alt="Masaüstü Sağ Tık Bağlam Menüsü" width="90%" />
-  </a>
-</div>
+Linux x86_64 üzerinde gerçekçi bir 4K PNG (**18.8 MB**, 3840×2160) ile test edilmiştir:
 
+| Hedef Format / Mod | Süre | Çıktı Boyutu | Tasarruf | Notlar |
+|---|---|---|---|---|
+| **JPEG XL (`.jxl`)** | **517 ms** | **1.4 MB** | **%92** | Yeni nesil süper hızlı sıkıştırma |
+| **WebP (`--profile web`)** | **843 ms** | **1.7 MB** | **%90** | Web için optimize edilmiş %80 kalite |
+| **JPEG (`-q 85`)** | **228 ms** | **3.8 MB** | **%79** | Anında günlük hızlı dönüşüm |
+| **Hedef Boyut (`--target-size 1mb`)** | **2.1 sn** | **693 KB** | **%96** | Dinamik merdiven arama (garantili < 1 MB) |
+| **Unix Boru Hattı (`cat in \| konvert -`)** | **37 ms** | **30 KB** | **%93** | Disksiz stdin/stdout anlık veri akışı |
+
+---
+
+## Hızlı Kurulum
+
+Önceden derlenmiş ikili dosyalar, masaüstü sağ tık menüleri, man sayfası ve kabuk tamamlama betiklerini tek satırda kurun:
+
+```bash
+curl -sSL https://enesehs.dev/konvert/install.sh | bash
+```
+
+<details>
+<summary><b>Diğer kurulum seçenekleri (.deb, Arch/AUR, AppImage, Flatpak, Kaynaktan Derleme)</b></summary>
 <br>
+
+### Debian / Ubuntu (.deb)
+```bash
+# Son sürümü kurun:
+sudo dpkg -i konvert_0.3.0_amd64.deb
+sudo apt-get install -f
+
+# Veya yerel olarak paketleyin:
+./packaging/build-deb.sh
+```
+
+### Arch Linux / AUR (PKGBUILD)
+```bash
+cd packaging && makepkg -si
+```
+
+### Taşınabilir AppImage
+```bash
+./packaging/build-appimage.sh
+```
+
+### Flatpak
+```bash
+flatpak-builder --user --install --force-clean build-dir packaging/io.github.enesehs.konvert.json
+```
+
+### Kaynaktan Derleme
+```bash
+git clone https://github.com/enesehs/konvert.git
+cd konvert && ./scripts/install.sh
+```
+</details>
+
+---
+
+## CLI ve Profiller
+
+Konvert doğrudan terminalden veya kabuk (shell) betiklerinden çağrılabilir:
+
+```bash
+# ── Profiller & Boru Hatları ──────────────────────────────────────────
+konvert --profile web -t webp photo.png       # %80 kalite, 150 DPI web modu
+konvert --profile archive -t jpg photo.png     # %95 kalite, 600 DPI arşiv modu
+cat photo.png | konvert -t webp - > out.webp  # stdin/stdout boru hattı üzerinden aktar
+
+# ── Akıllı Hedef Boyutlandırma ─────────────────────────────────────────
+konvert -t discord_8mb video.mp4              # 8 MB Discord yükleme limitine sığdır
+konvert -t email_25mb video.mp4               # 25 MB e-posta ek limitine sığdır
+konvert --target-size 15MB video.mp4          # İstenilen özel boyuta sığdır
+
+# ── Toplu İşlem & Güvenlik Kontrolleri ─────────────────────────────────
+konvert -t webp -j 4 *.png                    # 4 CPU iş parçacığıyla paralel toplu dönüşüm
+konvert -r -t webp ./fotograflar               # Klasörü alt dizinleriyle özyinelemeli tara
+konvert --dry-run -t webp *.jpg                # Dosyaları değiştirmeden çıktıları önizle
+konvert --backup -f -t png photo.jpg           # Üzerine yazmadan önce otomatik .bak yedeği al
+konvert --cancel                               # Çalışan arka plan işlemini iptal et
+konvert -s                                     # Qt6 Ayarlar Arayüzünü aç
+```
+
+---
+
+## Arayüz Vitrini
 
 <table align="center" width="100%">
   <tr>
     <td width="33.3%" align="center" valign="top">
-      <sub><b>Qt6 & Breeze Ayarlar Arayüzü</b></sub><br>
+      <sub><b>Qt6 & Breeze Ayarlar Paneli</b></sub><br>
       <a href="assets/screenshots/screenshot_convert.png">
         <img src="assets/screenshots/screenshot_convert.png" alt="Ayarlar Arayüzü" width="100%" />
       </a>
     </td>
     <td width="33.3%" align="center" valign="top">
-      <sub><b>Dönüşüm Geçmişi ve Tasarruf Paneli</b></sub><br>
+      <sub><b>Disk Tasarrufu ve Geçmiş</b></sub><br>
       <a href="assets/screenshots/screenshot_history.png">
         <img src="assets/screenshots/screenshot_history.png" alt="Geçmiş Paneli" width="100%" />
       </a>
     </td>
     <td width="33.3%" align="center" valign="top">
-      <sub><b>KDE Geliştirici Hakkında Paneli</b></sub><br>
+      <sub><b>KDE Breeze Hakkında Paneli</b></sub><br>
       <a href="assets/screenshots/screenshot_about.png">
         <img src="assets/screenshots/screenshot_about.png" alt="Hakkında Paneli" width="100%" />
       </a>
@@ -89,180 +158,41 @@
 
 ---
 
-## <img src="assets/icons/konvert-zap.svg" width="22" height="22" align="absmiddle" /> Özellikler
+## Desteklenen Formatlar
 
-| Özellik | Açıklama |
-|---|---|
-| <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Çoklu Masaüstü Desteği** | Dolphin, Nemo, Thunar ve Nautilus için MIME türü kirliliği yaratmayan temiz sağ tık eylemleri. |
-| <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 Rayon Motoru** | Yapılandırılabilir iş parçacığı bütçesi (`--jobs`), sıfır GC duraklaması ve LTO ile optimize edilmiş binary. |
-| <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Hazır Profiller** | Dahili profiller (`web`, `balanced`, `archive`, `lossless`) ve `config.toml` dosyasına kaydedilebilen özel profiller (`--save-profile`). |
-| <img src="assets/icons/konvert-terminal.svg" width="16" height="16" align="absmiddle" /> **Unix Boru Hattı (`-`)** | Shell scriptleri ve boru hatları için sihirli bayt (magic bytes) format algılamalı stdin/stdout desteği. |
-| <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Atomik Veri Güvenliği** | Geçici `.part` dosyaları, çakışma durumunda otomatik `_2`, `_3` adlandırması ve üzerine yazmadan önce `.bak` yedeği (`--backup`). |
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Yeni Nesil Görsel Formatları** | JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF desteği ve `potrace` ile SVG vektörleştirme. |
-| <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belge ve PDF Araçları** | UDF (UYAP) ve DOCX belgelerini tablo ve üstbilgi yapısını koruyarak PDF/TXT formatına çevirme; çoklu görseli tek PDF yapma. |
-| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Çok Dilli (i18n) Destek** | CLI'da 9 dil (`--lang <code>`: TR, EN, DE, FR, ES, IT, RU, ZH, JA) ve Qt6 GUI'de 5 dil desteği. |
+<details open>
+<summary><b>Tüm ortam ve belge format tablosunu görüntülemek için tıklayın</b></summary>
+<br>
 
----
-
-## <img src="assets/icons/konvert-compress.svg" width="22" height="22" align="absmiddle" /> Kurulum
-
-### Yöntem 1: Evrensel Tek Satırlık Kurucu (Önerilen)
-
-En güncel binary, ikonlar, man sayfası, kabuk tamamlama ve dosya yöneticisi menülerini kurar:
-
-```bash
-# enesehs.dev üzerinden:
-curl -sSL https://enesehs.dev/konvert/install.sh | bash
-
-# Veya GitHub üzerinden:
-curl -sSL https://raw.githubusercontent.com/enesehs/konvert/main/docs/public/install.sh | bash
-```
-
-### Yöntem 2: Debian / Ubuntu (.deb Paketi)
-
-[GitHub Releases](https://github.com/enesehs/konvert/releases) sayfasından `.deb` paketini indirin veya yerelde derleyin:
-
-```bash
-# Paketi kurun:
-sudo dpkg -i packaging/konvert_*.deb
-sudo apt-get install -f
-
-# Veya yerel olarak paketleyin:
-./packaging/build-deb.sh
-```
-
-### Yöntem 3: Arch Linux / AUR (PKGBUILD)
-
-```bash
-cd packaging
-makepkg -si
-```
-
-### Yöntem 4: Taşınabilir AppImage
-
-```bash
-# Bağımsız AppImage paketi üretin:
-./packaging/build-appimage.sh
-```
-
-### Yöntem 5: Flatpak (Flathub Manifesti)
-
-```bash
-flatpak-builder --user --install --force-clean build-dir packaging/io.github.enesehs.konvert.json
-```
-
-### Yöntem 6: Kaynaktan Yerel Derleme
-
-```bash
-git clone https://github.com/enesehs/konvert.git
-cd konvert
-./scripts/install.sh
-```
-
----
-
-## <img src="assets/icons/konvert-terminal.svg" width="22" height="22" align="absmiddle" /> CLI Kullanımı ve Profiller
-
-```bash
-# ── Hazır Profiller ve Boru Hattı ──────────────────────────────────────
-konvert --profile web -t webp photo.png       # Web profili (%80 kalite, 150 DPI)
-konvert --profile archive -t jpg photo.png     # Arşiv profili (%95 kalite, 600 DPI)
-konvert --profile lossless -t webp photo.png  # Kayıpsız kodlama modu
-konvert --list-profiles                       # Mevcut profilleri listele
-cat photo.png | konvert -t webp - > out.webp  # stdin/stdout üzerinden akış borulama
-
-# ── Akıllı Hedef Boyutlandırma ─────────────────────────────────────────
-konvert -t discord_8mb video.mp4              # 8 MB Discord sınırına sığdır
-konvert -t email_25mb video.mp4               # 25 MB e-posta sınırına sığdır
-konvert --target-size 15MB video.mp4          # Özel boyut hedefi (15 MB)
-
-# ── Görsel Dönüştürme ve Optimizasyon ──────────────────────────────────
-konvert -t webp -q 90 photo.png                # Belirli kaliteyle WebP dönüşümü
-konvert -t jxl --lossless photo.png            # Kayıpsız JPEG XL dönüşümü
-konvert -t avif photo.png                      # Yeni nesil AVIF dönüşümü
-konvert -t svg photo.png                       # Vektörleştirerek SVG konturuna dönüştür
-konvert -t resize_50 photo.png                 # Çözünürlüğü %50 küçült
-konvert -t resize_1080p photo.jpg              # Full HD (1920x1080) sınırına sığdır
-konvert -t strip-metadata photo.jpg            # EXIF, GPS ve gizlilik verilerini sil
-
-# ── Belge ve PDF Araçları ──────────────────────────────────────────────
-konvert --merge-pdf p1.png p2.jpg p3.webp     # Çoklu görseli tek PDF yap
-konvert -t pdf belge.udf                       # UDF belgesini doğrudan PDF yap
-konvert -t txt belge.docx                      # DOCX tablosu ve metnini dışa aktar
-
-# ── Video ve Ses Araçları ──────────────────────────────────────────────
-konvert -t gif video.mp4                       # Yüksek kaliteli iki aşamalı palet GIF
-konvert -t extract-audio video.mp4             # Sesi MP3 olarak ayıkla
-konvert --extract-frames video.mp4             # Kareleri klasöre PNG olarak çıkar
-konvert -t audio-to-video ses.mp3              # Ses dosyasından dalga formu MP4 video üret
-
-# ── Toplu İşlem ve Güvenlik Kontrolleri ─────────────────────────────────
-konvert -t webp -j 4 *.png                    # 4 CPU çekirdeği ile paralel toplu dönüşüm
-konvert -r -t webp ./fotograflar               # Alt klasörleri özyinelemeli tara ve dönüştür
-konvert --dry-run -t webp *.jpg                # Dosyaları yazmadan çıktı planını önizle
-konvert --backup -f -t png photo.jpg           # Üzerine yazmadan önce otomatik .bak yedeği al
-konvert --check-update                         # Çevrimiçi GitHub güncellemelerini denetle
-konvert --cancel                               # Çalışan arka plan işlemini güvenle iptal et
-konvert -s                                     # Qt6 Ayarlar Arayüzünü Aç
-```
-
----
-
-## <img src="assets/icons/konvert-folder.svg" width="22" height="22" align="absmiddle" /> Desteklenen Formatlar
-
-| Kategori | Girdi Formatları | Hedef Formatlar | Özel Yetenekler |
+| Kategori | Girdi Formatları | Hedef Formatlar | Yetenekler |
 |---|---|---|---|
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Görseller** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | Otomatik EXIF Yönü Düzeltme, Metadata Temizleme, %50 ve 1080p Ölçekleme, Çoklu Görselden PDF, Potrace Çizim |
-| <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, E-posta 25 MB, Özel Hedef Boyut, Kare Ayıklama, Ses Ayıklama, İki Aşamalı Palet GIF |
-| <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Ses** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Ayarlanabilir Bit Hızları (`128k` - `320k`), Dalga Formu MP4 Video Üretimi |
-| <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belgeler** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Çoklu Çözünürlük (36-1200 DPI), Ghostscript Optimizasyonu, DOCX/UDF Tablo ve Metin Çıkarma |
+| **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | Otomatik EXIF yönü, EXIF temizleme, %50 ve 1080p ölçekleme, çoklu görselden PDF birleştirme, potrace vektör çizimi |
+| **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, E-posta 25 MB, kare çıkarma, ses ayıklama, iki aşamalı palet GIF |
+| **Ses** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Ayarlanabilir bit hızı (`128k` - `320k`), dalga formu video üretimi |
+| **Belgeler** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Çoklu DPI işleme (36-1200 DPI), Ghostscript motoru, DOCX/UDF tablo ve metin çıkarma |
+
+</details>
 
 ---
 
-## <img src="assets/icons/konvert-layers.svg" width="22" height="22" align="absmiddle" /> Mimari
+## Katkıda Bulunma
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│            Linux Masaüstü Dosya Yöneticileri ve Kabuk Boru Hatları      │
-│     (KDE Dolphin • Cinnamon Nemo • XFCE Thunar • GNOME Nautilus)        │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │
-                    ┌────────────────┴────────────────┐
-                    ▼                                 ▼
-      ┌───────────────────────────┐     ┌───────────────────────────┐
-      │     Rust 2024 Çekirdeği   │     │   Qt6 C++ Masaüstü Ayar   │
-      │                           │     │                           │
-      │ • Rayon İş Havuzu (-j)    │     │ • KDE Breeze Tasarım Dili │
-      │ • FFmpeg & ImageMagick    │     │ • Canlı Süreç Monitörü    │
-      │ • Ghostscript & Poppler   │     │ • Çoklu Örnek Eşzamanlama │
-      │ • Atomik I/O (.part/.bak) │     │ • Çıktı Klasörü Seçici    │
-      │ • D-Bus Yerinde İlerleme  │     │ • Görsel Geçmiş & Tasarruf│
-      └───────────────────────────┘     └───────────────────────────┘
-```
-
----
-
-## <img src="assets/icons/konvert-git.svg" width="22" height="22" align="absmiddle" /> Katkıda Bulunma
-
-Katkılarınızı memnuniyetle kabul ediyoruz! Katkıda bulunmak için:
+Katkılarınızı memnuniyetle kabul ediyoruz!
 
 1. Depoyu forklayın.
 2. Özellik dalınızı oluşturun (`git checkout -b feature/harika-ozellik`).
-3. Değişikliklerinizi commit'leyin (`git commit -m 'feat: harika ozellik ekle'`).
-4. Testleri ve lintleri doğrulayın (`cargo test && cargo clippy --all-targets -- -D warnings`).
-5. Dalınıza gönderin (`git push origin feature/harika-ozellik`).
-6. Bir **Pull Request** açın.
-
----
-
-## <img src="assets/icons/konvert-license.svg" width="22" height="22" align="absmiddle" /> Lisans
-
-Bu proje **GNU General Public License v3.0 veya üzeri (GPL-3.0-or-later)** ile lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakabilirsiniz.
+3. Testlerin geçtiğini doğrulayın (`cargo test && cargo clippy --all-targets -- -D warnings`).
+4. Değişikliklerinizi commit'leyin ve bir **Pull Request** açın.
 
 ---
 
 <div align="center">
-  <b>Geliştirici:</b> <a href="https://github.com/enesehs">enesehs</a> &bull;
-  <b>İletişim:</b> <a href="mailto:enesehs@protonmail.com">enesehs@protonmail.com</a><br>
-  <sub>Linux ve Açık Kaynak Topluluğu için özenle geliştirildi.</sub>
+
+  **Diller:**
+  [English](README.md) • **Türkçe** • [Deutsch](README_de.md) • [Français](README_fr.md) • [Español](README_es.md) • [Italiano](README_it.md) • [Русский](README_ru.md) • [中文](README_zh.md) • [日本語](README_ja.md)
+
+  <br><br>
+
+  <sub><a href="LICENSE">GPL-3.0-or-later</a> ile lisanslanmıştır &bull; Geliştirici: <a href="https://github.com/enesehs">enesehs</a></sub>
+
 </div>
