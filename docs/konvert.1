@@ -24,6 +24,30 @@ Lossless mode (images and video).
 .BR \-f ", " \-\-force
 Overwrite existing outputs instead of creating \fIname_2.ext\fR.
 .TP
+.BR \-\-backup
+Create a \fI.bak\fR backup copy before overwriting an existing file.
+.TP
+.BR \-\-dry\-run
+Preview output destinations and planned conversions without modifying files.
+.TP
+.BR \-r ", " \-\-recursive
+Recursively scan directories for input files.
+.TP
+.BR \-\-profile " " \fINAME\fR
+Apply a preset profile (\fBweb\fR, \fBbalanced\fR, \fBarchive\fR, \fBlossless\fR, or custom).
+.TP
+.BR \-\-list\-profiles
+List all available preset profiles.
+.TP
+.BR \-\-save\-profile " " \fINAME\fR
+Save current CLI settings as a named preset profile in configuration.
+.TP
+.BR \-\-check\-update
+Check GitHub releases for available software updates.
+.TP
+.BR \-\-completions " " \fISHELL\fR
+Generate shell completions (\fBbash\fR, \fBzsh\fR, or \fBfish\fR).
+.TP
 .BR \-j ", " \-\-jobs " " \fIN\fR
 Maximum parallel conversions (1\-64, default: CPU cores capped at 4).
 .TP
@@ -90,6 +114,7 @@ konvert \-t webp photo.png
 konvert \-t mp4 \-\-target\-size 8mb video.mov
 konvert \-\-merge\-pdf page1.png page2.png
 konvert \-t mp3 video.mp4
+cat photo.jpg | konvert \-t webp \- > photo.webp
 konvert \-\-check\-deps
 .fi
 .SH FILES

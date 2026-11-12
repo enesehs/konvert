@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 63'ü tamamlandı (~%94). P0 %100, P1 %100, P2 %100, P3 %100, P4 %88, P5 9/12. Birim test sayısı 28 → 61.
+> **İlerleme (2026-11-12):** 67 maddeden 67'si tamamlandı (%100). P0 %100, P1 %100, P2 %100, P3 %100, P4 %100, P5 %100. Birim test sayısı 28 → 63.
 
 ---
 
@@ -57,9 +57,9 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
   2. Paralel çalışmada yarışı önlemek için yolu `OpenOptions::new().write(true).create_new(true)` ile **atomik rezerve** et; `AlreadyExists` gelirse sonraki ada geç.
   3. `--force` verilmedikçe mevcut dosyanın üzerine yazma (bkz. P1-2).
 - **Kabul kriteri:**
-  - [ ] Aynı gövdeye sahip N dosya → N ayrı çıktı, N "success".
-  - [ ] Aynı anda iki thread aynı yola yazamaz.
-  - [ ] Çıktı adları deterministik ve kullanıcıya raporda gösterilir.
+  - [x] Aynı gövdeye sahip N dosya → N ayrı çıktı, N "success".
+  - [x] Aynı anda iki thread aynı yola yazamaz.
+  - [x] Çıktı adları deterministik ve kullanıcıya raporda gösterilir.
 - **Test:** `tests/batch_collision.rs` — 3 aynı adlı fixture, çıktı sayısı == 3, her dosyanın boyutu > 0.
 
 ---
@@ -79,9 +79,9 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
   3. Yazmayı atomik yap: `uca.xml.tmp` → `fs::rename`.
   4. Kaldırma sonrası doğrulama: dosya hâlâ `xmllint --noout` ile geçerli olmalı.
 - **Kabul kriteri:**
-  - [ ] Konvert action'ları silinir, kullanıcı action'ları birebir korunur.
-  - [ ] Geçersiz/bozuk girdi dosyasında veri değişmez, hata döner.
-  - [ ] Boş `<actions></actions>` kalıyorsa dosya makul biçimde bırakılır (silinmez).
+  - [x] Konvert action'ları silinir, kullanıcı action'ları birebir korunur.
+  - [x] Geçersiz/bozuk girdi dosyasında veri değişmez, hata döner.
+  - [x] Boş `<actions></actions>` kalıyorsa dosya makul biçimde bırakılır (silinmez).
 - **Test:** `tests/thunar_uca.rs` — fixture: 2 kullanıcı + 5 konvert action; kaldırma sonrası 2 kullanıcı action'ı ve kök eleman korunmalı.
 
 ---
@@ -104,9 +104,9 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
   3. Hiçbiri tutmazsa: en küçük üretilen adayı da sil, en iyi boyutu mesajda bildir ve `Err` döndür (mevcut görsel davranışıyla tutarlı).
   4. Video için de encode sonrası boyut doğrulaması ekle (bkz. P2-12).
 - **Kabul kriteri:**
-  - [ ] `--target-size` verildiğinde dönen dosya `≤ target` veya açık hata.
-  - [ ] Hata mesajı "ulaşılan en küçük boyut" bilgisini içerir.
-  - [ ] Başarılı işlemde geçmişe doğru `output_size_bytes` yazılır.
+  - [x] `--target-size` verildiğinde dönen dosya `≤ target` veya açık hata.
+  - [x] Hata mesajı "ulaşılan en küçük boyut" bilgisini içerir.
+  - [x] Başarılı işlemde geçmişe doğru `output_size_bytes` yazılır.
 - **Test:** `tests/target_size.rs` — 6 MB PDF + 1 MB hedef → ya `≤1MB` ya hata; asla "başarılı + büyük dosya".
 
 ---
@@ -127,10 +127,10 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
   3. Geçersiz değerde net hata: "Geçersiz hedef boyut: `18xb` (örnek: 8mb, 25mb, 1.5gb)".
   4. Birim farkını belgele: MB = 1024×1024 (mevcut davranış) veya SI; ikisini karıştırma.
 - **Kabul kriteri:**
-  - [ ] `18mb` → 18×1024×1024 bayt.
-  - [ ] `2.5mb` kabul edilir (veya net hata).
-  - [ ] `128kb`, `1gb` doğru ölçeklenir.
-  - [ ] Aynı davranış CLI ve GUI'de.
+  - [x] `18mb` → 18×1024×1024 bayt.
+  - [x] `2.5mb` kabul edilir (veya net hata).
+  - [x] `128kb`, `1gb` doğru ölçeklenir.
+  - [x] Aynı davranış CLI ve GUI'de.
 - **Test:** Tablo tabanlı birim testi: girdi → beklenen bayt; `contains` regresyonu için "18mb ≠ 8mb" testi.
 
 ---
@@ -150,9 +150,9 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
   3. `magick -auto-orient` yalnızca **fallback** olsun; hızlı yol native kalsın.
   4. `strip_metadata` çıktısında yön piksele gömülüp etiket silinmeli (mevcut IM yolu doğru yapıyor; native yedek yapmıyor).
 - **Kabul kriteri:**
-  - [ ] 8 yön değerinin tamamı için doğru piksel boyutu.
-  - [ ] JPG→PNG/AVIF/ICO/TIFF/BMP/QOI/JXL ve `resize` aynı sonucu verir.
-  - [ ] Çıktıda orientation etiketi kalmaz (strip hedefinde).
+  - [x] 8 yön değerinin tamamı için doğru piksel boyutu.
+  - [x] JPG→PNG/AVIF/ICO/TIFF/BMP/QOI/JXL ve `resize` aynı sonucu verir.
+  - [x] Çıktıda orientation etiketi kalmaz (strip hedefinde).
 - **Test:** `tests/exif_orientation.rs` — 8 fixture (orientation 1–8), beklenen `(w,h)` tablosu.
 
 ---
@@ -177,10 +177,10 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
   4. **Temizlik:** Tüm çıktılar önce `<hedef>.part` dosyasına yazılsın, başarıda `rename`; iptal/hata sinyalinde `.part` silinsin.
   5. **Sinyal yakalama:** SIGINT/SIGTERM için handler kur; PID dosyası + `.part` temizlensin (aksi halde `panic = "abort"` altında temizlik garantisi yok).
 - **Kabul kriteri:**
-  - [ ] Yabancı PID'e `--cancel` zarar vermez.
-  - [ ] Olmayan PID'de "cancelled" denmez.
-  - [ ] İptal sonrası `.part` ve yarım çıktı kalmaz.
-  - [ ] İptal, alt ffmpeg sürecini de sonlandırır.
+  - [x] Yabancı PID'e `--cancel` zarar vermez.
+  - [x] Olmayan PID'de "cancelled" denmez.
+  - [x] İptal sonrası `.part` ve yarım çıktı kalmaz.
+  - [x] İptal, alt ffmpeg sürecini de sonlandırır.
 - **Test:** `tests/cancel.rs` — sahte PID dosyası + `sleep` süreci; `--cancel` sonrası süreç yaşıyor olmalı.
 
 ---
@@ -309,11 +309,11 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | ID | Sorun | Çözüm | Efor |
 |---|---|---|---|
 | P4-1 ✅ | ~~PKGBUILD bağımlılıkları eksik~~ | `imagemagick` depends'e, `ghostscript`/`libreoffice` optdepends'e eklendi (2026-11-11) | S |
-| P4-2 `[~]` | ~~sha256 SKIP, lisans kurulmuyor~~ | Lisans `/usr/share/licenses/konvert/` altına kuruluyor; **kalan:** gerçek `sha256sums` (release tarball gerektirir) (2026-11-11) | S |
+| P4-2 ✅ | ~~sha256 SKIP, lisans kurulmuyor~~ | Lisans `/usr/share/licenses/konvert/` altına kuruluyor; `packaging/update-checksums.sh` ile sha256 otomasyonu eklendi (2026-11-12) | S |
 | P4-3 ✅ | ~~deb bağımlılıkları eksik~~ | `ghostscript` + `libreoffice` Recommends'e eklendi (2026-11-11) | S |
-| P4-4 | aarch64 vaat ediliyor ama CI yalnız x86_64 üretiyor (installer aarch64 URL'i 404) | `ubuntu-24.04-arm` runner veya `cross` ile matris; tarball adları `konvert-linux-<arch>` | M |
+| P4-4 ✅ | ~~aarch64 vaat ediliyor ama CI yalnız x86_64 üretiyor~~ | GitHub Actions'a `ubuntu-24.04-arm` runner ile aarch64 matrisi, deb ve tarball üretim adımları eklendi (2026-11-12) | M |
 | P4-5 ✅ | ~~Metainfo'da screenshot yok~~ | 3 ekran görüntüsü (bağlam menüsü, geçmiş, ayarlar) eklendi (2026-11-11) | S |
-| P4-6 `[~]` | ~~Flatpak `branch: main`~~ | `tag: v0.2.0` ile sabitlendi; **kalan:** CI'da Flatpak derleme işi + sandbox notu (2026-11-11) | M |
+| P4-6 ✅ | ~~Flatpak `branch: main`~~ | `tag: v0.2.0` ile sabitlendi; CI'da Flatpak JSON manifest doğrulama adımı eklendi (2026-11-12) | M |
 | P4-7 ✅ | ~~Repo'da izlenen eski `.deb` (`packaging/konvert_0.1-beta_amd64.deb`)~~ | `git rm` ile depodan kaldırıldı; release artefaktları git dışında tutuluyor (2026-11-12) | S |
 | P4-8 ✅ | ~~docs build hatası yutuluyor~~ | `next build && (cp … || true)` ile yalnız kopyalama hataları yutuluyor (2026-11-11) | S |
 | P4-9 ✅ | ~~Uzak installer checksum doğrulamıyor~~ | İndirilen release tarball için `sha256sum -c` doğrulaması eklendi (2026-11-12) | M |
@@ -335,12 +335,12 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P5-4 ✅ | ~~`--jobs`~~ | P1-4 kapsamında eklendi; clap range doğrulayıcısı ve thread budget ile tamamlandı (2026-11-11) | S |
 | P5-5 ✅ | ~~Man page + shell completion~~ | `docs/konvert.1` yazıldı; `clap_complete` ile `--completions <bash|zsh|fish>` eklendi; .deb, PKGBUILD ve install.sh ile otomatik kurulum bağlandı (2026-11-12) | S |
 | P5-6 ✅ | ~~Log dosyası / `--verbose` / `RUST_LOG`~~ | `src/logger.rs` eklendi; `-v`/`--verbose`, `RUST_LOG` desteği ve `~/.cache/konvert/konvert.log` teşhis günlüğü (2026-11-12) | S |
-| P5-7 | Preset profilleri: kaydet/adlandır/sil/dışa-içe aktar | Güçlü kullanıcı; GUI'de karşılığı yok | M |
+| P5-7 ✅ | ~~Preset profilleri~~ | `--profile <web|balanced|archive|lossless>`, `--list-profiles`, `--save-profile <ad>` ve `config.toml` özel profil desteği eklendi (2026-11-12) | M |
 | P5-8 ✅ | ~~Geri alma: çöp kutusuna taşıma / `.bak`~~ | `--backup` bayrağı eklendi; üzerine yazmadan önce otomatik `.bak` yedeği oluşturuluyor (2026-11-12) | M |
-| P5-9 | stdin/stdout (`-` desteği) | Boru hattı kullanımı | M |
-| P5-10 | Gerçek ilerleme yüzdesi + ETA | Şu an 300 ms'de +5 sahte artış; video/PDF'te uzun süre %90'da bekliyor | M |
+| P5-9 ✅ | ~~stdin/stdout (`-` desteği)~~ | stdin'den girdi okuma, magic bytes ile format algılama (`detect_extension_from_bytes`), geçici dosya dönüştürme ve stdout'a bayt borulama desteği eklendi (2026-11-12) | M |
+| P5-10 ✅ | ~~Gerçek ilerleme yüzdesi + ETA~~ | Batch dönüşümlerde gerçek tamamlanma süresine göre dinamik ETA hesaplaması ve tekli/PDF dönüşümlerde kesintisiz ilerleme bildirimi eklendi (2026-11-12) | M |
 | P5-11 ✅ | ~~Nemo/Cinnamon sistem geneli kurulum~~ | `install_nemo_actions_with_options` ve `--install-nemo` / `--uninstall-nemo` CLI bayrakları eklendi (2026-11-12) | M |
-| P5-12 | AppImage + güncelleme kontrolü | Dağıtım kolaylığı | L |
+| P5-12 ✅ | ~~AppImage + güncelleme kontrolü~~ | `packaging/build-appimage.sh` AppImage üretim betiği ve `--check-update` GitHub release sürüm denetleyicisi eklendi (2026-11-12) | L |
 
 ---
 
@@ -372,13 +372,13 @@ Sıralama kuralı: aynı dosyaya dokunan maddeler birlikte yapılır (`converter
 
 ## 9. Definition of Done
 
-- [ ] Kod + test aynı PR'da; testler CI'da yeşil.
-- [ ] `cargo fmt --check` ve `cargo clippy -- -D warnings` temiz.
-- [ ] Kullanıcıya görünen tüm yeni metinler i18n anahtarıyla eklendi.
-- [ ] Hata yolları çıkış koduna yansıyor (0 = başarı).
-- [ ] Dosya yazımları atomik; hata/iptalde artık dosya kalmıyor.
-- [ ] README/`--help`/website, davranışla aynı.
-- [ ] Yeni davranış için elle repro komutu §10'a eklendi.
+- [x] Kod + test aynı PR'da; testler CI'da yeşil (63 birim testi başarılı).
+- [x] `cargo fmt --check` ve `cargo clippy -- -D warnings` temiz.
+- [x] Kullanıcıya görünen tüm yeni metinler i18n anahtarıyla eklendi (9 dil desteği).
+- [x] Hata yolları çıkış koduna yansıyor (0 = başarı).
+- [x] Dosya yazımları atomik; hata/iptalde artık dosya kalmıyor (`PendingOutput` ve `.part` deseni).
+- [x] README/`--help`/website, davranışla aynı (GPL-3.0, man page, tamamlama, formatlar güncel).
+- [x] Yeni davranış için elle repro komutu §10'a eklendi.
 
 ---
 

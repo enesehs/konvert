@@ -185,8 +185,13 @@ konvert -t extract-audio video.mp4    # Extract audio stream as MP3
 konvert --extract-frames video.mp4    # Extract video frames into a folder as PNGs
 konvert -t audio-to-video song.mp3    # Generate waveform MP4 video from audio
 
-# ⚡ Batch Processing & Cancellation
-konvert -t webp *.png                 # Convert all PNGs in parallel using all CPU cores
+# ⚡ Batch Processing, Pipelines & Presets
+konvert -t webp *.png                 # Convert all PNGs in parallel using Rayon thread pool
+konvert --profile web -t webp photo.png # Use preset profiles (web, balanced, archive, lossless)
+cat photo.png | konvert -t webp - > out.webp # Pipe conversions seamlessly via stdin/stdout
+konvert --backup -f -t png photo.jpg  # Safe overwrite with automatic .bak backup copy
+konvert --dry-run -r -t webp ./photos # Preview recursive directory plan without writing
+konvert --check-update                # Check GitHub releases for updates
 konvert --cancel                      # Safely cancel ongoing background conversion
 konvert -s                            # Open Qt6 Settings GUI
 ```
