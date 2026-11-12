@@ -1193,25 +1193,8 @@ QWidget* MainWindow::createAboutTab() {
     authorBoxLayout->addWidget(lblAuthDetail);
     authorsLayout->addWidget(authorBox);
 
-    auto *commBox = new QFrame(authorsWidget);
-    commBox->setFrameShape(QFrame::StyledPanel);
-    commBox->setStyleSheet("QFrame { border: 1px solid palette(midlight); border-radius: 6px; background-color: palette(base); padding: 10px; }");
-    auto *commBoxLayout = new QVBoxLayout(commBox);
-    commBoxLayout->setSpacing(4);
-    auto *lblCommTitle = new QLabel(QString("<b>%1</b>").arg(lang == "tr" ? "Açık Kaynak Topluluğu" : "Open Source Community"), commBox);
-    auto *lblCommDetail = new QLabel(
-        lang == "tr"
-            ? "Bu proje özgür yazılım dünyasının dayanışma ruhu sayesinde hayata geçirilmiştir. KDE Topluluğu'na, Linux çekirdeğine, Rust ve Qt açık kaynak ekosistemine emek veren tüm geliştiricilere teşekkür ederiz."
-            : "Konvert is built upon the collective spirit of the free software ecosystem. Heartfelt thanks to the KDE Community, Linux kernel contributors, and the Rust and Qt open source projects.",
-        commBox
-    );
-    lblCommDetail->setWordWrap(true);
-    commBoxLayout->addWidget(lblCommTitle);
-    commBoxLayout->addWidget(lblCommDetail);
-    authorsLayout->addWidget(commBox);
-
     authorsLayout->addStretch();
-    aboutTabs->addTab(authorsWidget, trKey("about_tab_community", lang));
+    aboutTabs->addTab(authorsWidget, trKey("about_tab_authors", lang));
 
     // --- SUB-TAB 3: COMPONENTS (BİLEŞENLER) ---
     auto *compWidget = new QWidget();
