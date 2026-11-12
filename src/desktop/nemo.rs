@@ -26,7 +26,17 @@ fn action_file_name(id: &str) -> String {
 }
 
 pub fn install_nemo_actions(custom_exec: Option<&str>) -> Result<PathBuf> {
-    let dir = get_nemo_actions_dir()?;
+    install_nemo_actions_with_options(custom_exec, None)
+}
+
+pub fn install_nemo_actions_with_options(
+    custom_exec: Option<&str>,
+    target_dir: Option<PathBuf>,
+) -> Result<PathBuf> {
+    let dir = match target_dir {
+        Some(d) => d,
+        None => get_nemo_actions_dir()?,
+    };
     fs::create_dir_all(&dir)?;
 
     let exec = match custom_exec {
@@ -74,7 +84,14 @@ pub fn install_nemo_actions(custom_exec: Option<&str>) -> Result<PathBuf> {
 }
 
 pub fn uninstall_nemo_actions() -> Result<bool> {
-    let dir = get_nemo_actions_dir()?;
+    uninstall_nemo_actions_with_options(None)
+}
+
+pub fn uninstall_nemo_actions_with_options(target_dir: Option<PathBuf>) -> Result<bool> {
+    let dir = match target_dir {
+        Some(d) => d,
+        None => get_nemo_actions_dir()?,
+    };
     if !dir.exists() {
         return Ok(false);
     }

@@ -144,6 +144,14 @@ pub struct Cli {
     #[arg(long = "uninstall-dolphin")]
     pub uninstall_dolphin: bool,
 
+    /// Install Nemo context menu integration
+    #[arg(long = "install-nemo")]
+    pub install_nemo: bool,
+
+    /// Uninstall Nemo context menu integration
+    #[arg(long = "uninstall-nemo")]
+    pub uninstall_nemo: bool,
+
     /// Install integrations for all supported file managers
     #[arg(long = "install-all")]
     pub install_all: bool,

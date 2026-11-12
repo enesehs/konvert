@@ -270,6 +270,41 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    if cli.uninstall_dolphin {
+        let ok = desktop::dolphin::uninstall_dolphin_service()
+            .map_err(|e| anyhow::anyhow!("Dolphin uninstall error: {:#}", e))?;
+        if ok {
+            println!("Dolphin service menu removed.");
+            notifier.success(t("notify_integ_title"), "Dolphin context menu removed.");
+        } else {
+            println!("Dolphin service menu was not found.");
+        }
+        return Ok(());
+    }
+
+    if cli.install_nemo {
+        let path = desktop::nemo::install_nemo_actions_with_options(
+            cli.menu_exec.as_deref(),
+            cli.menu_dir.clone(),
+        )
+        .map_err(|e| anyhow::anyhow!("Nemo installation error: {:#}", e))?;
+        println!("Nemo actions installed: {}", path.display());
+        notifier.success(t("notify_integ_title"), "Nemo context menu installed.");
+        return Ok(());
+    }
+
+    if cli.uninstall_nemo {
+        let ok = desktop::nemo::uninstall_nemo_actions_with_options(cli.menu_dir)
+            .map_err(|e| anyhow::anyhow!("Nemo uninstall error: {:#}", e))?;
+        if ok {
+            println!("Nemo actions removed.");
+            notifier.success(t("notify_integ_title"), "Nemo context menu removed.");
+        } else {
+            println!("Nemo actions were not found.");
+        }
+        return Ok(());
+    }
+
     if cli.uninstall_all {
         let report = desktop::detector::uninstall_all();
         for item in &report.affected {

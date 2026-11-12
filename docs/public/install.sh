@@ -94,6 +94,17 @@ fi
 
 if [ "${DOWNLOAD_SUCCESS}" = true ]; then
     echo -e "${GREEN}✓ Release package downloaded successfully.${RESET}"
+
+    # Verify sha256 checksum if available
+    RELEASE_SHA_URL="${RELEASE_URL}.sha256"
+    if curl -sSL -f -o "${TEMP_DIR}/konvert.tar.gz.sha256" "${RELEASE_SHA_URL}" 2>/dev/null; then
+        echo "==> Verifying package checksum..."
+        (cd "${TEMP_DIR}" && sha256sum -c konvert.tar.gz.sha256) || {
+            echo -e "${RED}Error: Checksum verification failed for downloaded release package!${RESET}" >&2
+            exit 1
+        }
+    fi
+
     tar -xzf "${TEMP_DIR}/konvert.tar.gz" -C "${TEMP_DIR}"
     
     rm -f "${INSTALL_DIR}/konvert" "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
@@ -122,7 +133,18 @@ fi
 
 chmod 755 "${INSTALL_DIR}/konvert" 2>/dev/null || true
 chmod 755 "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
-chmod 755 "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" 2>/dev/null || true
+chmod 644 "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" 2>/dev/null || true
+
+# Install Man page & Shell completions
+MAN_DIR="${REAL_HOME}/.local/share/man/man1"
+BASH_COMP_DIR="${REAL_HOME}/.local/share/bash-completion/completions"
+FISH_COMP_DIR="${REAL_HOME}/.config/fish/completions"
+ZSH_COMP_DIR="${REAL_HOME}/.local/share/zsh/site-functions"
+mkdir -p "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
+find "${TEMP_DIR}" -type f -name "konvert.1" -exec cp -f {} "${MAN_DIR}/konvert.1" \; 2>/dev/null || true
+"${INSTALL_DIR}/konvert" --completions bash > "${BASH_COMP_DIR}/konvert" 2>/dev/null || true
+"${INSTALL_DIR}/konvert" --completions fish > "${FISH_COMP_DIR}/konvert.fish" 2>/dev/null || true
+"${INSTALL_DIR}/konvert" --completions zsh > "${ZSH_COMP_DIR}/_konvert" 2>/dev/null || true
 
 # 3. Synchronize Dolphin Context Menus
 echo -e "==> 3. Integrating Dolphin KIO right-click menus..."
@@ -143,6 +165,7 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
     chown -R "${REAL_USER}:" "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" "${METAINFO_DIR}/io.github.enesehs.konvert.metainfo.xml" 2>/dev/null || true
     chown -R "${REAL_USER}:" "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
     chown -R "${REAL_USER}:" "${ICON_DIR}" 2>/dev/null || true
+    chown -R "${REAL_USER}:" "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
 fi
 
 echo -e "\n${GREEN}${BOLD}✨ Konvert installed successfully!${RESET}"
