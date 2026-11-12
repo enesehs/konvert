@@ -6,7 +6,7 @@
 
   <br><br>
 
-  **English** • [Türkçe](README_tr.md)
+  **English** • [Türkçe](README_tr.md) • [Deutsch](README_de.md) • [Français](README_fr.md) • [Español](README_es.md) • [Italiano](README_it.md) • [Русский](README_ru.md) • [中文](README_zh.md) • [日本語](README_ja.md)
 
   <br>
 
@@ -55,35 +55,36 @@ Tired of uploading confidential files to random online converter websites, openi
 
 ## <img src="assets/icons/konvert-monitor.svg" width="22" height="22" align="absmiddle" /> Screenshots
 
-<div align="center">
-
-### Right-Click File Manager Integration
-*Right-click any image, video, audio, or document to convert instantly from your desktop context menu*
-
-<img src="assets/screenshots/screenshot_context_menu.png" alt="Dolphin Context Menu Integration" width="92%" />
-
-<br><br>
-
-### Modern Qt6 & KDE Breeze Settings GUI
-*Manage context menus by category, configure conversion qualities, and tune encoding presets*
-
-<img src="assets/screenshots/screenshot_convert.png" alt="Konvert Settings UI" width="90%" />
-
-<br><br>
-
-### Conversion History & Disk Savings Panel
-*Cumulative disk savings tracker, thumbnail previews, and quick file management actions*
-
-<img src="assets/screenshots/screenshot_history.png" alt="Konvert History & Previews" width="90%" />
-
-<br><br>
-
-### Authentic KDE Developer About Dialog
-*Standard KDE tabs, system metadata inspection, and interactive language selection*
-
-<img src="assets/screenshots/screenshot_about.png" alt="Konvert About Dialog" width="90%" />
-
-</div>
+<table align="center" width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <sub><b>Desktop Context Menu Integration</b></sub><br>
+      <a href="assets/screenshots/screenshot_context_menu.png">
+        <img src="assets/screenshots/screenshot_context_menu.png" alt="Context Menu" width="100%" />
+      </a>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <sub><b>Qt6 & Breeze Settings GUI</b></sub><br>
+      <a href="assets/screenshots/screenshot_convert.png">
+        <img src="assets/screenshots/screenshot_convert.png" alt="Settings UI" width="100%" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <sub><b>Conversion History & Disk Savings</b></sub><br>
+      <a href="assets/screenshots/screenshot_history.png">
+        <img src="assets/screenshots/screenshot_history.png" alt="History & Previews" width="100%" />
+      </a>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <sub><b>KDE Developer About Dialog</b></sub><br>
+      <a href="assets/screenshots/screenshot_about.png">
+        <img src="assets/screenshots/screenshot_about.png" alt="About Dialog" width="100%" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 ---
 

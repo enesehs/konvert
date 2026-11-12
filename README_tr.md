@@ -6,7 +6,7 @@
 
   <br><br>
 
-  [English](README.md) • **Türkçe**
+  [English](README.md) • **Türkçe** • [Deutsch](README_de.md) • [Français](README_fr.md) • [Español](README_es.md) • [Italiano](README_it.md) • [Русский](README_ru.md) • [中文](README_zh.md) • [日本語](README_ja.md)
 
   <br>
 
@@ -55,35 +55,36 @@
 
 ## <img src="assets/icons/konvert-monitor.svg" width="22" height="22" align="absmiddle" /> Ekran Görüntüleri
 
-<div align="center">
-
-### Sağ Tık Dosya Yöneticisi Entegrasyonu
-*Herhangi bir görsel veya medyaya sağ tıklayın; program açmadan anında dönüştürün*
-
-<img src="assets/screenshots/screenshot_context_menu.png" alt="Dolphin Sağ Tık Bağlam Menüsü" width="92%" />
-
-<br><br>
-
-### Modern Qt6 & KDE Breeze Ayarlar Arayüzü
-*Bağlam menülerini kategori bazında yönetin, dönüştürme kalitelerini ve kodlama profillerini ayarlayın*
-
-<img src="assets/screenshots/screenshot_convert.png" alt="Konvert Ayarlar Arayüzü" width="90%" />
-
-<br><br>
-
-### Dönüşüm Geçmişi ve Tasarruf Paneli
-*Toplam disk alanı tasarrufu takipçisi, küçük resim önizlemeleri ve hızlı dosya yönetimi*
-
-<img src="assets/screenshots/screenshot_history.png" alt="Konvert Geçmiş Paneli" width="90%" />
-
-<br><br>
-
-### Özgün KDE Geliştirici Hakkında İletişim Kutusu
-*Standart KDE sekmeleri, sistem meta veri denetimi ve etkileşimli dil seçimi*
-
-<img src="assets/screenshots/screenshot_about.png" alt="Konvert Hakkında İletişim Kutusu" width="90%" />
-
-</div>
+<table align="center" width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <sub><b>Masaüstü Sağ Tık Bağlam Menüsü</b></sub><br>
+      <a href="assets/screenshots/screenshot_context_menu.png">
+        <img src="assets/screenshots/screenshot_context_menu.png" alt="Bağlam Menüsü" width="100%" />
+      </a>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <sub><b>Qt6 & Breeze Ayarlar Arayüzü</b></sub><br>
+      <a href="assets/screenshots/screenshot_convert.png">
+        <img src="assets/screenshots/screenshot_convert.png" alt="Ayarlar Arayüzü" width="100%" />
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center" valign="top">
+      <sub><b>Dönüşüm Geçmişi ve Tasarruf Paneli</b></sub><br>
+      <a href="assets/screenshots/screenshot_history.png">
+        <img src="assets/screenshots/screenshot_history.png" alt="Geçmiş Paneli" width="100%" />
+      </a>
+    </td>
+    <td width="50%" align="center" valign="top">
+      <sub><b>KDE Geliştirici Hakkında Paneli</b></sub><br>
+      <a href="assets/screenshots/screenshot_about.png">
+        <img src="assets/screenshots/screenshot_about.png" alt="Hakkında Paneli" width="100%" />
+      </a>
+    </td>
+  </tr>
+</table>
 
 ---
 

@@ -4,7 +4,7 @@
       .ColorScheme-Text { color: #007ebf; }
     </style>
   </defs>
-  <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ColorScheme-Text">
+  <g fill="none" stroke="#007ebf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ColorScheme-Text">
     <path d="m14 10 7-7"/>
     <path d="M20 10h-6V4"/>
     <path d="m3 21 7-7"/>
