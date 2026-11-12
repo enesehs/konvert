@@ -61,6 +61,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.3.0" date="2026-11-12">
+      <description>
+        <p>Release 0.3.0 introducing multi-threaded Rayon batch conversions, conversion preset profiles (web, balanced, archive, lossless), stdin/stdout pipeline streaming, accurate batch ETA calculation, AppImage packaging, automated update checking, and multi-desktop file manager integrations.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-11-11">
       <description>
         <p>Release 0.2.0 introducing multi-threaded Rayon parallel batch processing, LTO compiler optimizations, SVG/ICO/HEIC/BMP format conversions, native Lucide SVG action icons, live animated terminal progress bar, and comprehensive stability and security fixes.</p>

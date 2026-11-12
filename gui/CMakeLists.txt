@@ -12,7 +12,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
     list(GET APP_VERSION_RAW 0 APP_VERSION)
     string(STRIP "${APP_VERSION}" APP_VERSION)
 else()
-    set(APP_VERSION "v0.2.0")
+    set(APP_VERSION "v0.3.0")
 endif()
 
 add_compile_definitions(KONVERT_APP_VERSION="${APP_VERSION}")

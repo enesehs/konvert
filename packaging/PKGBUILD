@@ -1,6 +1,6 @@
 # Maintainer: enesehs <enesehs@protonmail.com>
 pkgname=konvert
-pkgver=0.2.0
+pkgver=0.3.0
 pkgrel=1
 pkgdesc="Fast, lightweight, native right-click file converter and optimizer for Linux & KDE Plasma"
 arch=('x86_64' 'aarch64')
