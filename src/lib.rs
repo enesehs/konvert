@@ -4,4 +4,5 @@ pub mod deps;
 pub mod desktop;
 pub mod history;
 pub mod i18n;
+pub mod logger;
 pub mod notification;

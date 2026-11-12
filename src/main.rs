@@ -5,6 +5,7 @@ mod deps;
 mod desktop;
 mod history;
 mod i18n;
+mod logger;
 mod notification;
 
 use anyhow::bail;
@@ -118,6 +119,7 @@ fn terminate_process(pid: i32) -> bool {
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
+    logger::init(cli.verbose);
     let config = Config::load();
     i18n::init(config.general.language.as_deref());
 

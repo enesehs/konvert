@@ -100,6 +100,10 @@ pub struct Cli {
     #[arg(long = "no-notify")]
     pub no_notify: bool,
 
+    /// Enable verbose diagnostic logging to terminal and ~/.cache/konvert/konvert.log
+    #[arg(short = 'v', long = "verbose")]
+    pub verbose: bool,
+
     /// Cancel running background conversion process
     #[arg(long = "cancel")]
     pub cancel: bool,

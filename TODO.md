@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 49'u tam, 6'sı kısmi (~%80). P0 %100, P1 ~%78, P2 11/13, P3 14/15, P4 7,5/12, P5 5/12. Birim test sayısı 28 → 55. Sıradaki: P4-2/6/12, P2-9/10, P1-7 (i18n), P3-14, P5-6.
+> **İlerleme (2026-11-12):** 67 maddeden 50'si tam, 6'sı kısmi (~%82). P0 %100, P1 ~%78, P2 11/13, P3 14/15, P4 7,5/12, P5 6/12. Birim test sayısı 28 → 57. Sıradaki: P4-2/6/12, P2-9/10, P1-7 (i18n), P3-14, P5-5 (completion).
 
 ---
 
@@ -359,7 +359,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 | P5-3 ✅ | ~~`--dry-run`~~ | `--dry-run` eklendi; `plan_output_path` ile çıktı hedefleri, çakışma ve üzerine yazma durumları simüle ediliyor (2026-11-12) | S |
 | P5-4 ✅ | ~~`--jobs`~~ | P1-4 kapsamında eklendi; clap range doğrulayıcısı ve thread budget ile tamamlandı (2026-11-11) | S |
 | P5-5 `[~]` | ~~Man page + shell completion~~ | `docs/konvert.1` yazıldı; PKGBUILD, .deb ve installer'a kurulum eklendi (2026-11-12). **Kalan:** shell completion (`clap_complete`) | S |
-| P5-6 | Log dosyası / `--verbose` / `RUST_LOG` | Destek ve teşhis; panic=abort'ta iz yok | S |
+| P5-6 ✅ | ~~Log dosyası / `--verbose` / `RUST_LOG`~~ | `src/logger.rs` eklendi; `-v`/`--verbose`, `RUST_LOG` desteği ve `~/.cache/konvert/konvert.log` teşhis günlüğü (2026-11-12) | S |
 | P5-7 | Preset profilleri: kaydet/adlandır/sil/dışa-içe aktar | Güçlü kullanıcı; GUI'de karşılığı yok | M |
 | P5-8 | Geri alma: çöp kutusuna taşıma / `.bak` | Yanlış dönüşümde kurtarma | M |
 | P5-9 | stdin/stdout (`-` desteği) | Boru hattı kullanımı | M |
