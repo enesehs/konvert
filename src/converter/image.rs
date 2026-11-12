@@ -533,6 +533,31 @@ pub fn merge_images_to_pdf(
     pending.commit()
 }
 
+pub fn image_to_pdf(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    let target_dir = get_output_dir(input_path, custom_output_dir);
+    let stem = input_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("image");
+    let output_path = claim_output_path(target_dir.join(format!("{}.pdf", stem)));
+    ensure_parent_dir(&output_path)?;
+
+    let pending = crate::converter::PendingOutput::new(&output_path);
+    let args = [
+        input_path.as_os_str().to_os_string(),
+        std::ffi::OsStr::new("-auto-orient").to_os_string(),
+        pending.path().as_os_str().to_os_string(),
+    ];
+
+    crate::converter::run_imagemagick(&args)
+        .with_context(|| "Görsel PDF'e dönüştürülemedi")?;
+
+    pending.commit()
+}
+
 pub fn compress_image_to_size(
     input_path: &Path,
     target_bytes: u64,
@@ -681,6 +706,24 @@ mod tests {
         let bytes = include_bytes!("../../tests/fixtures/orientation_6.jpg");
         let img = decode_with_orientation(std::io::Cursor::new(&bytes[..])).unwrap();
         assert_eq!(img.dimensions(), (100, 200));
+    }
+
+    #[test]
+    fn test_image_to_pdf_creates_pdf() {
+        let temp_dir = std::env::temp_dir();
+        let test_img = temp_dir.join("konvert_test_to_pdf.png");
+        let img = DynamicImage::new_rgb8(10, 10);
+        img.save(&test_img).unwrap();
+
+        if crate::deps::imagemagick_available() {
+            let res = image_to_pdf(&test_img, None);
+            if let Ok(pdf_path) = res {
+                assert!(pdf_path.exists());
+                assert_eq!(pdf_path.extension().and_then(|e| e.to_str()), Some("pdf"));
+                let _ = fs::remove_file(pdf_path);
+            }
+        }
+        let _ = fs::remove_file(test_img);
     }
 
     #[test]

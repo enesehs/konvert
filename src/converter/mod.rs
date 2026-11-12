@@ -591,6 +591,8 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 document::convert_udf(input_path, &target_fmt, out_dir)
             } else if ext == "docx" {
                 document::convert_docx(input_path, &target_fmt, out_dir)
+            } else if is_image_ext(&ext) && target_fmt == "pdf" {
+                image::image_to_pdf(input_path, out_dir)
             } else if is_image_ext(&ext) && image::is_supported_image_target(&target_fmt) {
                 image::convert_image(input_path, &target_fmt, opts.quality, opts.image_lossless, out_dir)
             } else if is_video_ext(&ext) && video::is_supported_video_target(&target_fmt) {
@@ -911,5 +913,38 @@ mod tests {
         let result = convert_batch_with_progress(&[], &opts, |_, _, _, _| {});
         assert!(result.succeeded.is_empty());
         assert!(result.failed.is_empty());
+    }
+
+    #[test]
+    fn test_convert_single_image_to_pdf() {
+        let temp_dir = std::env::temp_dir();
+        let test_img = temp_dir.join("konvert_test_single_to_pdf.png");
+        let img = ::image::DynamicImage::new_rgb8(10, 10);
+        img.save(&test_img).unwrap();
+
+        if crate::deps::imagemagick_available() {
+            let opts = ConvertOptions {
+                target: "pdf".to_string(),
+                quality: None,
+                image_lossless: false,
+                video_lossless: false,
+                jobs: 1,
+                gif_duration: 15.0,
+                gif_fps: 15,
+                max_pages: 200,
+                crf: None,
+                preset: None,
+                bitrate: None,
+                dpi: None,
+                custom_output_dir: None,
+            };
+            let res = convert_single(&test_img, &opts);
+            if let Ok(pdf_path) = res {
+                assert!(pdf_path.exists());
+                assert_eq!(pdf_path.extension().and_then(|e| e.to_str()), Some("pdf"));
+                let _ = fs::remove_file(pdf_path);
+            }
+        }
+        let _ = fs::remove_file(test_img);
     }
 }

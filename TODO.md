@@ -4,7 +4,7 @@
 > **Kapsam:** Rust çekirdeği (`src/`), Qt6 GUI (`gui/`), paketleme (`packaging/`), CI (`.github/`), doküman (README + docs sitesi)
 > **Amaç:** v0.2.0 kod denetiminde bulunan tüm hataları, riskleri ve eksikleri kanıtlarıyla listelemek; her biri için uygulanabilir çözüm, kabul kriteri ve test tanımlamak.
 > **Not:** Bu dosya, depodaki eski "Core Optimization Roadmap" dosyasının yerine geçer. Tamamlanan performans işleri §11'de arşivlendi.
-> **İlerleme (2026-11-12):** 67 maddeden 42'si tam, 7'si kısmi (~%68). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 1/12. Birim test sayısı 28 → 50. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-13/14, P5.
+> **İlerleme (2026-11-12):** 67 maddeden 43'ü tam, 7'si kısmi (~%70). P0 %100, P1 ~%78, P2 9/13, P3 14/15, P4 7,5/12, P5 2/12. Birim test sayısı 28 → 52. Sıradaki: P4-2/6/12, P2-8/10/11, P1-7 (i18n), P3-13/14, P5-3.
 
 ---
 
@@ -354,7 +354,7 @@ Ancak uçtan uca denemelerde **6 kritik hata** doğrulandı: toplu dönüşümde
 
 | ID | Özellik | Neden | Efor |
 |---|---|---|---|
-| P5-1 | Tek görsel → PDF | Yalnız çoklu birleştirme var; en sık talep | S |
+| P5-1 ✅ | ~~Tek görsel → PDF~~ | `image_to_pdf` eklendi (`-t pdf photo.png` → `photo.pdf`); ImageMagick `-auto-orient` + `PendingOutput` korumalı (2026-11-12) | S |
 | P5-2 | Klasör / recursive toplu dönüşüm (`-r`) | Kullanıcı klasör seçemiyor; dosya dosya gezmek zorunda | M |
 | P5-3 | `--dry-run` | Ne üretileceğini önceden göster; çakışmaları raporla | S |
 | P5-4 | `--jobs` (P1-4 ile birlikte) | Kaynak kontrolü | S |
