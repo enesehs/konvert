@@ -130,6 +130,24 @@ pub fn write_html_document(
     pending.commit()
 }
 
+const MAX_DOC_XML_BYTES: u64 = 50 * 1024 * 1024;
+
+fn read_limited_xml<R: Read>(mut reader: R, max_bytes: u64, path_hint: &Path) -> Result<String> {
+    let mut buf = String::new();
+    reader
+        .by_ref()
+        .take(max_bytes + 1)
+        .read_to_string(&mut buf)?;
+    if buf.len() as u64 > max_bytes {
+        bail!(
+            "Belge boyutu güvenlik sınırını aşıyor (maksimum {} MB): {}",
+            max_bytes / (1024 * 1024),
+            path_hint.display()
+        );
+    }
+    Ok(buf)
+}
+
 pub fn convert_udf(
     input_path: &Path,
     target_format: &str,
@@ -148,15 +166,13 @@ pub fn convert_udf(
     if let Ok(mut archive) = zip::ZipArchive::new(file)
         && let Ok(zip_file) = archive.by_name("content.xml")
     {
-        zip_file
-            .take(50 * 1024 * 1024)
-            .read_to_string(&mut xml_content)?;
+        xml_content = read_limited_xml(zip_file, MAX_DOC_XML_BYTES, input_path)?;
     }
 
     // ZIP olmayan düz dosya yedeğinde DoS saldırısını önlemek için 50 MB sınır koy
     if xml_content.is_empty() {
-        let f = File::open(input_path)?;
-        f.take(50 * 1024 * 1024).read_to_string(&mut xml_content)?;
+        let f = BufReader::new(File::open(input_path)?);
+        xml_content = read_limited_xml(f, MAX_DOC_XML_BYTES, input_path)?;
     }
 
     let text_content = extract_text_from_xml(&xml_content);
@@ -238,19 +254,75 @@ pub fn convert_docx(
 
     let file = BufReader::new(File::open(input_path)?);
     let mut archive = zip::ZipArchive::new(file)?;
-    let mut xml_content = String::new();
 
-    if let Ok(doc) = archive.by_name("word/document.xml") {
-        doc.take(50 * 1024 * 1024)
-            .read_to_string(&mut xml_content)?;
-    } else {
-        bail!("DOCX belgesi içinde word/document.xml bulunamadı");
+    // Belge bileşenlerini tara: üstbilgi, ana metin, dipnotlar ve altbilgiler
+    let mut header_names = Vec::new();
+    let mut footer_names = Vec::new();
+    let mut footnote_names = Vec::new();
+
+    for name in archive.file_names().flatten() {
+        if name.starts_with("word/header") && name.ends_with(".xml") {
+            header_names.push(name.to_string());
+        } else if name.starts_with("word/footer") && name.ends_with(".xml") {
+            footer_names.push(name.to_string());
+        } else if name.starts_with("word/footnotes") && name.ends_with(".xml") {
+            footnote_names.push(name.to_string());
+        }
+    }
+    header_names.sort();
+    footer_names.sort();
+    footnote_names.sort();
+
+    let mut full_text_sections = Vec::new();
+
+    // 1. Üstbilgiler (Headers)
+    for h_name in &header_names {
+        if let Ok(h_file) = archive.by_name(h_name)
+            && let Ok(h_xml) = read_limited_xml(h_file, MAX_DOC_XML_BYTES, input_path)
+        {
+            let h_text = extract_text_from_xml(&h_xml);
+            if !h_text.is_empty() {
+                full_text_sections.push(h_text);
+            }
+        }
     }
 
-    let text_content = extract_text_from_xml(&xml_content);
-    if text_content.is_empty() {
-        bail!("DOCX belgesinden metin okunamadı");
+    // 2. Ana Belge (word/document.xml)
+    let doc_file = archive
+        .by_name("word/document.xml")
+        .context("DOCX belgesi içinde word/document.xml bulunamadı")?;
+    let main_xml = read_limited_xml(doc_file, MAX_DOC_XML_BYTES, input_path)?;
+    let main_text = extract_text_from_xml(&main_xml);
+    if main_text.is_empty() {
+        bail!("DOCX belgesinden metin okunamadı: {}", input_path.display());
     }
+    full_text_sections.push(main_text);
+
+    // 3. Dipnotlar (Footnotes)
+    for fn_name in &footnote_names {
+        if let Ok(fn_file) = archive.by_name(fn_name)
+            && let Ok(fn_xml) = read_limited_xml(fn_file, MAX_DOC_XML_BYTES, input_path)
+        {
+            let fn_text = extract_text_from_xml(&fn_xml);
+            if !fn_text.is_empty() {
+                full_text_sections.push(format!("--- Dipnotlar ---\n{}", fn_text));
+            }
+        }
+    }
+
+    // 4. Altbilgiler (Footers)
+    for f_name in &footer_names {
+        if let Ok(f_file) = archive.by_name(f_name)
+            && let Ok(f_xml) = read_limited_xml(f_file, MAX_DOC_XML_BYTES, input_path)
+        {
+            let f_text = extract_text_from_xml(&f_xml);
+            if !f_text.is_empty() {
+                full_text_sections.push(f_text);
+            }
+        }
+    }
+
+    let text_content = full_text_sections.join("\n\n");
 
     match target_format.to_lowercase().as_str() {
         "html" => write_html_document("Doküman", None, &text_content, &output_path),
@@ -352,6 +424,7 @@ fn unescape_xml(input: &str) -> String {
 pub fn extract_text_from_xml(xml: &str) -> String {
     let mut result = String::with_capacity(xml.len() / 2);
     let mut chars = xml.chars().peekable();
+    let mut in_table_cell = false;
 
     while let Some(ch) = chars.next() {
         if ch == '<' {
@@ -401,14 +474,30 @@ pub fn extract_text_from_xml(xml: &str) -> String {
                 .unwrap_or("")
                 .to_ascii_lowercase();
 
-            if (is_closing
-                && (tag_token == "w:p"
-                    || tag_token == "p"
-                    || tag_token == "tr"
-                    || tag_token == "w:tr"))
-                || tag_token == "br"
-                || tag_token == "w:br"
-            {
+            let is_cell =
+                tag_token == "w:tc" || tag_token == "tc" || tag_token == "td" || tag_token == "th";
+            let is_row = tag_token == "w:tr" || tag_token == "tr";
+            let is_para = tag_token == "w:p" || tag_token == "p";
+            let is_break = tag_token == "br" || tag_token == "w:br";
+
+            if is_cell {
+                if is_closing {
+                    in_table_cell = false;
+                    if !result.ends_with('\t') && !result.ends_with('\n') {
+                        result.push('\t');
+                    }
+                } else {
+                    in_table_cell = true;
+                }
+            } else if is_row {
+                if is_closing {
+                    result.push('\n');
+                }
+            } else if is_para {
+                if is_closing && !in_table_cell {
+                    result.push('\n');
+                }
+            } else if is_break {
                 result.push('\n');
             } else if tag_token == "w:tab" {
                 result.push('\t');
@@ -421,8 +510,8 @@ pub fn extract_text_from_xml(xml: &str) -> String {
     let unescaped = unescape_xml(&result);
     unescaped
         .lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
+        .map(|l| l.trim_end())
+        .filter(|l| !l.trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n\n")
 }
@@ -644,6 +733,35 @@ mod tests {
         let xml = "<content><![CDATA[Mahkeme & Karari]]></content>";
         let text = extract_text_from_xml(xml);
         assert_eq!(text, "Mahkeme & Karari");
+    }
+
+    #[test]
+    fn test_extract_text_table() {
+        let xml = "<w:tbl>\
+            <w:tr>\
+                <w:tc><w:p><w:r><w:t>Header A</w:t></w:r></w:p></w:tc>\
+                <w:tc><w:p><w:r><w:t>Header B</w:t></w:r></w:p></w:tc>\
+            </w:tr>\
+            <w:tr>\
+                <w:tc><w:p><w:r><w:t>Data 1</w:t></w:r></w:p></w:tc>\
+                <w:tc><w:p><w:r><w:t>Data 2</w:t></w:r></w:p></w:tc>\
+            </w:tr>\
+        </w:tbl>";
+        let text = extract_text_from_xml(xml);
+        assert_eq!(text, "Header A\tHeader B\n\nData 1\tData 2");
+    }
+
+    #[test]
+    fn test_read_limited_xml_exceeding_guard() {
+        let data = "x".repeat(200);
+        let reader = data.as_bytes();
+        let res = read_limited_xml(reader, 100, Path::new("test.xml"));
+        assert!(res.is_err());
+        assert!(
+            res.unwrap_err()
+                .to_string()
+                .contains("güvenlik sınırını aşıyor")
+        );
     }
 
     #[test]
