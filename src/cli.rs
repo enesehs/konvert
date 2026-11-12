@@ -53,6 +53,10 @@ pub struct Cli {
     #[arg(long = "target-size")]
     pub target_size: Option<String>,
 
+    /// Conversion profile preset (web, balanced, archive, lossless)
+    #[arg(long = "profile", value_parser = ["web", "balanced", "archive", "lossless"])]
+    pub profile: Option<String>,
+
     /// Strip EXIF, GPS, and privacy metadata
     #[arg(long = "strip-metadata")]
     pub strip_metadata: bool,

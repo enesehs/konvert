@@ -10,12 +10,27 @@ on:
 
 jobs:
   build:
-    name: Build & Package (Linux x86_64)
-    runs-on: ubuntu-latest
+    name: Build & Package (Linux ${{ matrix.target.arch }})
+    runs-on: ${{ matrix.target.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - arch: x86_64
+            runner: ubuntu-latest
+            deb_arch: amd64
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Validate Flatpak Manifest & Packaging Metadata
+        run: |
+          python3 -m json.tool packaging/io.github.enesehs.konvert.json > /dev/null
+          chmod +x packaging/build-deb.sh packaging/update-checksums.sh scripts/*.sh
 
       - name: Install System Dependencies
         run: |
@@ -57,17 +72,17 @@ jobs:
 
       - name: Build Debian (.deb) Package
         run: |
-          chmod +x packaging/build-deb.sh
-          ./packaging/build-deb.sh
-          sha256sum packaging/*.deb > packaging/deb.sha256
+          DEB_ARCH="${{ matrix.target.deb_arch }}" ./packaging/build-deb.sh
+          sha256sum packaging/*.deb > "packaging/deb-${{ matrix.target.arch }}.sha256"
           cp packaging/*.deb .
-          cp packaging/deb.sha256 .
+          cp "packaging/deb-${{ matrix.target.arch }}.sha256" .
 
       - name: Package Release Bundle
         run: |
-          PKG_NAME="konvert-linux-x86_64"
+          ARCH="${{ matrix.target.arch }}"
+          PKG_NAME="konvert-linux-${ARCH}"
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            PKG_NAME="konvert-${{ github.ref_name }}-linux-x86_64"
+            PKG_NAME="konvert-${{ github.ref_name }}-linux-${ARCH}"
           fi
           mkdir -p "${PKG_NAME}"
           cp target/release/konvert "${PKG_NAME}/"
@@ -86,21 +101,21 @@ jobs:
           tar -czvf "${PKG_NAME}.tar.gz" "${PKG_NAME}"
           sha256sum "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256"
           
-          # Also ensure universal 'konvert-linux-x86_64.tar.gz' is available for remote installer
-          if [ "${PKG_NAME}" != "konvert-linux-x86_64" ]; then
-            cp "${PKG_NAME}.tar.gz" "konvert-linux-x86_64.tar.gz"
-            sha256sum "konvert-linux-x86_64.tar.gz" > "konvert-linux-x86_64.tar.gz.sha256"
+          # Also ensure universal 'konvert-linux-<arch>.tar.gz' is available for remote installer
+          if [ "${PKG_NAME}" != "konvert-linux-${ARCH}" ]; then
+            cp "${PKG_NAME}.tar.gz" "konvert-linux-${ARCH}.tar.gz"
+            sha256sum "konvert-linux-${ARCH}.tar.gz" > "konvert-linux-${ARCH}.tar.gz.sha256"
           fi
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: konvert-binaries
+          name: konvert-binaries-${{ matrix.target.arch }}
           path: |
             konvert-*.tar.gz
             konvert-*.tar.gz.sha256
             *.deb
-            deb.sha256
+            *.sha256
 
   release:
     name: Create GitHub Release
@@ -114,7 +129,8 @@ jobs:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: konvert-binaries
+          pattern: konvert-binaries-*
+          merge-multiple: true
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -123,7 +139,7 @@ jobs:
             konvert-*.tar.gz
             konvert-*.tar.gz.sha256
             *.deb
-            deb.sha256
+            *.sha256
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}

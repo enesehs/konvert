@@ -14,7 +14,7 @@ else
     VERSION="0.2.0"
 fi
 PKG_NAME="konvert"
-ARCH="amd64"
+ARCH="${DEB_ARCH:-$(dpkg --print-architecture 2>/dev/null || echo amd64)}"
 DEB_FILE="${PKG_NAME}_${VERSION}_${ARCH}.deb"
 
 echo "==> 1. Generating Konvert .deb package (v${VERSION} - ${ARCH})..."

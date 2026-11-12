@@ -552,21 +552,88 @@ fn main() -> anyhow::Result<()> {
         .min(total_count.max(1));
     converter::set_job_count(jobs);
 
-    let opts = ConvertOptions {
+    let mut opts = ConvertOptions {
         jobs,
         target: target.clone(),
         quality: cli.quality.or(Some(config.image.quality)),
         image_lossless: cli.lossless || config.image.lossless,
         video_lossless: cli.lossless || config.video.lossless,
         crf: cli.crf.or(Some(config.video.crf)),
-        preset: cli.preset.or(Some(config.video.preset.clone())),
-        bitrate: cli.bitrate.or(Some(config.audio.bitrate.clone())),
+        preset: cli.preset.clone().or(Some(config.video.preset.clone())),
+        bitrate: cli.bitrate.clone().or(Some(config.audio.bitrate.clone())),
         dpi: cli.dpi.or(Some(config.document.pdf_dpi)),
         gif_duration: cli.gif_duration.unwrap_or(15.0),
         gif_fps: cli.gif_fps.unwrap_or(15),
         max_pages: cli.max_pages.unwrap_or(200),
         custom_output_dir,
     };
+
+    if let Some(profile) = cli.profile.as_deref() {
+        match profile {
+            "web" => {
+                if cli.quality.is_none() {
+                    opts.quality = Some(80);
+                }
+                if cli.crf.is_none() {
+                    opts.crf = Some(28);
+                }
+                if cli.preset.is_none() {
+                    opts.preset = Some("fast".into());
+                }
+                if cli.bitrate.is_none() {
+                    opts.bitrate = Some("128k".into());
+                }
+                if cli.dpi.is_none() {
+                    opts.dpi = Some(150);
+                }
+            }
+            "balanced" => {
+                if cli.quality.is_none() {
+                    opts.quality = Some(85);
+                }
+                if cli.crf.is_none() {
+                    opts.crf = Some(23);
+                }
+                if cli.preset.is_none() {
+                    opts.preset = Some("medium".into());
+                }
+                if cli.bitrate.is_none() {
+                    opts.bitrate = Some("192k".into());
+                }
+                if cli.dpi.is_none() {
+                    opts.dpi = Some(300);
+                }
+            }
+            "archive" => {
+                if cli.quality.is_none() {
+                    opts.quality = Some(95);
+                }
+                if cli.crf.is_none() {
+                    opts.crf = Some(18);
+                }
+                if cli.preset.is_none() {
+                    opts.preset = Some("slow".into());
+                }
+                if cli.bitrate.is_none() {
+                    opts.bitrate = Some("320k".into());
+                }
+                if cli.dpi.is_none() {
+                    opts.dpi = Some(600);
+                }
+            }
+            "lossless" => {
+                opts.image_lossless = true;
+                opts.video_lossless = true;
+                if cli.crf.is_none() {
+                    opts.crf = Some(0);
+                }
+                if cli.bitrate.is_none() {
+                    opts.bitrate = Some("320k".into());
+                }
+            }
+            _ => {}
+        }
+    }
 
     if cli.dry_run {
         println!("[Dry Run] Planning conversion for {} file(s):", files.len());
