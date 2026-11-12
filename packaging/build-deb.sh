@@ -97,7 +97,7 @@ Package: konvert
 Version: ${VERSION}
 Section: utils
 Priority: optional
-Architecture: amd64
+Architecture: ${ARCH}
 Maintainer: enesehs <enesehs@protonmail.com>
 Depends: libc6, libqt6core6, libqt6gui6, libqt6widgets6, libqt6svg6, ffmpeg, imagemagick
 Recommends: poppler-utils, ghostscript, libreoffice, libjxl-tools

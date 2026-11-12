@@ -80,24 +80,48 @@ fi
 echo -e "==> 2. Fetching Konvert release package..."
 
 DOWNLOAD_SUCCESS=false
-RELEASE_URL="https://github.com/${REPO}/releases/latest/download/konvert-linux-${ARCH}.tar.gz"
+LATEST_TAG="$(curl -sSL -o /dev/null -w "%{url_effective}" "https://github.com/${REPO}/releases/latest" 2>/dev/null | sed 's#.*/tag/##')"
+if [ -n "${LATEST_TAG}" ] && [ "${LATEST_TAG}" != "latest" ]; then
+    VERSIONED_URL="https://github.com/${REPO}/releases/download/${LATEST_TAG}/konvert-${LATEST_TAG}-linux-${ARCH}.tar.gz"
+else
+    VERSIONED_URL=""
+fi
+FALLBACK_URL="https://github.com/${REPO}/releases/latest/download/konvert-linux-${ARCH}.tar.gz"
 
-if command -v curl >/dev/null 2>&1; then
-    if curl -sSL -f -o "${TEMP_DIR}/konvert.tar.gz" "${RELEASE_URL}" 2>/dev/null; then
-        DOWNLOAD_SUCCESS=true
+fetch_file() {
+    local url="$1"
+    local dest="$2"
+    if command -v curl >/dev/null 2>&1; then
+        curl -sSL -f -o "${dest}" "${url}" 2>/dev/null
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "${dest}" "${url}" 2>/dev/null
+    else
+        return 1
     fi
-elif command -v wget >/dev/null 2>&1; then
-    if wget -q -O "${TEMP_DIR}/konvert.tar.gz" "${RELEASE_URL}" 2>/dev/null; then
-        DOWNLOAD_SUCCESS=true
-    fi
+}
+
+if [ -n "${VERSIONED_URL}" ] && fetch_file "${VERSIONED_URL}" "${TEMP_DIR}/konvert.tar.gz"; then
+    DOWNLOAD_SUCCESS=true
+elif fetch_file "${FALLBACK_URL}" "${TEMP_DIR}/konvert.tar.gz"; then
+    DOWNLOAD_SUCCESS=true
 fi
 
 if [ "${DOWNLOAD_SUCCESS}" = true ]; then
     echo -e "${GREEN}✓ Release package downloaded successfully.${RESET}"
 
-    # Verify sha256 checksum if available
-    RELEASE_SHA_URL="${RELEASE_URL}.sha256"
-    if curl -sSL -f -o "${TEMP_DIR}/konvert.tar.gz.sha256" "${RELEASE_SHA_URL}" 2>/dev/null; then
+    # Verify sha256 checksum: try unified SHA256SUMS.txt first, fallback to individual .sha256
+    if [ -n "${LATEST_TAG}" ] && fetch_file "https://github.com/${REPO}/releases/download/${LATEST_TAG}/SHA256SUMS.txt" "${TEMP_DIR}/SHA256SUMS.txt"; then
+        echo "==> Verifying package checksum against SHA256SUMS.txt..."
+        EXPECTED_HASH="$(grep -E "konvert.*${ARCH}.*\.tar\.gz" "${TEMP_DIR}/SHA256SUMS.txt" | head -n 1 | awk '{print $1}')"
+        if [ -n "${EXPECTED_HASH}" ]; then
+            ACTUAL_HASH="$(sha256sum "${TEMP_DIR}/konvert.tar.gz" | awk '{print $1}')"
+            if [ "${EXPECTED_HASH}" != "${ACTUAL_HASH}" ]; then
+                echo -e "${RED}Error: Checksum mismatch! Expected ${EXPECTED_HASH}, got ${ACTUAL_HASH}${RESET}" >&2
+                exit 1
+            fi
+            echo -e "${GREEN}✓ Checksum verified (${ACTUAL_HASH:0:16}...)${RESET}"
+        fi
+    elif fetch_file "${FALLBACK_URL}.sha256" "${TEMP_DIR}/konvert.tar.gz.sha256"; then
         echo "==> Verifying package checksum..."
         (cd "${TEMP_DIR}" && sha256sum -c konvert.tar.gz.sha256) || {
             echo -e "${RED}Error: Checksum verification failed for downloaded release package!${RESET}" >&2

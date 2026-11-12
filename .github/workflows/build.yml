@@ -72,14 +72,14 @@ jobs:
 
       - name: Build Debian (.deb) Package
         run: |
+          rm -f packaging/*.deb packaging/*.sha256 *.deb *.sha256
           DEB_ARCH="${{ matrix.target.deb_arch }}" ./packaging/build-deb.sh
-          sha256sum packaging/*.deb > "packaging/deb-${{ matrix.target.arch }}.sha256"
           cp packaging/*.deb .
-          cp "packaging/deb-${{ matrix.target.arch }}.sha256" .
 
       - name: Package Release Bundle
         run: |
           ARCH="${{ matrix.target.arch }}"
+          VERSION="$(tr -d 'v' < VERSION | tr -d ' \n\r')"
           PKG_NAME="konvert-linux-${ARCH}"
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             PKG_NAME="konvert-${{ github.ref_name }}-linux-${ARCH}"
@@ -99,13 +99,7 @@ jobs:
           if [ -f LICENSE ]; then cp LICENSE "${PKG_NAME}/"; fi
 
           tar -czvf "${PKG_NAME}.tar.gz" "${PKG_NAME}"
-          sha256sum "${PKG_NAME}.tar.gz" > "${PKG_NAME}.tar.gz.sha256"
-          
-          # Also ensure universal 'konvert-linux-<arch>.tar.gz' is available for remote installer
-          if [ "${PKG_NAME}" != "konvert-linux-${ARCH}" ]; then
-            cp "${PKG_NAME}.tar.gz" "konvert-linux-${ARCH}.tar.gz"
-            sha256sum "konvert-linux-${ARCH}.tar.gz" > "konvert-linux-${ARCH}.tar.gz.sha256"
-          fi
+          rm -rf "${PKG_NAME}"
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -113,9 +107,7 @@ jobs:
           name: konvert-binaries-${{ matrix.target.arch }}
           path: |
             konvert-*.tar.gz
-            konvert-*.tar.gz.sha256
             *.deb
-            *.sha256
 
   release:
     name: Create GitHub Release
@@ -126,20 +118,48 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: konvert-binaries-*
           merge-multiple: true
 
+      - name: Prepare Release Manifest & Notes
+        run: |
+          # 1. Generate clean unified SHA256SUMS.txt
+          rm -f *.sha256 SHA256SUMS.txt
+          sha256sum konvert-*.tar.gz *.deb > SHA256SUMS.txt
+
+          # 2. Extract release notes from CHANGELOG.md for the current tag
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk -v ver="$VERSION" '
+            /^## \[/ {
+              if (found) exit;
+              if (index($0, "[" ver "]") > 0) { found=1; next }
+            }
+            found { print }
+          ' CHANGELOG.md > RELEASE_NOTES.md || true
+
+          if [ ! -s RELEASE_NOTES.md ]; then
+            echo "Release ${GITHUB_REF_NAME}" > RELEASE_NOTES.md
+          fi
+
+          # 3. Append Quick Install and Checksum table
+          printf "\n---\n\n### Quick Install\n\n\`\`\`bash\n# Universal one-line installer:\ncurl -sSL https://enesehs.dev/konvert/install.sh | bash\n\n# Or install Debian / Ubuntu package:\nsudo dpkg -i konvert_%s_amd64.deb\n\`\`\`\n\n### Verification (SHA-256)\n\`\`\`text\n" "${VERSION}" >> RELEASE_NOTES.md
+          cat SHA256SUMS.txt >> RELEASE_NOTES.md
+          printf "\`\`\`\n" >> RELEASE_NOTES.md
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          name: Konvert ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
           files: |
             konvert-*.tar.gz
-            konvert-*.tar.gz.sha256
             *.deb
-            *.sha256
-          generate_release_notes: true
+            SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
