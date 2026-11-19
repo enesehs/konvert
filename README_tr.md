@@ -80,9 +80,11 @@ Gizli dosyalarınızı çevrimiçi dönüştürücü sitelerine yüklemekten, ta
 
 ## Performans ve Kıyaslama
 
-AMD Ryzen 7 (8 çekirdek / 16 iş parçacığı) üzerinde **19.4 MB 4K PNG** (`3840×2160`) testi:
+AMD Ryzen 7 (8 çekirdek / 16 iş parçacığı) üzerinde test edilmiştir.
 
-| İşlem | Hedef / Kip | Çıktı Boyutu | Disk Tasarrufu | Süre (Tek Dosya) | Süre (Rayon `-j 8` ×50 Toplu) |
+### Paralel Toplu İşleme ve Hızlanma (19.4 MB 4K PNG)
+
+| İşlem | Kip / Ayar | Çıktı Boyutu | Disk Tasarrufu | Süre (Tek Dosya) | Süre (Rayon `-j 8` ×50) |
 |---|---|---|---|---|---|
 | **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-%92.2** | 517 ms | **3.8 sn** (~3.9× hızlanma) |
 | **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-%90.2** | 843 ms | **5.4 sn** (~4.1× hızlanma) |
@@ -90,6 +92,33 @@ AMD Ryzen 7 (8 çekirdek / 16 iş parçacığı) üzerinde **19.4 MB 4K PNG** (`
 | **Unix Boru Hattı (`-`)** | Stdin -> Stdout | Akış | — | **37 ms** gecikme | — |
 
 *Sıfır Electron/JVM çalışma zamanı yükü. Taban bellek kullanımı (RSS): ~24–28 MB.*
+
+### Kalite ve Sadakat Ölçümleri (PSNR, SSIM ve SNR)
+
+Yüksek kaliteli referans medyalarıyla `benchmark_quality.py` üzerinden ölçülmüştür:
+
+#### Görsel Kalite Analizi (1080p Referans Kare)
+
+| Format / Profil | Çıktı Boyutu | Disk Tasarrufu | Süre | PSNR (dB) | SSIM (Yapısal Benzerlik) |
+|---|---|---|---|---|---|
+| **WebP (`-q 85`)** | 70.6 KB | **-%97.3** | 128.8 ms | 37.67 dB | **0.9985** |
+| **JPEG XL (`.jxl`)** | 72.7 KB | **-%97.3** | 140.8 ms | 40.14 dB | **0.9984** |
+| **AVIF (`-q 80`)** | 35.4 KB | **-%98.7** | 1106.6 ms | 42.31 dB | **0.9983** |
+| **JPEG (`-q 90`)** | 212.2 KB | **-%92.0** | 54.9 ms | 42.67 dB | **0.9989** |
+| **WebP (`--lossless`)** | 820.5 KB | **-%69.1** | 49.7 ms | 61.59 dB | **1.0000** |
+
+#### Video, Ses ve Belge Sadakati
+
+| Hedef / Profil | Referans | Çıktı Boyutu | Disk Tasarrufu | Kalite Metriği |
+|---|---|---|---|---|
+| **Discord 8MB Profili** | 1080p MP4 (20.6 MB) | 6.98 MB | **-%66.1** | **40.05 dB PSNR** / **0.9906 SSIM** |
+| **MP3 (320 kbps)** | 48 kHz WAV (375 KB) | 158.5 KB | **-%57.7** | **74.18 dB SNR** |
+| **MP3 (192 kbps)** | 48 kHz WAV (375 KB) | 95.1 KB | **-%74.6** | **30.46 dB SNR** |
+| **FLAC Ses** | 48 kHz WAV (375 KB) | 97.2 KB | **-%74.1** | **Kayıpsız (Tam Eşleşme)** |
+| **DOCX -> TXT** | `source_doc.docx` | 682 B | — | **%100 Kelime / Karakter Doğruluğu** |
+| **UDF (UYAP) -> TXT** | `source_court.udf` | 519 B | — | **%100 Kelime / Karakter Doğruluğu** |
+
+*Ölçümleri yerel ortamınızda dilediğiniz an `python3 ~/konvert-test/benchmark_quality.py` ile tekrarlayabilirsiniz.*
 
 ---
 

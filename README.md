@@ -80,9 +80,11 @@ Tired of uploading private files to online converter sites, switching to browser
 
 ## Benchmarks
 
-Tested on AMD Ryzen 7 (8 cores / 16 threads), converting a **19.4 MB 4K PNG** (`3840×2160`):
+Tested on AMD Ryzen 7 (8 cores / 16 threads).
 
-| Operation | Target / Mode | Output Size | Disk Saved | Time (Single) | Time (Rayon `-j 8` Batch ×50) |
+### Batch Processing & Speedup (19.4 MB 4K PNG)
+
+| Operation | Mode | Output Size | Disk Saved | Time (Single) | Time (Rayon `-j 8` ×50) |
 |---|---|---|---|---|---|
 | **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-92.2%** | 517 ms | **3.8s** (~3.9× speedup) |
 | **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-90.2%** | 843 ms | **5.4s** (~4.1× speedup) |
@@ -90,6 +92,33 @@ Tested on AMD Ryzen 7 (8 cores / 16 threads), converting a **19.4 MB 4K PNG** (`
 | **Unix Pipe (`-`)** | Stdin -> Stdout | Stream | — | **37 ms** latency | — |
 
 *Zero Electron/JVM runtime overhead. Base resident memory (RSS): ~24–28 MB.*
+
+### Quality & Fidelity Assessment (PSNR, SSIM & SNR)
+
+Evaluated with high-fidelity reference media via `benchmark_quality.py`:
+
+#### Image Quality (1080p Reference Frame)
+
+| Format / Profile | Output Size | Disk Saved | Latency | PSNR (dB) | SSIM (Structural Similarity) |
+|---|---|---|---|---|---|
+| **WebP (`-q 85`)** | 70.6 KB | **-97.3%** | 128.8 ms | 37.67 dB | **0.9985** |
+| **JPEG XL (`.jxl`)** | 72.7 KB | **-97.3%** | 140.8 ms | 40.14 dB | **0.9984** |
+| **AVIF (`-q 80`)** | 35.4 KB | **-98.7%** | 1106.6 ms | 42.31 dB | **0.9983** |
+| **JPEG (`-q 90`)** | 212.2 KB | **-92.0%** | 54.9 ms | 42.67 dB | **0.9989** |
+| **WebP (`--lossless`)** | 820.5 KB | **-69.1%** | 49.7 ms | 61.59 dB | **1.0000** |
+
+#### Video, Audio & Document Fidelity
+
+| Target / Preset | Reference | Output Size | Disk Saved | Quality Metric |
+|---|---|---|---|---|
+| **Discord 8MB Profile** | 1080p MP4 (20.6 MB) | 6.98 MB | **-66.1%** | **40.05 dB PSNR** / **0.9906 SSIM** |
+| **MP3 (320 kbps)** | 48 kHz WAV (375 KB) | 158.5 KB | **-57.7%** | **74.18 dB SNR** |
+| **MP3 (192 kbps)** | 48 kHz WAV (375 KB) | 95.1 KB | **-74.6%** | **30.46 dB SNR** |
+| **FLAC Audio** | 48 kHz WAV (375 KB) | 97.2 KB | **-74.1%** | **Lossless (Exact Match)** |
+| **DOCX -> TXT** | `source_doc.docx` | 682 B | — | **100% Word & Character Recall** |
+| **UDF (UYAP) -> TXT** | `source_court.udf` | 519 B | — | **100% Word & Character Recall** |
+
+*Reproduce measurements locally anytime with `python3 ~/konvert-test/benchmark_quality.py`.*
 
 ---
 
