@@ -44,7 +44,8 @@ jobs:
             libpoppler-cpp-dev \
             libjxl-tools \
             ffmpeg \
-            imagemagick
+            imagemagick \
+            potrace
 
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@stable

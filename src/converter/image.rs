@@ -209,20 +209,28 @@ pub fn convert_image(
         }
 
         if !vectorized {
-            crate::logger::info(&format!(
-                "Converting raster image to SVG (bitmap embed) via ImageMagick: {}",
-                input_path.display()
-            ));
-            let status = crate::converter::run_imagemagick(&[
+            let im_res = crate::converter::run_imagemagick(&[
                 input_path.as_os_str(),
                 pending.path().as_os_str(),
             ]);
-            if status.is_err() || !pending.path().exists() {
-                bail!(
-                    "{}: {}",
-                    crate::i18n::t("err_svg_convert"),
+
+            if im_res.is_err() || !pending.path().exists() {
+                crate::logger::info(&format!(
+                    "ImageMagick SVG delegate unavailable; falling back to native SVG bitmap embedding: {}",
                     input_path.display()
-                );
+                ));
+                embed_image_to_svg(input_path, pending.path()).with_context(|| {
+                    format!(
+                        "{}: {}",
+                        crate::i18n::t("err_svg_convert"),
+                        input_path.display()
+                    )
+                })?;
+            } else {
+                crate::logger::info(&format!(
+                    "Converting raster image to SVG (bitmap embed) via ImageMagick: {}",
+                    input_path.display()
+                ));
             }
         }
 
@@ -369,6 +377,64 @@ fn convert_to_jxl(
     }
 
     pending.commit()
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut result = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as usize;
+        let b1 = chunk.get(1).copied().unwrap_or(0) as usize;
+        let b2 = chunk.get(2).copied().unwrap_or(0) as usize;
+        let triple = (b0 << 16) | (b1 << 8) | b2;
+        result.push(CHARSET[(triple >> 18) & 0x3F] as char);
+        result.push(CHARSET[(triple >> 12) & 0x3F] as char);
+        if chunk.len() > 1 {
+            result.push(CHARSET[(triple >> 6) & 0x3F] as char);
+        } else {
+            result.push('=');
+        }
+        if chunk.len() > 2 {
+            result.push(CHARSET[triple & 0x3F] as char);
+        } else {
+            result.push('=');
+        }
+    }
+    result
+}
+
+fn embed_image_to_svg(input_path: &Path, output_path: &Path) -> Result<()> {
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+
+    let (width, height, mime, bytes) = if ext == "png" {
+        let img = open_dynamic_image(input_path)?;
+        let raw = fs::read(input_path)?;
+        (img.width(), img.height(), "image/png", raw)
+    } else if ext == "jpg" || ext == "jpeg" {
+        let img = open_dynamic_image(input_path)?;
+        let raw = fs::read(input_path)?;
+        (img.width(), img.height(), "image/jpeg", raw)
+    } else {
+        let img = open_dynamic_image(input_path)?;
+        let mut buf = std::io::Cursor::new(Vec::new());
+        img.write_to(&mut buf, ImageFormat::Png)?;
+        (img.width(), img.height(), "image/png", buf.into_inner())
+    };
+
+    let b64 = base64_encode(&bytes);
+    let svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\n  <image width=\"{w}\" height=\"{h}\" href=\"data:{mime};base64,{b64}\" xlink:href=\"data:{mime};base64,{b64}\"/>\n</svg>\n",
+        w = width,
+        h = height,
+        mime = mime,
+        b64 = b64
+    );
+    fs::write(output_path, svg)?;
+    Ok(())
 }
 
 pub fn encode_webp_optimized(
@@ -943,12 +1009,16 @@ mod tests {
 
     #[test]
     fn test_convert_image_to_svg_vectorization_or_fallback() {
-        if !crate::deps::imagemagick_available() {
-            return;
-        }
-
         let temp_dir = std::env::temp_dir();
-        let test_png = temp_dir.join("konvert_test_vector.png");
+        let unique_id = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let test_png = temp_dir.join(format!(
+            "konvert_test_vector_{}_{}.png",
+            std::process::id(),
+            unique_id
+        ));
         let img = ::image::DynamicImage::new_rgb8(32, 32);
         img.save(&test_png).expect("Failed to save test PNG");
 
