@@ -38,9 +38,9 @@
 
   <br>
 
-  <a href="https://enesehs.dev/konvert">
-    <img src="assets/output.mp4" alt="Konvert Right-Click Conversion Workflow" width="90%" />
-  </a>
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/e7fbf3ad-e3cf-4256-a340-00aad7f257c6" width="90%" controls autoplay loop muted></video>
+</div>
 
 </div>
 
