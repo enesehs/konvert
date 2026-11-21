@@ -84,15 +84,8 @@ pub fn convert_audio(
 
     // libvorbis encoder mono/nominal max bitrate safe clamp (max 192k)
     let safe_bitrate = if target == "ogg" {
-        let numeric: u32 = b_rate
-            .trim_end_matches(['k', 'K'])
-            .parse()
-            .unwrap_or(160);
-        if numeric > 192 {
-            "192k"
-        } else {
-            b_rate
-        }
+        let numeric: u32 = b_rate.trim_end_matches(['k', 'K']).parse().unwrap_or(160);
+        if numeric > 192 { "192k" } else { b_rate }
     } else {
         b_rate
     };

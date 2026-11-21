@@ -283,7 +283,10 @@ impl Config {
                 let q = trimmed_val
                     .parse::<u8>()
                     .map_err(|_| anyhow::anyhow!("Geçersiz kalite değeri (1-100): '{}'", value))?;
-                anyhow::ensure!((1..=100).contains(&q), "Kalite 1 ile 100 arasında olmalıdır");
+                anyhow::ensure!(
+                    (1..=100).contains(&q),
+                    "Kalite 1 ile 100 arasında olmalıdır"
+                );
                 self.image.quality = q;
             }
             "image.lossless" => {
@@ -339,9 +342,12 @@ impl Config {
             "general.output_directory" => {
                 Some(self.general.output_directory.clone().unwrap_or_default())
             }
-            "general.language" => {
-                Some(self.general.language.clone().unwrap_or_else(|| "auto".to_string()))
-            }
+            "general.language" => Some(
+                self.general
+                    .language
+                    .clone()
+                    .unwrap_or_else(|| "auto".to_string()),
+            ),
             "image.quality" => Some(self.image.quality.to_string()),
             "image.lossless" => Some(self.image.lossless.to_string()),
             "video.crf" => Some(self.video.crf.to_string()),
@@ -438,7 +444,11 @@ mod tests {
                 "kayıtta olmayan varsayılan action: {id}"
             );
         }
-        assert!(!cfg.context_menu.enabled_actions.contains(&"extract_frames".to_string()));
+        assert!(
+            !cfg.context_menu
+                .enabled_actions
+                .contains(&"extract_frames".to_string())
+        );
     }
 
     #[test]
@@ -544,7 +554,10 @@ author = "custom"
         assert_eq!(reloaded.image.quality, 92);
         assert!(reloaded.profiles.contains_key("discord_preset"));
         assert_eq!(reloaded.profiles["discord_preset"].quality, Some(70));
-        assert_eq!(reloaded.profiles["discord_preset"].bitrate.as_deref(), Some("96k"));
+        assert_eq!(
+            reloaded.profiles["discord_preset"].bitrate.as_deref(),
+            Some("96k")
+        );
         assert!(reloaded.extra.contains_key("custom_external_section"));
     }
 
@@ -557,12 +570,19 @@ author = "custom"
         assert_eq!(cfg.get_key_value("image.quality"), Some("95".to_string()));
         assert_eq!(cfg.image.quality, 95);
 
-        cfg.set_key_value("general.notification_enabled", "false").unwrap();
-        assert_eq!(cfg.get_key_value("general.notification_enabled"), Some("false".to_string()));
+        cfg.set_key_value("general.notification_enabled", "false")
+            .unwrap();
+        assert_eq!(
+            cfg.get_key_value("general.notification_enabled"),
+            Some("false".to_string())
+        );
         assert_eq!(cfg.general.notification_enabled, false);
 
         cfg.set_key_value("video.hwaccel", "nvenc").unwrap();
-        assert_eq!(cfg.get_key_value("video.hwaccel"), Some("nvenc".to_string()));
+        assert_eq!(
+            cfg.get_key_value("video.hwaccel"),
+            Some("nvenc".to_string())
+        );
         assert_eq!(cfg.video.hwaccel, "nvenc");
 
         assert!(cfg.set_key_value("image.quality", "150").is_err());
@@ -581,6 +601,9 @@ author = "custom"
         assert_eq!(cfg.video.crf, 18);
         assert_eq!(cfg.video.preset, "slow");
         assert_eq!(cfg.video.hwaccel, "vaapi");
-        assert_eq!(cfg.context_menu.enabled_actions, vec!["convert_webp", "convert_avif"]);
+        assert_eq!(
+            cfg.context_menu.enabled_actions,
+            vec!["convert_webp", "convert_avif"]
+        );
     }
 }

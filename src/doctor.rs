@@ -229,7 +229,10 @@ pub fn print_doctor_report(report: &DoctorReport) {
     }
     println!();
 
-    println!("{:<20} {:<12} {:<10} AÇIKLAMA / SÜRÜM", "BİLEŞEN", "DURUM", "TÜR");
+    println!(
+        "{:<20} {:<12} {:<10} AÇIKLAMA / SÜRÜM",
+        "BİLEŞEN", "DURUM", "TÜR"
+    );
     println!("{:-<20} {:-<12} {:-<10} {:-<40}", "", "", "", "");
 
     for tool in &report.tools {
@@ -253,13 +256,18 @@ pub fn print_doctor_report(report: &DoctorReport) {
             tool.purpose
         };
 
-        println!("{:<20} {:<12} {:<10} {}", tool.name, status_str, role_str, detail_str);
+        println!(
+            "{:<20} {:<12} {:<10} {}",
+            tool.name, status_str, role_str, detail_str
+        );
     }
 
     println!();
 
     if report.all_required_installed && report.missing_optional.is_empty() {
-        println!("[TAMAM] Tüm çekirdek ve isteğe bağlı araçlar kurulu. Konvert tüm özellikleriyle hazır.");
+        println!(
+            "[TAMAM] Tüm çekirdek ve isteğe bağlı araçlar kurulu. Konvert tüm özellikleriyle hazır."
+        );
     } else if report.all_required_installed {
         println!("[UYARI] Temel dönüşümler çalışabilir, ancak bazı isteğe bağlı bileşenler eksik.");
     } else {
@@ -277,7 +285,10 @@ pub fn print_doctor_report(report: &DoctorReport) {
 
         println!("  * Arch Linux:    sudo pacman -S {}", arch_pkgs.join(" "));
         println!("  * Debian/Ubuntu: sudo apt install {}", deb_pkgs.join(" "));
-        println!("  * Fedora:        sudo dnf install {}", fedora_pkgs.join(" "));
+        println!(
+            "  * Fedora:        sudo dnf install {}",
+            fedora_pkgs.join(" ")
+        );
     }
 }
 

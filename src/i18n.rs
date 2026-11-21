@@ -583,8 +583,12 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("err_target_size_not_reached", Language::Tr) => "Hedef boyuta sıkıştırılamadı",
         ("err_target_size_not_reached", _) => "Could not compress to target size",
 
-        ("err_soffice_failed", Language::Tr) => "LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil",
-        ("err_soffice_failed", _) => "LibreOffice (soffice) PDF conversion failed or soffice is not installed",
+        ("err_soffice_failed", Language::Tr) => {
+            "LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil"
+        }
+        ("err_soffice_failed", _) => {
+            "LibreOffice (soffice) PDF conversion failed or soffice is not installed"
+        }
 
         ("err_doc_size_limit", Language::Tr) => "Belge boyutu güvenlik sınırını aşıyor",
         ("err_doc_size_limit", _) => "Document size exceeds security limit",
@@ -601,8 +605,12 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("err_gs_compress_failed", Language::Tr) => "Ghostscript PDF sıkıştırma başarısız oldu",
         ("err_gs_compress_failed", _) => "Ghostscript PDF compression failed",
 
-        ("err_gs_not_installed", Language::Tr) => "PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı",
-        ("err_gs_not_installed", _) => "Ghostscript (gs) is required for PDF compression but not installed",
+        ("err_gs_not_installed", Language::Tr) => {
+            "PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı"
+        }
+        ("err_gs_not_installed", _) => {
+            "Ghostscript (gs) is required for PDF compression but not installed"
+        }
 
         ("err_ffmpeg_failed", Language::Tr) => "ffmpeg işlemi başarısız sonuçlandı",
         ("err_ffmpeg_failed", _) => "FFmpeg process failed",
@@ -619,8 +627,12 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("err_invalid_duration", Language::Tr) => "Geçersiz video süresi",
         ("err_invalid_duration", _) => "Invalid video duration",
 
-        ("err_video_target_size_failed", Language::Tr) => "Video hedef boyuta sıkıştırılamadı: hiçbir kodlama denemesi sonuç üretmedi",
-        ("err_video_target_size_failed", _) => "Failed to compress video to target size: no encoding attempt succeeded",
+        ("err_video_target_size_failed", Language::Tr) => {
+            "Video hedef boyuta sıkıştırılamadı: hiçbir kodlama denemesi sonuç üretmedi"
+        }
+        ("err_video_target_size_failed", _) => {
+            "Failed to compress video to target size: no encoding attempt succeeded"
+        }
 
         ("err_web_video_opt", Language::Tr) => "Web video optimizasyonu başarısız oldu",
         ("err_web_video_opt", _) => "Web video optimization failed",
@@ -640,25 +652,45 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("err_invalid_resize_spec", Language::Tr) => "Geçersiz boyutlandırma parametresi",
         ("err_invalid_resize_spec", _) => "Invalid resize specification",
 
-        ("err_unsupported_strip_meta", Language::Tr) => "Metadata temizleme bu format için desteklenmiyor",
+        ("err_unsupported_strip_meta", Language::Tr) => {
+            "Metadata temizleme bu format için desteklenmiyor"
+        }
         ("err_unsupported_strip_meta", _) => "Metadata stripping is not supported for this format",
 
-        ("err_unsupported_resize", Language::Tr) => "Yeniden boyutlandırma sadece görseller için geçerlidir",
+        ("err_unsupported_resize", Language::Tr) => {
+            "Yeniden boyutlandırma sadece görseller için geçerlidir"
+        }
         ("err_unsupported_resize", _) => "Resizing is only supported for images",
 
-        ("err_unsupported_web_opt", Language::Tr) => "Web optimizasyonu sadece görsel ve videolar için geçerlidir",
-        ("err_unsupported_web_opt", _) => "Web optimization is only supported for image and video formats",
+        ("err_unsupported_web_opt", Language::Tr) => {
+            "Web optimizasyonu sadece görsel ve videolar için geçerlidir"
+        }
+        ("err_unsupported_web_opt", _) => {
+            "Web optimization is only supported for image and video formats"
+        }
 
-        ("err_unsupported_audio_extract", Language::Tr) => "Videodan ses ayıklama sadece video dosyaları için geçerlidir",
-        ("err_unsupported_audio_extract", _) => "Audio extraction is only supported for video files",
+        ("err_unsupported_audio_extract", Language::Tr) => {
+            "Videodan ses ayıklama sadece video dosyaları için geçerlidir"
+        }
+        ("err_unsupported_audio_extract", _) => {
+            "Audio extraction is only supported for video files"
+        }
 
-        ("err_unsupported_frame_extract", Language::Tr) => "Kare çıkarma sadece video dosyaları için geçerlidir",
-        ("err_unsupported_frame_extract", _) => "Frame extraction is only supported for video files",
+        ("err_unsupported_frame_extract", Language::Tr) => {
+            "Kare çıkarma sadece video dosyaları için geçerlidir"
+        }
+        ("err_unsupported_frame_extract", _) => {
+            "Frame extraction is only supported for video files"
+        }
 
-        ("err_unsupported_gif_convert", Language::Tr) => "GIF dönüşümü sadece video dosyaları için geçerlidir",
+        ("err_unsupported_gif_convert", Language::Tr) => {
+            "GIF dönüşümü sadece video dosyaları için geçerlidir"
+        }
         ("err_unsupported_gif_convert", _) => "GIF conversion is only supported for video files",
 
-        ("err_unsupported_audio_to_video", Language::Tr) => "Ses dalgası videosu oluşturmak için bir ses dosyası gereklidir",
+        ("err_unsupported_audio_to_video", Language::Tr) => {
+            "Ses dalgası videosu oluşturmak için bir ses dosyası gereklidir"
+        }
         ("err_unsupported_audio_to_video", _) => "Audio waveform video requires a valid audio file",
 
         // Notifications

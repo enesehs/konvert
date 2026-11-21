@@ -781,7 +781,11 @@ pub fn get_video_duration(input_path: &Path) -> Result<f64> {
         .with_context(|| "ffprobe çalıştırılamadı")?;
 
     if !output.status.success() {
-        bail!("{}: {}", crate::i18n::t("err_video_duration"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_video_duration"),
+            input_path.display()
+        );
     }
 
     let s = String::from_utf8_lossy(&output.stdout);
@@ -948,7 +952,11 @@ pub fn compress_video_to_size_with_progress(
 
     let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes == 0 {
-        bail!("{}: {}", crate::i18n::t("err_file_empty_or_unreadable"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_file_empty_or_unreadable"),
+            input_path.display()
+        );
     }
 
     if current_bytes <= target_bytes {

@@ -1,5 +1,5 @@
 use notify_rust::{Hint, Notification, NotificationHandle, Timeout};
-use zbus::{block_on, Connection, OwnedObjectPath};
+use zbus::{Connection, OwnedObjectPath, block_on};
 
 enum JobMsg {
     SetInfo(String),
@@ -265,12 +265,7 @@ impl Notifier {
         }
     }
 
-    pub fn finish_progress(
-        &self,
-        handle: &mut Option<ProgressSession>,
-        title: &str,
-        body: &str,
-    ) {
+    pub fn finish_progress(&self, handle: &mut Option<ProgressSession>, title: &str, body: &str) {
         if !self.enabled {
             return;
         }

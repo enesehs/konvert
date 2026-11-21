@@ -671,7 +671,11 @@ where
             );
         }
         if !trimmed_err.is_empty() {
-            bail!("{}: {}", crate::i18n::t("err_imagemagick_failed"), trimmed_err);
+            bail!(
+                "{}: {}",
+                crate::i18n::t("err_imagemagick_failed"),
+                trimmed_err
+            );
         }
         bail!("{}", crate::i18n::t("err_imagemagick_failed"));
     }
@@ -723,7 +727,11 @@ where
     let input_path = &sanitized_input;
 
     if !input_path.exists() {
-        bail!("{}: {}", crate::i18n::t("err_input_not_found"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_input_not_found"),
+            input_path.display()
+        );
     }
 
     let action = TargetAction::parse(&opts.target)?;
@@ -743,22 +751,14 @@ where
             } else if is_audio_ext(&ext) {
                 audio::strip_audio_metadata(input_path, out_dir)
             } else {
-                bail!(
-                    "{}: .{}",
-                    crate::i18n::t("err_unsupported_strip_meta"),
-                    ext
-                )
+                bail!("{}: .{}", crate::i18n::t("err_unsupported_strip_meta"), ext)
             }
         }
         TargetAction::Resize(spec) => {
             if is_image_ext(&ext) {
                 image::resize_image(input_path, &spec, out_dir)
             } else {
-                bail!(
-                    "{}: .{}",
-                    crate::i18n::t("err_unsupported_resize"),
-                    ext
-                )
+                bail!("{}: .{}", crate::i18n::t("err_unsupported_resize"), ext)
             }
         }
         TargetAction::Compress => {
@@ -774,7 +774,11 @@ where
             } else if ext == "pdf" {
                 document::compress_pdf(input_path, out_dir)
             } else {
-                bail!("{}: .{}", crate::i18n::t("err_unsupported_compression"), ext)
+                bail!(
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_compression"),
+                    ext
+                )
             }
         }
         TargetAction::TargetSize(target_bytes) => {
@@ -804,11 +808,7 @@ where
             } else if is_image_ext(&ext) {
                 image::web_optimize_image(input_path, out_dir)
             } else {
-                bail!(
-                    "{}: .{}",
-                    crate::i18n::t("err_unsupported_web_opt"),
-                    ext
-                )
+                bail!("{}: .{}", crate::i18n::t("err_unsupported_web_opt"), ext)
             }
         }
         TargetAction::ExtractAudio => {
@@ -885,7 +885,9 @@ where
                     opts.image_lossless,
                     out_dir,
                 )
-            } else if (is_video_ext(&ext) || ext == "gif") && video::is_supported_video_target(&target_fmt) {
+            } else if (is_video_ext(&ext) || ext == "gif")
+                && video::is_supported_video_target(&target_fmt)
+            {
                 video::convert_video_with_progress(
                     input_path,
                     &target_fmt,
@@ -902,7 +904,12 @@ where
             } else if is_audio_ext(&ext) && audio::is_supported_audio_target(&target_fmt) {
                 audio::convert_audio(input_path, &target_fmt, opts.bitrate.as_deref(), out_dir)
             } else {
-                bail!("{}: .{} -> .{}", crate::i18n::t("err_unsupported_conversion"), ext, target_fmt)
+                bail!(
+                    "{}: .{} -> .{}",
+                    crate::i18n::t("err_unsupported_conversion"),
+                    ext,
+                    target_fmt
+                )
             }
         }
     }

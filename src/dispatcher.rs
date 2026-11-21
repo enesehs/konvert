@@ -1,11 +1,11 @@
+use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
-use anyhow::{bail, Context, Result};
 
 use crate::cli::Cli;
 use crate::config::Config;
 use crate::converter::{self, ConvertOptions};
 use crate::desktop;
-use crate::history::{self, add_history_entry, format_bytes, HistoryEntry};
+use crate::history::{self, HistoryEntry, add_history_entry, format_bytes};
 use crate::i18n::t;
 use crate::notification::Notifier;
 use crate::process::{remove_pid_lock, write_pid_lock};
@@ -216,12 +216,8 @@ pub fn run_merge_pdf(
         .sum();
     let progress_title = "Konvert: Merging PDF...".to_string();
     let stable_body = format!("Scanning {} images...", files.len());
-    let mut progress_handle = notifier.start_progress(
-        &progress_title,
-        &stable_body,
-        15,
-        Some("15%"),
-    );
+    let mut progress_handle =
+        notifier.start_progress(&progress_title, &stable_body, 15, Some("15%"));
 
     let (tx, rx) = std::sync::mpsc::channel();
     let merge_files = files.to_vec();
@@ -447,20 +443,13 @@ pub fn run_single_conversion(
     target_display: &str,
     notifier: &Notifier,
 ) -> Result<()> {
-    let file_name = file
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("dosya");
+    let file_name = file.file_name().and_then(|s| s.to_str()).unwrap_or("dosya");
 
     let progress_title = "Konvert".to_string();
     let stable_body = format!("{} -> {}", file_name, target_display);
 
-    let mut progress_handle = notifier.start_progress(
-        &progress_title,
-        &stable_body,
-        10,
-        Some("10%"),
-    );
+    let mut progress_handle =
+        notifier.start_progress(&progress_title, &stable_body, 10, Some("10%"));
 
     enum SingleProgressMsg {
         Progress(i32, String),
@@ -547,11 +536,7 @@ pub fn run_single_conversion(
 
             let msg = format!("Converted:\n{}\n{}", output.display(), savings_str);
             println!("{}", msg);
-            notifier.finish_progress(
-                &mut progress_handle,
-                out_name,
-                &savings_str,
-            );
+            notifier.finish_progress(&mut progress_handle, out_name, &savings_str);
 
             let savings_pct = calculate_savings_pct(orig_total_bytes, out_bytes);
             let _ = add_history_entry(HistoryEntry {
@@ -570,11 +555,7 @@ pub fn run_single_conversion(
             remove_pid_lock();
             let msg = format!("Failed to convert {}:\n{:#}", file.display(), err);
             eprintln!("{}", msg);
-            notifier.error_progress(
-                &mut progress_handle,
-                file_name,
-                &format!("{:#}", err),
-            );
+            notifier.error_progress(&mut progress_handle, file_name, &format!("{:#}", err));
 
             let _ = add_history_entry(HistoryEntry {
                 timestamp: history::current_timestamp(),
@@ -602,12 +583,8 @@ pub fn run_batch_conversion(
     let total_count = files.len();
     let batch_title = t("notify_batch_in_progress");
     let initial_batch_body = format!("[0/{}] {}", total_count, target_display);
-    let mut progress_handle = notifier.start_progress(
-        batch_title,
-        &initial_batch_body,
-        0,
-        Some("0%"),
-    );
+    let mut progress_handle =
+        notifier.start_progress(batch_title, &initial_batch_body, 0, Some("0%"));
 
     let batch_start = std::time::Instant::now();
     let batch_result =
@@ -685,7 +662,12 @@ pub fn run_batch_conversion(
         notifier.finish_progress(
             &mut progress_handle,
             t("notify_done_batch"),
-            &format!("{} {} • {}", success_count, t("label_files_converted"), savings_str),
+            &format!(
+                "{} {} • {}",
+                success_count,
+                t("label_files_converted"),
+                savings_str
+            ),
         );
     } else if success_count > 0 {
         notifier.finish_progress(

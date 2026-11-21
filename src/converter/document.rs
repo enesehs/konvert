@@ -294,7 +294,11 @@ pub fn convert_docx(
     let main_xml = read_limited_xml(doc_file, MAX_DOC_XML_BYTES, input_path)?;
     let main_text = extract_text_from_xml(&main_xml);
     if main_text.is_empty() {
-        bail!("{}: {}", crate::i18n::t("err_docx_read_text"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_docx_read_text"),
+            input_path.display()
+        );
     }
     full_text_sections.push(main_text);
 
@@ -565,7 +569,11 @@ pub fn compress_pdf_to_size(
 
     let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes == 0 {
-        bail!("{}: {}", crate::i18n::t("err_file_empty_or_unreadable"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_file_empty_or_unreadable"),
+            input_path.display()
+        );
     }
 
     if current_bytes <= target_bytes {

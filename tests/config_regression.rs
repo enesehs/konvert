@@ -43,8 +43,8 @@ version = 2
 "#;
 
     // 1. Parse initial TOML containing custom profiles and unknown sections
-    let mut config: Config = toml::from_str(raw_initial_toml)
-        .expect("Failed to deserialize initial configuration");
+    let mut config: Config =
+        toml::from_str(raw_initial_toml).expect("Failed to deserialize initial configuration");
 
     assert!(config.profiles.contains_key("discord_preset"));
     assert!(config.profiles.contains_key("web_opt_extreme"));
@@ -71,16 +71,17 @@ version = 2
         }
     }"#;
 
-    config.update_from_json(gui_save_payload)
+    config
+        .update_from_json(gui_save_payload)
         .expect("Failed to apply GUI update payload");
 
     // 3. Serialize back to TOML
-    let serialized_toml = toml::to_string_pretty(&config)
-        .expect("Failed to serialize updated configuration");
+    let serialized_toml =
+        toml::to_string_pretty(&config).expect("Failed to serialize updated configuration");
 
     // 4. Reload from serialized TOML and assert zero data loss
-    let reloaded: Config = toml::from_str(&serialized_toml)
-        .expect("Failed to parse serialized TOML");
+    let reloaded: Config =
+        toml::from_str(&serialized_toml).expect("Failed to parse serialized TOML");
 
     // Assert GUI changes took effect
     assert_eq!(reloaded.general.notification_enabled, false);
@@ -90,18 +91,33 @@ version = 2
     assert_eq!(reloaded.video.crf, 18);
     assert_eq!(reloaded.video.preset, "slow");
     assert_eq!(reloaded.video.hwaccel, "nvenc");
-    assert_eq!(reloaded.context_menu.enabled_actions, vec!["convert_avif", "convert_jxl"]);
+    assert_eq!(
+        reloaded.context_menu.enabled_actions,
+        vec!["convert_avif", "convert_jxl"]
+    );
 
     // CRITICAL: Assert profiles and external sections were NOT destroyed
-    assert!(reloaded.profiles.contains_key("discord_preset"), "REGRESSION: discord_preset was deleted!");
+    assert!(
+        reloaded.profiles.contains_key("discord_preset"),
+        "REGRESSION: discord_preset was deleted!"
+    );
     assert_eq!(reloaded.profiles["discord_preset"].quality, Some(70));
-    assert_eq!(reloaded.profiles["discord_preset"].bitrate.as_deref(), Some("96k"));
+    assert_eq!(
+        reloaded.profiles["discord_preset"].bitrate.as_deref(),
+        Some("96k")
+    );
 
-    assert!(reloaded.profiles.contains_key("web_opt_extreme"), "REGRESSION: web_opt_extreme was deleted!");
+    assert!(
+        reloaded.profiles.contains_key("web_opt_extreme"),
+        "REGRESSION: web_opt_extreme was deleted!"
+    );
     assert_eq!(reloaded.profiles["web_opt_extreme"].quality, Some(65));
     assert_eq!(reloaded.profiles["web_opt_extreme"].crf, Some(30));
 
-    assert!(reloaded.extra.contains_key("custom_thirdparty_section"), "REGRESSION: custom_thirdparty_section was deleted!");
+    assert!(
+        reloaded.extra.contains_key("custom_thirdparty_section"),
+        "REGRESSION: custom_thirdparty_section was deleted!"
+    );
 }
 
 #[test]
@@ -145,6 +161,9 @@ lossless = true
 
     assert_eq!(reloaded.image.quality, 50);
     assert_eq!(reloaded.video.hwaccel, "vaapi");
-    assert!(reloaded.profiles.contains_key("my_saved_preset"), "REGRESSION: CLI set deleted my_saved_preset!");
+    assert!(
+        reloaded.profiles.contains_key("my_saved_preset"),
+        "REGRESSION: CLI set deleted my_saved_preset!"
+    );
     assert_eq!(reloaded.profiles["my_saved_preset"].quality, Some(45));
 }

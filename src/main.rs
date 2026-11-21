@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Parser;
 
 use konvert::cli::{self, Cli};
@@ -17,9 +17,7 @@ use konvert::gui::launch_settings_gui;
 use konvert::i18n::{self, t};
 use konvert::logger;
 use konvert::notification::Notifier;
-use konvert::process::{
-    pid_file_path, process_is_konvert, terminate_process, write_pid_lock,
-};
+use konvert::process::{pid_file_path, process_is_konvert, terminate_process, write_pid_lock};
 use konvert::update::check_for_updates;
 
 fn main() -> Result<()> {
@@ -383,7 +381,13 @@ fn main() -> Result<()> {
     };
 
     if total_count == 1 {
-        run_single_conversion(&files[0], &opts, orig_total_bytes, &target_display, &notifier)
+        run_single_conversion(
+            &files[0],
+            &opts,
+            orig_total_bytes,
+            &target_display,
+            &notifier,
+        )
     } else {
         run_batch_conversion(&files, &opts, orig_total_bytes, &target_display, &notifier)
     }

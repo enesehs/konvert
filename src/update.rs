@@ -35,9 +35,7 @@ pub fn check_for_updates() -> Result<()> {
                                 tag, current_version
                             );
                             println!("Download release or run installer:");
-                            println!(
-                                "  curl -fsSL https://enesehs.dev/konvert/install.sh | bash"
-                            );
+                            println!("  curl -fsSL https://enesehs.dev/konvert/install.sh | bash");
                             println!("  https://github.com/enesehs/konvert/releases/tag/{}", tag);
                             return Ok(());
                         } else {

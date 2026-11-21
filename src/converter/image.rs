@@ -49,7 +49,11 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "djxl komutu çalıştırılamadı")?;
 
         if !output.status.success() {
-            bail!("{}: {}", crate::i18n::t("err_jxl_decode"), input_path.display());
+            bail!(
+                "{}: {}",
+                crate::i18n::t("err_jxl_decode"),
+                input_path.display()
+            );
         }
 
         image::load_from_memory(&output.stdout).with_context(|| "djxl çıktısı bellekten okunamadı")
@@ -71,7 +75,11 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "SVG rasterleştirici (magick veya convert) çalıştırılamadı")?;
 
         if !output.status.success() {
-            bail!("{}: {}", crate::i18n::t("err_svg_rasterize"), input_path.display());
+            bail!(
+                "{}: {}",
+                crate::i18n::t("err_svg_rasterize"),
+                input_path.display()
+            );
         }
 
         image::load_from_memory(&output.stdout)
@@ -92,7 +100,11 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "HEIC/HEIF okuyucu (magick veya convert) çalıştırılamadı")?;
 
         if !output.status.success() {
-            bail!("{}: {}", crate::i18n::t("err_heic_decode"), input_path.display());
+            bail!(
+                "{}: {}",
+                crate::i18n::t("err_heic_decode"),
+                input_path.display()
+            );
         }
 
         image::load_from_memory(&output.stdout)
@@ -206,7 +218,11 @@ pub fn convert_image(
                 pending.path().as_os_str(),
             ]);
             if status.is_err() || !pending.path().exists() {
-                bail!("{}: {}", crate::i18n::t("err_svg_convert"), input_path.display());
+                bail!(
+                    "{}: {}",
+                    crate::i18n::t("err_svg_convert"),
+                    input_path.display()
+                );
             }
         }
 
@@ -226,7 +242,11 @@ pub fn convert_image(
         if status.is_ok() && pending.path().exists() {
             return pending.commit();
         }
-        bail!("{}: {}", crate::i18n::t("err_heic_convert"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_heic_convert"),
+            input_path.display()
+        );
     }
 
     let img = open_dynamic_image(input_path)?;
@@ -698,7 +718,11 @@ pub fn compress_image_to_size(
 
     let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes == 0 {
-        bail!("{}: {}", crate::i18n::t("err_file_empty_or_unreadable"), input_path.display());
+        bail!(
+            "{}: {}",
+            crate::i18n::t("err_file_empty_or_unreadable"),
+            input_path.display()
+        );
     }
 
     if current_bytes <= target_bytes {
@@ -908,7 +932,11 @@ mod tests {
         let res_empty = compress_image_to_size(&empty_file, 8 * 1024 * 1024, None);
         assert!(res_empty.is_err());
         let err_empty = res_empty.unwrap_err().to_string();
-        assert!(err_empty.contains("boş") || err_empty.contains("okunamadı") || err_empty.contains("empty"));
+        assert!(
+            err_empty.contains("boş")
+                || err_empty.contains("okunamadı")
+                || err_empty.contains("empty")
+        );
 
         let _ = std::fs::remove_file(&empty_file);
     }
@@ -925,7 +953,11 @@ mod tests {
         img.save(&test_png).expect("Failed to save test PNG");
 
         let svg_res = convert_image(&test_png, "svg", None, false, None);
-        assert!(svg_res.is_ok(), "SVG conversion failed: {:?}", svg_res.err());
+        assert!(
+            svg_res.is_ok(),
+            "SVG conversion failed: {:?}",
+            svg_res.err()
+        );
 
         let svg_path = svg_res.unwrap();
         assert!(svg_path.exists());
