@@ -56,6 +56,11 @@ pub fn info(message: &str) {
 }
 
 #[allow(dead_code)]
+pub fn warn(message: &str) {
+    log("WARN", message);
+}
+
+#[allow(dead_code)]
 pub fn error(message: &str) {
     log("ERROR", message);
 }

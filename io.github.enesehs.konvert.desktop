@@ -9,7 +9,7 @@ Comment[it]=Impostazioni di conversione ed elaborazione dei file
 Comment[ru]=Настройки конвертации и обработки файлов
 Comment[zh_CN]=文件转换和处理设置
 Comment[ja]=ファイル変換および処理の設定
-Exec=konvert-settings
+Exec=sh -c "PATH=\"$HOME/.local/bin:$PATH\" exec konvert -s"
 Icon=konvert
 StartupWMClass=konvert-settings
 Terminal=false

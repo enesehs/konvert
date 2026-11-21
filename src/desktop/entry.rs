@@ -22,7 +22,7 @@ pub fn install_desktop_entry(exec_path: Option<&str>) -> Result<PathBuf> {
 
     let exec = match exec_path {
         Some(e) => e.to_string(),
-        None => "konvert-settings".to_string(),
+        None => "sh -c \"PATH=\\\"$HOME/.local/bin:$PATH\\\" exec konvert -s\"".to_string(),
     };
 
     let content = format!(

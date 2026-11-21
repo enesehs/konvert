@@ -45,7 +45,7 @@ pub fn convert_pdf_to_images(
 
     let status = cmd.status().with_context(|| "pdftoppm bulunamadı")?;
     if !status.success() {
-        bail!("PDF sayfaları görsele dönüştürülemedi");
+        bail!("{}", crate::i18n::t("err_pdf_render_images"));
     }
 
     Ok(pages_dir)
@@ -89,9 +89,7 @@ pub fn convert_to_pdf_via_soffice(
         return Ok(output_path.to_path_buf());
     }
 
-    bail!(
-        "LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil"
-    )
+    bail!("{}", crate::i18n::t("err_soffice_failed"))
 }
 
 pub fn write_html_document(
@@ -140,9 +138,10 @@ fn read_limited_xml<R: Read>(mut reader: R, max_bytes: u64, path_hint: &Path) ->
         .read_to_string(&mut buf)?;
     if buf.len() as u64 > max_bytes {
         bail!(
-            "Belge boyutu güvenlik sınırını aşıyor (maksimum {} MB): {}",
-            max_bytes / (1024 * 1024),
-            path_hint.display()
+            "{}: {} MB (max: {} MB)",
+            crate::i18n::t("err_doc_size_limit"),
+            path_hint.display(),
+            max_bytes / (1024 * 1024)
         );
     }
     Ok(buf)
@@ -177,7 +176,7 @@ pub fn convert_udf(
 
     let text_content = extract_text_from_xml(&xml_content);
     if text_content.is_empty() {
-        bail!("UDF belgesinden metin okunamadı");
+        bail!("{}", crate::i18n::t("err_udf_read_text"));
     }
 
     match target_format.to_lowercase().as_str() {
@@ -228,7 +227,8 @@ pub fn convert_udf(
         }
         _ => {
             bail!(
-                "UDF dosyası için desteklenmeyen hedef format: .{}",
+                "{}: UDF -> .{}",
+                crate::i18n::t("err_unsupported_conversion"),
                 target_format
             );
         }
@@ -294,7 +294,7 @@ pub fn convert_docx(
     let main_xml = read_limited_xml(doc_file, MAX_DOC_XML_BYTES, input_path)?;
     let main_text = extract_text_from_xml(&main_xml);
     if main_text.is_empty() {
-        bail!("DOCX belgesinden metin okunamadı: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_docx_read_text"), input_path.display());
     }
     full_text_sections.push(main_text);
 
@@ -333,7 +333,8 @@ pub fn convert_docx(
         }
         _ => {
             bail!(
-                "DOCX dosyası için desteklenmeyen hedef format: .{}",
+                "{}: DOCX -> .{}",
+                crate::i18n::t("err_unsupported_conversion"),
                 target_format
             );
         }
@@ -548,7 +549,7 @@ fn run_ghostscript_pdf(
         .status()
         .with_context(|| "ghostscript (gs) çalıştırılamadı; PDF sıkıştırma için kurulu olmalı")?;
     if !status.success() {
-        bail!("ghostscript PDF sıkıştırma başarısız oldu (çıkış kodu 0 değil)");
+        bail!("{}", crate::i18n::t("err_gs_compress_failed"));
     }
     Ok(())
 }
@@ -559,18 +560,18 @@ pub fn compress_pdf_to_size(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     if target_bytes == 0 {
-        bail!("Hedef dosya boyutu 0 olamaz");
+        bail!("{}", crate::i18n::t("err_target_size_zero"));
     }
 
     let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes == 0 {
-        bail!("Dosya boş veya boyutu okunamadı: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_file_empty_or_unreadable"), input_path.display());
     }
 
     if current_bytes <= target_bytes {
         bail!(
-            "PDF belgesi zaten hedef boyuttan ({}) daha küçük ({}). Hedef boyut sıkıştırması için dosyanın {}'dan büyük olması gerekir.",
-            crate::history::format_bytes(target_bytes),
+            "{} ({} <= {}).",
+            crate::i18n::t("err_file_already_smaller"),
             crate::history::format_bytes(current_bytes),
             crate::history::format_bytes(target_bytes)
         );
@@ -603,7 +604,7 @@ pub fn compress_pdf_to_size(
     ));
 
     if Command::new("gs").arg("--version").output().is_err() {
-        bail!("PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı");
+        bail!("{}", crate::i18n::t("err_gs_not_installed"));
     }
 
     let mut best_size: Option<u64> = None;
@@ -636,15 +637,14 @@ pub fn compress_pdf_to_size(
 
     if let Some(size) = best_size {
         bail!(
-            "PDF hedef boyuta ({}) sıkıştırılamadı. Ulaşılan en küçük boyut: {}",
+            "{}: {} -> {}",
+            crate::i18n::t("err_target_size_not_reached"),
             crate::history::format_bytes(target_bytes),
             crate::history::format_bytes(size)
         );
     }
 
-    bail!(
-        "PDF hedef boyuta sıkıştırılamadı: ghostscript (gs) çalıştırılamadı veya hiçbir ayar sonuç üretmedi"
-    )
+    bail!("{}", crate::i18n::t("err_gs_compress_failed"))
 }
 
 pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
@@ -687,7 +687,7 @@ pub fn compress_pdf(input_path: &Path, custom_output_dir: Option<&Path>) -> Resu
         .with_context(|| "PDF sıkıştırıcı (gs veya magick) çalıştırılamadı")?;
 
     if !fb_status.success() {
-        bail!("PDF sıkıştırma başarısız oldu");
+        bail!("{}", crate::i18n::t("err_gs_compress_failed"));
     }
 
     pending.commit()
@@ -757,10 +757,11 @@ mod tests {
         let reader = data.as_bytes();
         let res = read_limited_xml(reader, 100, Path::new("test.xml"));
         assert!(res.is_err());
+        let err_str = res.unwrap_err().to_string();
         assert!(
-            res.unwrap_err()
-                .to_string()
-                .contains("güvenlik sınırını aşıyor")
+            err_str.contains("güvenlik sınırını aşıyor")
+                || err_str.contains("security limit")
+                || err_str.contains("limit")
         );
     }
 
@@ -774,7 +775,7 @@ mod tests {
         let res = compress_pdf_to_size(&test_file, 8 * 1024 * 1024, None);
         assert!(res.is_err());
         let err_msg = res.unwrap_err().to_string();
-        assert!(err_msg.contains("zaten hedef boyuttan"));
+        assert!(err_msg.contains("zaten hedef boyuttan") || err_msg.contains("already smaller"));
 
         // 0 hedef boyutu -> hata vermeli
         assert!(compress_pdf_to_size(&test_file, 0, None).is_err());

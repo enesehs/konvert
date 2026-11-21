@@ -137,7 +137,13 @@ if [ "${DOWNLOAD_SUCCESS}" = true ]; then
     find "${TEMP_DIR}" -type f -name "io.github.enesehs.konvert.desktop" -exec cp -f {} "${DESKTOP_DIR}/" \;
     find "${TEMP_DIR}" -type f -name "io.github.enesehs.konvert.metainfo.xml" -exec cp -f {} "${METAINFO_DIR}/" \;
     find "${TEMP_DIR}" -type f -name "logo.svg" -exec cp -f {} "${ICON_DIR}/scalable/apps/konvert.svg" \;
+    find "${TEMP_DIR}" -type f -name "konvert-symbolic.svg" -exec cp -f {} "${ICON_DIR}/scalable/apps/konvert-symbolic.svg" \; 2>/dev/null || true
     find "${TEMP_DIR}" -type f -path "*/icons/*.svg" -exec cp -f {} "${ICON_DIR}/scalable/actions/" \; 2>/dev/null || true
+    mkdir -p "${REAL_HOME}/.local/share/mime/packages" 2>/dev/null || true
+    find "${TEMP_DIR}" -type f -name "konvert-mime.xml" -exec cp -f {} "${REAL_HOME}/.local/share/mime/packages/konvert-mime.xml" \; 2>/dev/null || true
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database "${REAL_HOME}/.local/share/mime" >/dev/null 2>&1 || true
+    fi
 else
     echo -e "${YELLOW}Notice: Precompiled release not found, building quickly from source...${RESET}"
     
@@ -192,7 +198,7 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
     chown -R "${REAL_USER}:" "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
 fi
 
-echo -e "\n${GREEN}${BOLD}✨ Konvert installed successfully!${RESET}"
+echo -e "\n${GREEN}${BOLD}[OK] Konvert installed successfully!${RESET}"
 echo -e "--------------------------------------------------"
 echo -e "• Open settings GUI:                ${CYAN}konvert -s${RESET}"
 echo -e "• Convert files via CLI:            ${CYAN}konvert -t webp image.png${RESET}"

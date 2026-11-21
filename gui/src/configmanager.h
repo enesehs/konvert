@@ -27,6 +27,7 @@ public:
     int videoCrf = 23;
     QString videoPreset = "medium";
     bool videoLossless = false;
+    QString videoHwaccel = "auto";
 
     // Audio
     QString audioBitrate = "320k";

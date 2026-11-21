@@ -68,6 +68,7 @@ private:
     QSlider *m_videoCrfSlider = nullptr;
     QLabel *m_videoCrfLabel = nullptr;
     QComboBox *m_videoPresetCombo = nullptr;
+    QComboBox *m_videoHwaccelCombo = nullptr;
     QCheckBox *m_videoLosslessCheck = nullptr;
 
     // Music

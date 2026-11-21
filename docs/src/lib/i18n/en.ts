@@ -4,7 +4,7 @@ export const en: Translations = {
   meta: {
     title: "Konvert — Native Right-Click File Converter for Linux",
     description:
-      "Stop memorizing terminal parameters. Convert 50+ formats offline directly from the context menu in Dolphin, Nautilus, Nemo, and Thunar with 0 MB idle RAM.",
+      "Stop memorizing terminal parameters. Convert 35+ formats offline directly from the context menu in Dolphin, Nautilus, Nemo, and Thunar.",
     keywords: [
       "Konvert",
       "Linux",
@@ -36,7 +36,7 @@ export const en: Translations = {
     displayTitle1: "Right click.",
     displayTitle2: "Convert.",
     valueProposition:
-      "Stop memorizing terminal flags and uploading private files to web converters. Convert 50+ formats offline directly inside Dolphin, Nautilus, Nemo, and Thunar.",
+      "Stop memorizing terminal flags and uploading private files to web converters. Convert 35+ formats offline directly inside Dolphin, Nautilus, Nemo, and Thunar.",
     oneLinerLabel: "ONE-LINE INSTALLATION",
     oneLinerCommand: "curl -fsSL https://enesehs.dev/konvert/install.sh | bash",
     copied: "Copied!",
@@ -149,7 +149,7 @@ export const en: Translations = {
   },
   formats: {
     badge: "SUPPORTED FORMATS & ENGINES",
-    title: "50+ Formats. Powered by the CLI engines you already trust.",
+    title: "35+ Formats. Powered by the CLI engines you already trust.",
     subtitle:
       "Optimized native toolchain for image, video, audio, and document conversions.",
     tabs: {

@@ -1,8 +1,14 @@
+pub mod cli;
 pub mod config;
 pub mod converter;
 pub mod deps;
 pub mod desktop;
+pub mod dispatcher;
+pub mod doctor;
+pub mod gui;
 pub mod history;
 pub mod i18n;
 pub mod logger;
 pub mod notification;
+pub mod process;
+pub mod update;

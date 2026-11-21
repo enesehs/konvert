@@ -8,10 +8,13 @@ use super::dolphin::ALL_ACTIONS;
 
 fn nemo_extensions(category: &str) -> &'static str {
     match category {
-        "photos" => "png;jpg;jpeg;webp;avif;jxl;bmp;ico;tiff;tif;qoi;svg;heic;heif;",
+        "photos" => "png;jpg;jpeg;webp;avif;jxl;bmp;ico;tiff;tif;qoi;svg;heic;heif;gif;",
         "videos" => "mp4;mkv;webm;avi;mov;flv;wmv;m4v;ts;",
         "music" => "mp3;wav;flac;ogg;m4a;aac;opus;wma;aiff;",
-        "documents" => "pdf;udf;docx;doc;txt;html;",
+        "pdf" => "pdf;",
+        "udf" => "udf;",
+        "word" => "docx;doc;",
+        "documents" => "pdf;udf;docx;doc;",
         _ => "any;",
     }
 }

@@ -49,7 +49,7 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "djxl komutu çalıştırılamadı")?;
 
         if !output.status.success() {
-            bail!("JXL görseli çözülemedi: {}", input_path.display());
+            bail!("{}: {}", crate::i18n::t("err_jxl_decode"), input_path.display());
         }
 
         image::load_from_memory(&output.stdout).with_context(|| "djxl çıktısı bellekten okunamadı")
@@ -71,7 +71,7 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "SVG rasterleştirici (magick veya convert) çalıştırılamadı")?;
 
         if !output.status.success() {
-            bail!("SVG görseli rasterleştirilemedi: {}", input_path.display());
+            bail!("{}: {}", crate::i18n::t("err_svg_rasterize"), input_path.display());
         }
 
         image::load_from_memory(&output.stdout)
@@ -92,7 +92,7 @@ pub fn open_dynamic_image(input_path: &Path) -> Result<DynamicImage> {
             .with_context(|| "HEIC/HEIF okuyucu (magick veya convert) çalıştırılamadı")?;
 
         if !output.status.success() {
-            bail!("HEIC/HEIF görseli çözülemedi: {}", input_path.display());
+            bail!("{}: {}", crate::i18n::t("err_heic_decode"), input_path.display());
         }
 
         image::load_from_memory(&output.stdout)
@@ -154,21 +154,63 @@ pub fn convert_image(
     ));
     ensure_parent_dir(&output_path)?;
 
-    // SVG (.svg) - Bitmap görseller potrace üzerinden vektörleştirilir
+    // SVG (.svg) - Sistemde potrace varsa gerçek vektörizasyon (tracing), yoksa ImageMagick ile gömme.
     if target_lower == "svg" {
-        crate::logger::info(&format!(
-            "Tracing raster image to vector SVG via ImageMagick/potrace: {}",
-            input_path.display()
-        ));
         let pending = crate::converter::PendingOutput::new(&output_path);
-        let status = crate::converter::run_imagemagick(&[
-            input_path.as_os_str(),
-            pending.path().as_os_str(),
-        ]);
-        if status.is_ok() && pending.path().exists() {
-            return pending.commit();
+
+        let mut vectorized = false;
+        if crate::deps::command_exists("potrace") {
+            let magick_child = Command::new("magick")
+                .arg(input_path)
+                .args(["-flatten", "pbm:-"])
+                .stdout(std::process::Stdio::piped())
+                .spawn()
+                .or_else(|_| {
+                    Command::new("convert")
+                        .arg(input_path)
+                        .args(["-flatten", "pbm:-"])
+                        .stdout(std::process::Stdio::piped())
+                        .spawn()
+                });
+
+            if let Ok(mut m_child) = magick_child
+                && let Some(m_out) = m_child.stdout.take()
+            {
+                let potrace_status = Command::new("potrace")
+                    .args(["-s", "-", "-o"])
+                    .arg(pending.path())
+                    .stdin(m_out)
+                    .status();
+
+                let _ = m_child.wait();
+                if let Ok(st) = potrace_status
+                    && st.success()
+                    && pending.path().exists()
+                {
+                    crate::logger::info(&format!(
+                        "Vectorized raster image to SVG via potrace: {}",
+                        input_path.display()
+                    ));
+                    vectorized = true;
+                }
+            }
         }
-        bail!("SVG formatına dönüştürülemedi: {}", input_path.display());
+
+        if !vectorized {
+            crate::logger::info(&format!(
+                "Converting raster image to SVG (bitmap embed) via ImageMagick: {}",
+                input_path.display()
+            ));
+            let status = crate::converter::run_imagemagick(&[
+                input_path.as_os_str(),
+                pending.path().as_os_str(),
+            ]);
+            if status.is_err() || !pending.path().exists() {
+                bail!("{}: {}", crate::i18n::t("err_svg_convert"), input_path.display());
+            }
+        }
+
+        return pending.commit();
     }
 
     // HEIC / HEIF (.heic, .heif)
@@ -184,7 +226,7 @@ pub fn convert_image(
         if status.is_ok() && pending.path().exists() {
             return pending.commit();
         }
-        bail!("HEIC formatına dönüştürülemedi: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_heic_convert"), input_path.display());
     }
 
     let img = open_dynamic_image(input_path)?;
@@ -303,7 +345,7 @@ fn convert_to_jxl(
         .status()
         .with_context(|| "cjxl komutu çalıştırılamadı")?;
     if !status.success() {
-        bail!("cjxl ile JPEG XL dönüştürme başarısız oldu");
+        bail!("{}", crate::i18n::t("err_cjxl_failed"));
     }
 
     pending.commit()
@@ -510,7 +552,7 @@ pub fn merge_images_to_pdf(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     if images.is_empty() {
-        bail!("Birleştirilecek görsel bulunamadı");
+        bail!("{}", crate::i18n::t("err_no_images_to_merge"));
     }
 
     let first_stem = images[0]
@@ -543,7 +585,7 @@ pub fn merge_images_to_pdf(
             .status()
             .with_context(|| "Ghostscript (gs) çalıştırılamadı")?;
         if !status.success() {
-            bail!("Ghostscript ile PDF dosyaları birleştirilemedi");
+            bail!("{}", crate::i18n::t("err_gs_merge_pdf"));
         }
         return pending.commit();
     }
@@ -597,7 +639,7 @@ pub fn merge_images_to_pdf(
                 .status()
                 .with_context(|| "Ghostscript çalıştırılamadı")?;
             if !status.success() {
-                bail!("Ghostscript ile parçalar birleştirilemedi");
+                bail!("{}", crate::i18n::t("err_gs_merge_parts"));
             }
         } else {
             let mut final_args: Vec<std::ffi::OsString> = chunk_pdfs
@@ -651,18 +693,18 @@ pub fn compress_image_to_size(
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
     if target_bytes == 0 {
-        bail!("Hedef dosya boyutu 0 olamaz");
+        bail!("{}", crate::i18n::t("err_target_size_zero"));
     }
 
     let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes == 0 {
-        bail!("Dosya boş veya boyutu okunamadı: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_file_empty_or_unreadable"), input_path.display());
     }
 
     if current_bytes <= target_bytes {
         bail!(
-            "Görsel zaten hedef boyuttan ({}) daha küçük ({}). Hedef boyut sıkıştırması için dosyanın {}'dan büyük olması gerekir.",
-            crate::history::format_bytes(target_bytes),
+            "{} ({} <= {}).",
+            crate::i18n::t("err_file_already_smaller"),
             crate::history::format_bytes(current_bytes),
             crate::history::format_bytes(target_bytes)
         );
@@ -727,7 +769,8 @@ pub fn compress_image_to_size(
     let reached_size = fs::metadata(pending.path()).map(|m| m.len()).unwrap_or(0);
     drop(pending);
     bail!(
-        "Görsel hedef boyuta ({:.1} MB) sıkıştırılamadı. Ulaşılan en küçük boyut: {:.1} MB",
+        "{}: {:.1} MB -> {:.1} MB",
+        crate::i18n::t("err_target_size_not_reached"),
         target_bytes as f64 / (1024.0 * 1024.0),
         reached_size as f64 / (1024.0 * 1024.0)
     );
@@ -851,7 +894,7 @@ mod tests {
         let res = compress_image_to_size(&test_file, 8 * 1024 * 1024, None);
         assert!(res.is_err());
         let err_msg = res.unwrap_err().to_string();
-        assert!(err_msg.contains("zaten hedef boyuttan"));
+        assert!(err_msg.contains("zaten hedef boyuttan") || err_msg.contains("already smaller"));
 
         // 0 hedef boyutu -> hata vermeli
         let res_zero = compress_image_to_size(&test_file, 0, None);
@@ -865,8 +908,33 @@ mod tests {
         let res_empty = compress_image_to_size(&empty_file, 8 * 1024 * 1024, None);
         assert!(res_empty.is_err());
         let err_empty = res_empty.unwrap_err().to_string();
-        assert!(err_empty.contains("boş") || err_empty.contains("okunamadı"));
+        assert!(err_empty.contains("boş") || err_empty.contains("okunamadı") || err_empty.contains("empty"));
 
         let _ = std::fs::remove_file(&empty_file);
+    }
+
+    #[test]
+    fn test_convert_image_to_svg_vectorization_or_fallback() {
+        if !crate::deps::imagemagick_available() {
+            return;
+        }
+
+        let temp_dir = std::env::temp_dir();
+        let test_png = temp_dir.join("konvert_test_vector.png");
+        let img = ::image::DynamicImage::new_rgb8(32, 32);
+        img.save(&test_png).expect("Failed to save test PNG");
+
+        let svg_res = convert_image(&test_png, "svg", None, false, None);
+        assert!(svg_res.is_ok(), "SVG conversion failed: {:?}", svg_res.err());
+
+        let svg_path = svg_res.unwrap();
+        assert!(svg_path.exists());
+        assert_eq!(svg_path.extension().and_then(|e| e.to_str()), Some("svg"));
+
+        let content = std::fs::read_to_string(&svg_path).expect("Failed to read generated SVG");
+        assert!(content.contains("<svg") || content.contains("SVG"));
+
+        let _ = std::fs::remove_file(&test_png);
+        let _ = std::fs::remove_file(&svg_path);
     }
 }

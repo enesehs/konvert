@@ -36,11 +36,11 @@ else
   cargo build --release
 
   echo "==> 2. Building Qt6 / KDE Settings GUI (konvert-settings)..."
-  if command -v cmake >/dev/null 2>&1 && command -v ninja >/dev/null 2>&1; then
-    cmake -B gui/build -S gui -GNinja -DCMAKE_BUILD_TYPE=Release
-    ninja -C gui/build
+  if command -v cmake >/dev/null 2>&1; then
+    cmake -B gui/build -S gui -DCMAKE_BUILD_TYPE=Release
+    cmake --build gui/build
   else
-    echo "Warning: cmake/ninja not found; the settings GUI will not be installed." >&2
+    echo "Warning: cmake not found; the settings GUI will not be installed." >&2
   fi
 fi
 
@@ -78,10 +78,23 @@ mkdir -p "${ICON_DIR}/scalable/actions"
 
 cp -f "${ROOT_DIR}/assets/logo.svg" "${ICON_DIR}/scalable/apps/konvert.svg"
 cp -f "${ROOT_DIR}/assets/logo.svg" "${ICON_DIR}/scalable/apps/io.github.enesehs.konvert.svg"
+cp -f "${ROOT_DIR}/assets/logo.svg" "${ICON_DIR}/scalable/actions/konvert.svg"
+[ -f "${ROOT_DIR}/assets/icons/konvert-symbolic.svg" ] && cp -f "${ROOT_DIR}/assets/icons/konvert-symbolic.svg" "${ICON_DIR}/scalable/apps/konvert-symbolic.svg"
+[ -f "${ROOT_DIR}/assets/icons/konvert-symbolic.svg" ] && cp -f "${ROOT_DIR}/assets/icons/konvert-symbolic.svg" "${ICON_DIR}/scalable/actions/konvert-symbolic.svg"
 
 # Copy Lucide action icons for right-click context menu
 if [ -d "${ROOT_DIR}/assets/icons" ]; then
   cp -f "${ROOT_DIR}/assets/icons/"*.svg "${ICON_DIR}/scalable/actions/" 2>/dev/null || true
+fi
+
+# Install custom MIME types (e.g. application/x-udf for *.udf)
+MIME_DIR="${REAL_HOME}/.local/share/mime/packages"
+mkdir -p "${MIME_DIR}"
+if [ -f "${ROOT_DIR}/packaging/konvert-mime.xml" ]; then
+  cp -f "${ROOT_DIR}/packaging/konvert-mime.xml" "${MIME_DIR}/konvert-mime.xml"
+  if command -v update-mime-database >/dev/null 2>&1; then
+    update-mime-database "${REAL_HOME}/.local/share/mime" 2>/dev/null || true
+  fi
 fi
 
 for size in 16 24 32 48 64 128 256 512; do
@@ -138,10 +151,10 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
   [ -f "${INSTALL_DIR}/konvert-settings" ] && chown -R "${REAL_USER}:" "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
   chown -R "${REAL_USER}:" "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" "${METAINFO_DIR}/io.github.enesehs.konvert.metainfo.xml" 2>/dev/null || true
   chown -R "${REAL_USER}:" "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
-  chown -R "${REAL_USER}:" "${ICON_DIR}" 2>/dev/null || true
+  chown -R "${REAL_USER}:" "${ICON_DIR}" "${MIME_DIR}" 2>/dev/null || true
   chown -R "${REAL_USER}:" "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
 fi
 
 echo ""
-echo "✨ Konvert installed and synchronized successfully!"
+echo "[OK] Konvert installed and synchronized successfully!"
 echo "To open settings: konvert -s or launch Konvert from your applications menu."

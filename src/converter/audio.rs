@@ -46,7 +46,7 @@ pub fn convert_audio_to_video(
         .with_context(|| "ffmpeg çalıştırılamadı (ses -> video)")?;
 
     if !status.success() {
-        bail!("Sesten video oluşturma başarısız oldu");
+        bail!("{}", crate::i18n::t("err_audio_to_video"));
     }
 
     pending.commit()
@@ -82,9 +82,24 @@ pub fn convert_audio(
     };
     let b_rate = bitrate.unwrap_or(default_bitrate);
 
+    // libvorbis encoder mono/nominal max bitrate safe clamp (max 192k)
+    let safe_bitrate = if target == "ogg" {
+        let numeric: u32 = b_rate
+            .trim_end_matches(['k', 'K'])
+            .parse()
+            .unwrap_or(160);
+        if numeric > 192 {
+            "192k"
+        } else {
+            b_rate
+        }
+    } else {
+        b_rate
+    };
+
     match target.as_str() {
         "mp3" | "ogg" | "opus" | "m4a" | "aac" => {
-            cmd.arg("-b:a").arg(b_rate);
+            cmd.arg("-b:a").arg(safe_bitrate);
         }
         "flac" => {
             cmd.arg("-c:a")
@@ -105,7 +120,8 @@ pub fn convert_audio(
         .with_context(|| "ffmpeg çalıştırılamadı (ses dönüştürme)")?;
     if !status.success() {
         bail!(
-            "Ses dönüştürme işlemi başarısız oldu: {}",
+            "{}: {}",
+            crate::i18n::t("err_ffmpeg_failed"),
             output_path.display()
         );
     }
@@ -149,7 +165,7 @@ pub fn strip_audio_metadata(
         .with_context(|| "ffmpeg çalıştırılamadı (ses metadata temizleme)")?;
 
     if !status.success() {
-        bail!("Ses metadata temizleme başarısız oldu");
+        bail!("{}", crate::i18n::t("err_audio_strip_metadata"));
     }
 
     pending.commit()

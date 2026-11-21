@@ -6,19 +6,19 @@
 
   <br><br>
 
-  **English** • [Türkçe](README_tr.md) • [Deutsch](README_de.md) • [Français](README_fr.md) • [Español](README_es.md) • [Italiano](README_it.md) • [Русский](README_ru.md) • [中文](README_zh.md) • [日本語](README_ja.md)
+  **English** • [Türkçe](README_tr.md)
 
   <br>
 
   [![Website](https://img.shields.io/badge/Website-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.3.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/badge/Release-v0.4.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
   [![License](https://img.shields.io/badge/License-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>
 
   <p align="center">
-    <b>Ultra-fast, lightweight, 100% offline native right-click file converter & optimizer for Linux and all major desktop file managers.</b>
+    <b>Fast, lightweight, 100% offline native right-click file converter & optimizer for Linux and all major desktop file managers.</b>
   </p>
 
   <p align="center">
@@ -39,7 +39,7 @@
   <br>
 
   <a href="https://enesehs.dev/konvert">
-    <img src="assets/demo.gif" alt="Konvert Right-Click Conversion Workflow" width="92%" />
+    <img src="assets/output.mp4" alt="Konvert Right-Click Conversion Workflow" width="90%" />
   </a>
 
 </div>
@@ -84,14 +84,16 @@ Tested on AMD Ryzen 7 (8 cores / 16 threads).
 
 ### Batch Processing & Speedup (19.4 MB 4K PNG)
 
-| Operation | Mode | Output Size | Disk Saved | Time (Single) | Time (Rayon `-j 8` ×50) |
-|---|---|---|---|---|---|
-| **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-92.2%** | 517 ms | **3.8s** (~3.9× speedup) |
-| **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-90.2%** | 843 ms | **5.4s** (~4.1× speedup) |
-| **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-78.8%** | 228 ms | **1.6s** (~3.8× speedup) |
-| **Unix Pipe (`-`)** | Stdin -> Stdout | Stream | — | **37 ms** latency | — |
+| Operation | Mode | Output Size | Disk Saved | Bare Subprocess (Single) | Konvert (Single) | Konvert (Rayon `-j 8` ×50) |
+|---|---|---|---|---|---|---|
+| **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-92.2%** | 515 ms (`cjxl`) | 517 ms | **3.8s** (~6.8× vs serial `cjxl`) |
+| **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-90.2%** | 840 ms (`magick`) | 843 ms | **5.4s** (~7.8× vs serial `magick`) |
+| **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-78.8%** | 225 ms (`magick`) | 228 ms | **1.6s** (~7.0× vs serial `magick`) |
+| **Unix Pipe (`-`)** | Stdin -> Stdout | Stream | — | — | **37 ms** latency | — |
 
-*Zero Electron/JVM runtime overhead. Base resident memory (RSS): ~24–28 MB.*
+*Performance Model Breakdown: For single-file conversion, Konvert delegates directly to native underlying tools (`cjxl`, `magick`, `ffmpeg`) with minimal wrapper latency (~2–3 ms POSIX exec overhead). The primary performance advantage emerges in batch processing: instead of executing heavy shell scripts serially (e.g., 50 files taking ~26s in JXL or ~42s in WebP), Konvert dispatches jobs across a Rayon multi-threaded work-stealing pool (`-j 8`), delivering up to 7–8× total batch throughput speedup without spawning shell interpreters.*
+
+*Zero Electron/JVM runtime overhead. Base resident memory (RSS): ~24–28 MB (Rust core process). Note: Peak memory usage during 4K video transcoding or heavy PDF processing is governed by FFmpeg and Ghostscript subprocesses.*
 
 ### Quality & Fidelity Assessment (PSNR, SSIM & SNR)
 
@@ -167,9 +169,9 @@ Evaluated with high-fidelity reference media via `benchmark_quality.py`:
 | <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Preset Profiles** | Built-in presets (`web`, `balanced`, `archive`, `lossless`) plus custom profile creation (`--save-profile <name>`) saved in `config.toml`. |
 | <img src="assets/icons/konvert-terminal.svg" width="16" height="16" align="absmiddle" /> **Unix Pipeline (`-`)** | Direct stdin/stdout streaming with automatic magic-byte format identification for shell pipelines. |
 | <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Atomic Data Safety** | All file writes use temporary `.part` files with atomic commits, collision avoidance (`_2`, `_3`), and optional `.bak` backups (`--backup`). |
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Next-Gen Image Formats** | Native support for JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF, and raster-to-SVG vectorization via `potrace`. |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Next-Gen Image Formats** | Native support for JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF, and raster-to-SVG embedding via ImageMagick (vector tracing with Potrace on roadmap). |
 | <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Document & PDF Tools** | Direct UDF (UYAP) and DOCX to PDF/TXT conversions with structural table and header extraction, plus multi-image PDF merge. |
-| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Multi-Language (i18n)** | 9 localized languages in CLI (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA) and 5 in the Qt6 Settings GUI. |
+| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Multi-Language (i18n)** | UI and CLI interface localized in 9 languages (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA; core engine errors undergoing full i18n migration) and 5 in Qt6 Settings GUI. |
 
 ---
 
@@ -187,7 +189,8 @@ curl -sSL https://enesehs.dev/konvert/install.sh | bash
 > **Audit before running:** You can inspect the installer source at [`docs/public/install.sh`](docs/public/install.sh) or verify its checksum:
 > ```bash
 > curl -sSL https://enesehs.dev/konvert/install.sh -o /tmp/install.sh
-> echo "faccff6b8e0601a1dce2d3efb215a69cfe08f748a557b6c01a4375236d3c8c0c  /tmp/install.sh" | sha256sum -c
+> curl -sSL https://enesehs.dev/konvert/install.sh.sha256 -o /tmp/install.sh.sha256
+> (cd /tmp && sha256sum -c install.sh.sha256)
 > bash /tmp/install.sh
 > ```
 
@@ -287,7 +290,7 @@ konvert -s                                     # Open Qt6 Settings GUI
 
 | Category | Input Formats | Target Formats | Engine Capabilities |
 |---|---|---|---|
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Photos** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Auto-Orientation, EXIF Stripping, 50% & 1080p Resizing, Multi-Image PDF Merge, Potrace Tracing |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Photos** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Auto-Orientation, EXIF Stripping, 50% & 1080p Resizing, Multi-Image PDF Merge, SVG Bitmap Embedding |
 | <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videos** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, Email 25 MB, Custom Target Sizing, Frame Extraction, Audio Extraction, Two-Pass Palette GIF |
 | <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Audio** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Configurable Bitrates (`128k` to `320k`), Waveform Video (MP4) Generation |
 | <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Documents** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Multi-DPI Page Rendering (36-1200 DPI), Ghostscript Optimization, DOCX/UDF Table & Text Extraction |
@@ -302,6 +305,17 @@ flowchart TD
     FM -.->|"konvert -s"| GUI["<b>Qt6 & Breeze Settings GUI</b><br>• Quality, Profile & Format Config<br>• Cumulative History & Disk Savings<br>• Custom Profile Editor"]
     CORE <--> GUI
 ```
+
+---
+
+## Security & Threat Model
+
+Konvert is engineered around a zero-telemetry, 100% offline security posture. Because conversions delegate to system-level external tools for specific formats, users and system administrators should be aware of the following security considerations:
+
+* **External Engine Delegates:** Complex document and vector conversions delegate to system binaries (`ghostscript` for PostScript/PDF rasterization, `imagemagick` for format negotiation, and `libreoffice` for DOCX/UDF rendering). When processing untrusted files from external sources, system administrators should ensure security patches are applied and ImageMagick security policies (`/etc/ImageMagick-7/policy.xml`) restrict vulnerable legacy coders.
+* **Input Sanitization & Injection Prevention:** Konvert does not execute commands through a shell interpreter (`sh -c`). All external processes are invoked via direct POSIX `exec` arrays with strictly validated file paths, preventing command injection vulnerabilities.
+* **Denial of Service (DoS) Guards:** XML document extraction (UDF, DOCX) enforces a strict 50 MB decompression limit to prevent zip-bomb attacks.
+* **System Diagnostics:** Run `konvert --doctor` at any time to verify the status, path, and version of all external delegate binaries.
 
 ---
 

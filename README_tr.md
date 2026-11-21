@@ -6,19 +6,19 @@
 
   <br><br>
 
-  [English](README.md) • **Türkçe** • [Deutsch](README_de.md) • [Français](README_fr.md) • [Español](README_es.md) • [Italiano](README_it.md) • [Русский](README_ru.md) • [中文](README_zh.md) • [日本語](README_ja.md)
+  [English](README.md) • **Türkçe**
 
   <br>
 
   [![Web Sitesi](https://img.shields.io/badge/Web%20Sitesi-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.3.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/badge/Release-v0.4.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
   [![Lisans](https://img.shields.io/badge/Lisans-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>
 
   <p align="center">
-    <b>Linux ve tüm büyük masaüstü dosya yöneticileri için ultra hızlı, hafif, %100 çevrimdışı yerel sağ tık dosya dönüştürücüsü ve optimize edicisi.</b>
+    <b>Linux ve tüm büyük masaüstü dosya yöneticileri için hızlı, hafif, %100 çevrimdışı yerel sağ tık dosya dönüştürücüsü ve optimize edicisi.</b>
   </p>
 
   <p align="center">
@@ -39,7 +39,7 @@
   <br>
 
   <a href="https://enesehs.dev/konvert">
-    <img src="assets/demo.gif" alt="Konvert Sağ Tık Dönüşüm Akışı" width="92%" />
+    <img src="assets/output.mp4" alt="Konvert Sağ Tık Dönüştür" width="90%" />
   </a>
 
 </div>
@@ -84,14 +84,16 @@ AMD Ryzen 7 (8 çekirdek / 16 iş parçacığı) üzerinde test edilmiştir.
 
 ### Paralel Toplu İşleme ve Hızlanma (19.4 MB 4K PNG)
 
-| İşlem | Kip / Ayar | Çıktı Boyutu | Disk Tasarrufu | Süre (Tek Dosya) | Süre (Rayon `-j 8` ×50) |
-|---|---|---|---|---|---|
-| **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-%92.2** | 517 ms | **3.8 sn** (~3.9× hızlanma) |
-| **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-%90.2** | 843 ms | **5.4 sn** (~4.1× hızlanma) |
-| **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-%78.8** | 228 ms | **1.6 sn** (~3.8× hızlanma) |
-| **Unix Boru Hattı (`-`)** | Stdin -> Stdout | Akış | — | **37 ms** gecikme | — |
+| İşlem | Kip / Ayar | Çıktı Boyutu | Disk Tasarrufu | Yalın Araç (Tek Dosya) | Konvert (Tek Dosya) | Konvert (Rayon `-j 8` ×50) |
+|---|---|---|---|---|---|---|
+| **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-%92.2** | 515 ms (`cjxl`) | 517 ms | **3.8 sn** (Seri `cjxl`'e göre ~6.8×) |
+| **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-%90.2** | 840 ms (`magick`) | 843 ms | **5.4 sn** (Seri `magick`'e göre ~7.8×) |
+| **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-%78.8** | 225 ms (`magick`) | 228 ms | **1.6 sn** (Seri `magick`'e göre ~7.0×) |
+| **Unix Boru Hattı (`-`)** | Stdin -> Stdout | Akış | — | — | **37 ms** gecikme | — |
 
-*Sıfır Electron/JVM çalışma zamanı yükü. Taban bellek kullanımı (RSS): ~24–28 MB.*
+*Performans Modeli ve Ayrımı: Tekil dosya dönüştürmelerinde Konvert doğrudan optimize yerel araçları (`cjxl`, `magick`, `ffmpeg`) çağırır ve aracı gecikmesi ihmal edilebilir düzeydedir (~2–3 ms doğrudan POSIX exec yükü). Asıl performans kazanımı toplu işleme süreçlerinde ortaya çıkar: 50 dosyayı seri kabuk betikleriyle işlemek yerine (JXL için ~26 sn, WebP için ~42 sn), Konvert tüm CPU çekirdeklerini Rayon iş parçacığı havuzu (`-j 8`) ile paralel devreye sokarak kabuk yorumlayıcı masrafı olmadan 7 ila 8 kat hızlanma sağlar.*
+
+*Sıfır Electron/JVM çalışma zamanı yükü. Taban bellek kullanımı (RSS): ~24–28 MB (Rust çekirdek süreci). Not: 4K video dönüştürme veya büyük PDF işlemlerinde tepe bellek kullanımı FFmpeg ve Ghostscript alt süreçleri tarafından belirlenir.*
 
 ### Kalite ve Sadakat Ölçümleri (PSNR, SSIM ve SNR)
 
@@ -167,9 +169,9 @@ Yüksek kaliteli referans medyalarıyla `benchmark_quality.py` üzerinden ölç�
 | <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Hazır ve Özel Profiller** | Yerleşik profiller (`web`, `balanced`, `archive`, `lossless`) ve `config.toml` dosyasına kaydedilen özel profil yönetimi (`--save-profile <isim>`). |
 | <img src="assets/icons/konvert-terminal.svg" width="16" height="16" align="absmiddle" /> **Unix Boru Hattı Akışı (`-`)** | Kabuk boru hatları (pipeline) için otomatik sihirli bayt format tespiti ile doğrudan stdin/stdout akış desteği. |
 | <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Atomik Veri Güvenliği** | Geçici `.part` dosyaları ile atomik yazma, çakışma koruması (`_2`, `_3`) ve isteğe bağlı `.bak` yedekleme (`--backup`). |
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Yeni Nesil Görsel Formatları** | JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF ve `potrace` ile raster görsellerden vektör SVG çıkarımı. |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Yeni Nesil Görsel Formatları** | JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF desteği ve ImageMagick ile raster görselleri SVG içine gömme (Potrace ile vektörizasyon yol haritasında). |
 | <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belge ve PDF Araçları** | Tablo ve başlıkları koruyan doğrudan UDF (UYAP) ve DOCX -> PDF/TXT dönüşümü ve çoklu görselden PDF birleştirme. |
-| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Çok Dilli (i18n) Destek** | Komut satırında 9 yerelleştirilmiş dil (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA) ve Qt6 arayüzünde 5 dil. |
+| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Çok Dilli (i18n) Destek** | Komut satırı ve arayüz 9 dilde yerelleştirildi (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA; çekirdek hata mesajları i18n taşınma sürecinde) ve Qt6 arayüzünde 5 dil. |
 
 ---
 
@@ -187,7 +189,8 @@ curl -sSL https://enesehs.dev/konvert/install.sh | bash
 > **Çalıştırmadan önce denetleyin:** Kurulum betiğini [`docs/public/install.sh`](docs/public/install.sh) adresinden inceleyebilir veya sağlama toplamını doğrulayabilirsiniz:
 > ```bash
 > curl -sSL https://enesehs.dev/konvert/install.sh -o /tmp/install.sh
-> echo "faccff6b8e0601a1dce2d3efb215a69cfe08f748a557b6c01a4375236d3c8c0c  /tmp/install.sh" | sha256sum -c
+> curl -sSL https://enesehs.dev/konvert/install.sh.sha256 -o /tmp/install.sh.sha256
+> (cd /tmp && sha256sum -c install.sh.sha256)
 > bash /tmp/install.sh
 > ```
 
@@ -287,7 +290,7 @@ konvert -s                                      # Qt6 Ayarlar Arayüzünü Aç
 
 | Kategori | Girdi Formatları | Hedef Formatlar | Motor Yetenekleri |
 |---|---|---|---|
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Otomatik Yönlendirme, EXIF Temizleme, %50 ve 1080p Yeniden Boyutlandırma, Çoklu Görselden PDF, Potrace Çizimi |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Otomatik Yönlendirme, EXIF Temizleme, %50 ve 1080p Yeniden Boyutlandırma, Çoklu Görselden PDF, SVG Görsel Gömme |
 | <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, E-posta 25 MB, Özel Hedef Boyutlandırma, Kare Çıkarma, Ses Çıkarma, İki Geçişli Paletli GIF |
 | <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Müzik / Ses** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Yapılandırılabilir Bit Hızı (`128k` - `320k`), Dalga Formu Videoları (MP4) Üretimi |
 | <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belgeler** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Çoklu DPI Sayfa Çizimi (36-1200 DPI), Ghostscript Optimizasyonu, DOCX/UDF Tablo ve Metin Çıkarımı |
@@ -302,6 +305,17 @@ flowchart TD
     FM -.->|"konvert -s"| GUI["<b>Qt6 & Breeze Ayarlar Arayüzü</b><br>• Kalite, Profil ve Format Yapılandırması<br>• Toplam Disk Tasarrufu ve Görsel Geçmiş<br>• Özel Profil Düzenleyici"]
     CORE <--> GUI
 ```
+
+---
+
+## Güvenlik ve Tehdit Modeli
+
+Konvert, sıfır telemetri ve %100 çevrimdışı çalışma prensibiyle tasarlanmıştır. Bununla birlikte, belirli dosya türlerinde sistemdeki harici araçlar delegatör olarak kullanıldığından, kullanıcıların ve sistem yöneticilerinin aşağıdaki güvenlik hususlarını dikkate alması önerilir:
+
+* **Harici Delegatör Güvenliği:** Doküman ve vektör dönüşümleri sistemdeki harici ikililere (`gs` / Ghostscript, `magick` / ImageMagick, `soffice` / LibreOffice) devredilir. İnternetten indirilen veya güvenilmeyen kaynaklardan gelen dosyaları dönüştürürken bu araçların güncel tutulduğundan ve `/etc/ImageMagick-7/policy.xml` üzerindeki güvenlik kısıtlamalarının aktif olduğundan emin olunmalıdır.
+* **Girdi Sanitizasyonu ve Enjeksiyon Koruması:** Konvert hiçbir harici komutu kabuk (`sh -c`) üzerinden çalıştırmaz. Tüm alt süreçler doğrudan POSIX `exec` dizi argümanlarıyla çağrılır ve dosya yolları katı bir sanitizasyondan geçirilir.
+* **Hizmet Engelleme (DoS / Zip-Bomb) Koruması:** UDF ve DOCX XML ayrıştırmalarında zip-bomb saldırılarını önlemek için 50 MB'lık katı bir dekompresyon sınırı uygulanır.
+* **Sistem Teşhisi:** Kurulu delegatörlerin durumunu, yollarını ve sürümlerini denetlemek için dilediğiniz zaman `konvert --doctor` komutunu çalıştırabilirsiniz.
 
 ---
 

@@ -524,6 +524,143 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("err_unexpected_exit", Language::Ja) => "変換処理が予期せず終了しました",
         ("err_unexpected_exit", _) => "Conversion process terminated unexpectedly",
 
+        ("err_input_not_found", Language::Tr) => "Girdi dosyası mevcut değil",
+        ("err_input_not_found", Language::De) => "Eingabedatei existiert nicht",
+        ("err_input_not_found", Language::Fr) => "Le fichier d'entrée n'existe pas",
+        ("err_input_not_found", Language::Es) => "El archivo de entrada no existe",
+        ("err_input_not_found", Language::It) => "Il file di input non esiste",
+        ("err_input_not_found", Language::Ru) => "Входной файл не существует",
+        ("err_input_not_found", Language::Zh) => "输入文件不存在",
+        ("err_input_not_found", Language::Ja) => "入力ファイルが存在しません",
+        ("err_input_not_found", _) => "Input file does not exist",
+
+        ("err_unsupported_conversion", Language::Tr) => "Desteklenmeyen dönüştürme",
+        ("err_unsupported_conversion", Language::De) => "Nicht unterstützte Konvertierung",
+        ("err_unsupported_conversion", Language::Fr) => "Conversion non prise en charge",
+        ("err_unsupported_conversion", Language::Es) => "Conversión no compatible",
+        ("err_unsupported_conversion", Language::It) => "Conversione non supportata",
+        ("err_unsupported_conversion", Language::Ru) => "Неподдерживаемая конвертация",
+        ("err_unsupported_conversion", Language::Zh) => "不支持的转换",
+        ("err_unsupported_conversion", Language::Ja) => "サポートされていない変換",
+        ("err_unsupported_conversion", _) => "Unsupported conversion",
+
+        ("err_jxl_decode", Language::Tr) => "JXL görseli çözülemedi",
+        ("err_jxl_decode", _) => "Failed to decode JXL image",
+
+        ("err_svg_rasterize", Language::Tr) => "SVG görseli rasterleştirilemedi",
+        ("err_svg_rasterize", _) => "Failed to rasterize SVG image",
+
+        ("err_heic_decode", Language::Tr) => "HEIC/HEIF görseli çözülemedi",
+        ("err_heic_decode", _) => "Failed to decode HEIC/HEIF image",
+
+        ("err_svg_convert", Language::Tr) => "SVG formatına dönüştürülemedi",
+        ("err_svg_convert", _) => "Failed to convert to SVG format",
+
+        ("err_heic_convert", Language::Tr) => "HEIC formatına dönüştürülemedi",
+        ("err_heic_convert", _) => "Failed to convert to HEIC format",
+
+        ("err_cjxl_failed", Language::Tr) => "cjxl ile JPEG XL dönüştürme başarısız oldu",
+        ("err_cjxl_failed", _) => "JPEG XL conversion via cjxl failed",
+
+        ("err_no_images_to_merge", Language::Tr) => "Birleştirilecek görsel bulunamadı",
+        ("err_no_images_to_merge", _) => "No images found to merge",
+
+        ("err_gs_merge_pdf", Language::Tr) => "Ghostscript ile PDF dosyaları birleştirilemedi",
+        ("err_gs_merge_pdf", _) => "Failed to merge PDF files via Ghostscript",
+
+        ("err_gs_merge_parts", Language::Tr) => "Ghostscript ile parçalar birleştirilemedi",
+        ("err_gs_merge_parts", _) => "Failed to merge parts via Ghostscript",
+
+        ("err_target_size_zero", Language::Tr) => "Hedef dosya boyutu 0 olamaz",
+        ("err_target_size_zero", _) => "Target file size cannot be zero",
+
+        ("err_file_empty_or_unreadable", Language::Tr) => "Dosya boş veya boyutu okunamadı",
+        ("err_file_empty_or_unreadable", _) => "File is empty or size could not be determined",
+
+        ("err_file_already_smaller", Language::Tr) => "Dosya zaten hedef boyuttan daha küçük",
+        ("err_file_already_smaller", _) => "File is already smaller than the target size",
+
+        ("err_target_size_not_reached", Language::Tr) => "Hedef boyuta sıkıştırılamadı",
+        ("err_target_size_not_reached", _) => "Could not compress to target size",
+
+        ("err_soffice_failed", Language::Tr) => "LibreOffice (soffice) ile PDF dönüşümü başarısız oldu veya soffice sistemde kurulu değil",
+        ("err_soffice_failed", _) => "LibreOffice (soffice) PDF conversion failed or soffice is not installed",
+
+        ("err_doc_size_limit", Language::Tr) => "Belge boyutu güvenlik sınırını aşıyor",
+        ("err_doc_size_limit", _) => "Document size exceeds security limit",
+
+        ("err_pdf_render_images", Language::Tr) => "PDF sayfaları görsele dönüştürülemedi",
+        ("err_pdf_render_images", _) => "Failed to render PDF pages to images",
+
+        ("err_udf_read_text", Language::Tr) => "UDF belgesinden metin okunamadı",
+        ("err_udf_read_text", _) => "Failed to extract text from UDF document",
+
+        ("err_docx_read_text", Language::Tr) => "DOCX belgesinden metin okunamadı",
+        ("err_docx_read_text", _) => "Failed to extract text from DOCX document",
+
+        ("err_gs_compress_failed", Language::Tr) => "Ghostscript PDF sıkıştırma başarısız oldu",
+        ("err_gs_compress_failed", _) => "Ghostscript PDF compression failed",
+
+        ("err_gs_not_installed", Language::Tr) => "PDF hedef boyut sıkıştırması için ghostscript (gs) kurulu olmalı, ancak bulunamadı",
+        ("err_gs_not_installed", _) => "Ghostscript (gs) is required for PDF compression but not installed",
+
+        ("err_ffmpeg_failed", Language::Tr) => "ffmpeg işlemi başarısız sonuçlandı",
+        ("err_ffmpeg_failed", _) => "FFmpeg process failed",
+
+        ("err_extract_frames", Language::Tr) => "Video kareleri PNG olarak çıkarılamadı",
+        ("err_extract_frames", _) => "Failed to extract video frames as PNG",
+
+        ("err_video_strip_metadata", Language::Tr) => "Video metadata temizleme başarısız oldu",
+        ("err_video_strip_metadata", _) => "Failed to strip video metadata",
+
+        ("err_video_duration", Language::Tr) => "Video süresi okunamadı",
+        ("err_video_duration", _) => "Could not read video duration",
+
+        ("err_invalid_duration", Language::Tr) => "Geçersiz video süresi",
+        ("err_invalid_duration", _) => "Invalid video duration",
+
+        ("err_video_target_size_failed", Language::Tr) => "Video hedef boyuta sıkıştırılamadı: hiçbir kodlama denemesi sonuç üretmedi",
+        ("err_video_target_size_failed", _) => "Failed to compress video to target size: no encoding attempt succeeded",
+
+        ("err_web_video_opt", Language::Tr) => "Web video optimizasyonu başarısız oldu",
+        ("err_web_video_opt", _) => "Web video optimization failed",
+
+        ("err_audio_to_video", Language::Tr) => "Sesten video oluşturma başarısız oldu",
+        ("err_audio_to_video", _) => "Failed to generate video from audio",
+
+        ("err_audio_strip_metadata", Language::Tr) => "Ses metadata temizleme başarısız oldu",
+        ("err_audio_strip_metadata", _) => "Failed to strip audio metadata",
+
+        ("err_imagemagick_failed", Language::Tr) => "ImageMagick komutu başarısız oldu",
+        ("err_imagemagick_failed", _) => "ImageMagick command failed",
+
+        ("err_unsupported_compression", Language::Tr) => "Bu format için sıkıştırma desteklenmiyor",
+        ("err_unsupported_compression", _) => "Compression is not supported for this format",
+
+        ("err_invalid_resize_spec", Language::Tr) => "Geçersiz boyutlandırma parametresi",
+        ("err_invalid_resize_spec", _) => "Invalid resize specification",
+
+        ("err_unsupported_strip_meta", Language::Tr) => "Metadata temizleme bu format için desteklenmiyor",
+        ("err_unsupported_strip_meta", _) => "Metadata stripping is not supported for this format",
+
+        ("err_unsupported_resize", Language::Tr) => "Yeniden boyutlandırma sadece görseller için geçerlidir",
+        ("err_unsupported_resize", _) => "Resizing is only supported for images",
+
+        ("err_unsupported_web_opt", Language::Tr) => "Web optimizasyonu sadece görsel ve videolar için geçerlidir",
+        ("err_unsupported_web_opt", _) => "Web optimization is only supported for image and video formats",
+
+        ("err_unsupported_audio_extract", Language::Tr) => "Videodan ses ayıklama sadece video dosyaları için geçerlidir",
+        ("err_unsupported_audio_extract", _) => "Audio extraction is only supported for video files",
+
+        ("err_unsupported_frame_extract", Language::Tr) => "Kare çıkarma sadece video dosyaları için geçerlidir",
+        ("err_unsupported_frame_extract", _) => "Frame extraction is only supported for video files",
+
+        ("err_unsupported_gif_convert", Language::Tr) => "GIF dönüşümü sadece video dosyaları için geçerlidir",
+        ("err_unsupported_gif_convert", _) => "GIF conversion is only supported for video files",
+
+        ("err_unsupported_audio_to_video", Language::Tr) => "Ses dalgası videosu oluşturmak için bir ses dosyası gereklidir",
+        ("err_unsupported_audio_to_video", _) => "Audio waveform video requires a valid audio file",
+
         // Notifications
         ("notify_done_single", Language::Tr) => "Dönüştürme Tamamlandı",
         ("notify_done_single", Language::De) => "Konvertierung abgeschlossen",
@@ -535,15 +672,55 @@ pub fn t_lang(key: &str, lang: Language) -> &'static str {
         ("notify_done_single", Language::Ja) => "変換完了",
         ("notify_done_single", _) => "Conversion Completed",
 
-        ("notify_done_batch", Language::Tr) => "Toplu Dönüştürme Başarılı",
-        ("notify_done_batch", Language::De) => "Stapelkonvertierung erfolgreich",
-        ("notify_done_batch", Language::Fr) => "Conversion par lot réussie",
+        ("notify_done_batch", Language::Tr) => "Toplu Dönüştürme Tamamlandı",
+        ("notify_done_batch", Language::De) => "Stapelkonvertierung abgeschlossen",
+        ("notify_done_batch", Language::Fr) => "Conversion par lot terminée",
         ("notify_done_batch", Language::Es) => "Conversión por lotes completada",
         ("notify_done_batch", Language::It) => "Conversione batch completata",
         ("notify_done_batch", Language::Ru) => "Пакетная конвертация завершена",
-        ("notify_done_batch", Language::Zh) => "批量转换成功",
+        ("notify_done_batch", Language::Zh) => "批量转换完成",
         ("notify_done_batch", Language::Ja) => "一括変換完了",
-        ("notify_done_batch", _) => "Batch Conversion Completed",
+        ("notify_done_batch", _) => "Batch Conversion Complete",
+
+        ("notify_batch_in_progress", Language::Tr) => "Toplu Dönüştürme",
+        ("notify_batch_in_progress", Language::De) => "Stapelkonvertierung",
+        ("notify_batch_in_progress", Language::Fr) => "Conversion par lot",
+        ("notify_batch_in_progress", Language::Es) => "Conversión por lotes",
+        ("notify_batch_in_progress", Language::It) => "Conversione batch",
+        ("notify_batch_in_progress", Language::Ru) => "Пакетная конвертация",
+        ("notify_batch_in_progress", Language::Zh) => "批量转换中",
+        ("notify_batch_in_progress", Language::Ja) => "一括変換中",
+        ("notify_batch_in_progress", _) => "Batch Conversion",
+
+        ("label_files_converted", Language::Tr) => "dosya dönüştürüldü",
+        ("label_files_converted", Language::De) => "Dateien konvertiert",
+        ("label_files_converted", Language::Fr) => "fichiers convertis",
+        ("label_files_converted", Language::Es) => "archivos convertidos",
+        ("label_files_converted", Language::It) => "file convertiti",
+        ("label_files_converted", Language::Ru) => "файлов конвертировано",
+        ("label_files_converted", Language::Zh) => "个文件已转换",
+        ("label_files_converted", Language::Ja) => "個のファイルを変換完了",
+        ("label_files_converted", _) => "files converted",
+
+        ("label_succeeded", Language::Tr) => "başarılı",
+        ("label_succeeded", Language::De) => "erfolgreich",
+        ("label_succeeded", Language::Fr) => "réussi",
+        ("label_succeeded", Language::Es) => "completado",
+        ("label_succeeded", Language::It) => "riuscito",
+        ("label_succeeded", Language::Ru) => "успешно",
+        ("label_succeeded", Language::Zh) => "成功",
+        ("label_succeeded", Language::Ja) => "成功",
+        ("label_succeeded", _) => "succeeded",
+
+        ("label_failed", Language::Tr) => "başarısız",
+        ("label_failed", Language::De) => "fehlgeschlagen",
+        ("label_failed", Language::Fr) => "échoué",
+        ("label_failed", Language::Es) => "fallido",
+        ("label_failed", Language::It) => "non riuscito",
+        ("label_failed", Language::Ru) => "ошибка",
+        ("label_failed", Language::Zh) => "失败",
+        ("label_failed", Language::Ja) => "失敗",
+        ("label_failed", _) => "failed",
 
         ("notify_partial_batch", Language::Tr) => "Toplu Dönüştürme Kısmen Tamamlandı",
         ("notify_partial_batch", Language::De) => "Stapelkonvertierung teilweise abgeschlossen",

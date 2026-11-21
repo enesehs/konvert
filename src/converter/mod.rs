@@ -104,7 +104,8 @@ impl TargetAction {
                                 Ok(TargetAction::Resize(ResizeSpec::Percent(pct)))
                             }
                             _ => bail!(
-                                "Geçersiz boyutlandırma parametresi: {} (örnek: 50%, 1080p, 720p)",
+                                "{}: {} (e.g. 50%, 1080p, 720p)",
+                                crate::i18n::t("err_invalid_resize_spec"),
                                 spec
                             ),
                         }
@@ -304,6 +305,8 @@ pub fn plan_output_path(
                     .and_then(|s| s.to_str())
                     .unwrap_or("document");
                 get_output_dir(input_path, out_dir).join(format!("{}_pages", stem))
+            } else if target_fmt == "av1" {
+                determine_suffixed_output_path(input_path, "av1", "mp4", out_dir)
             } else {
                 determine_output_path(input_path, &target_fmt, out_dir)
             }
@@ -504,14 +507,8 @@ fn temp_owner_pid(path: &Path) -> Option<u32> {
     rest.split('-').next()?.parse().ok()
 }
 
-#[cfg(unix)]
 fn process_alive(pid: u32) -> bool {
-    unsafe { libc::kill(pid as i32, 0) == 0 }
-}
-
-#[cfg(not(unix))]
-fn process_alive(_pid: u32) -> bool {
-    true
+    crate::process::process_alive(pid as i32)
 }
 
 fn record_temp_file(temp: &Path) {
@@ -674,9 +671,9 @@ where
             );
         }
         if !trimmed_err.is_empty() {
-            bail!("ImageMagick komutu başarısız oldu: {}", trimmed_err);
+            bail!("{}: {}", crate::i18n::t("err_imagemagick_failed"), trimmed_err);
         }
-        bail!("ImageMagick komutu başarısız oldu (çıkış kodu 0 değil)");
+        bail!("{}", crate::i18n::t("err_imagemagick_failed"));
     }
     Ok(())
 }
@@ -707,14 +704,26 @@ pub struct ConvertOptions {
     pub bitrate: Option<String>,
     pub dpi: Option<u32>,
     pub custom_output_dir: Option<PathBuf>,
+    pub hwaccel: Option<String>,
 }
 
 pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBuf> {
+    convert_single_with_progress(input_path, opts, |_, _| {})
+}
+
+pub fn convert_single_with_progress<F>(
+    input_path: &Path,
+    opts: &ConvertOptions,
+    mut on_progress: F,
+) -> Result<PathBuf>
+where
+    F: FnMut(i32, &str),
+{
     let sanitized_input = sanitize_cli_path(input_path);
     let input_path = &sanitized_input;
 
     if !input_path.exists() {
-        bail!("Girdi dosyası mevcut değil: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_input_not_found"), input_path.display());
     }
 
     let action = TargetAction::parse(&opts.target)?;
@@ -735,7 +744,8 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 audio::strip_audio_metadata(input_path, out_dir)
             } else {
                 bail!(
-                    "Metadata temizleme sadece görsel, video ve ses dosyaları için desteklenir: .{}",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_strip_meta"),
                     ext
                 )
             }
@@ -745,32 +755,45 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 image::resize_image(input_path, &spec, out_dir)
             } else {
                 bail!(
-                    "Yeniden boyutlandırma sadece görseller için geçerlidir (.{})",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_resize"),
                     ext
                 )
             }
         }
         TargetAction::Compress => {
             if is_video_ext(&ext) {
-                video::compress_video(input_path, out_dir)
+                video::compress_video_with_progress(
+                    input_path,
+                    out_dir,
+                    opts.hwaccel.as_deref(),
+                    Some(&mut on_progress),
+                )
             } else if is_image_ext(&ext) {
                 image::compress_image(input_path, opts.quality, out_dir)
             } else if ext == "pdf" {
                 document::compress_pdf(input_path, out_dir)
             } else {
-                bail!("Bu format için sıkıştırma desteklenmiyor: .{}", ext)
+                bail!("{}: .{}", crate::i18n::t("err_unsupported_compression"), ext)
             }
         }
         TargetAction::TargetSize(target_bytes) => {
             if is_video_ext(&ext) {
-                video::compress_video_to_size(input_path, target_bytes, out_dir)
+                video::compress_video_to_size_with_progress(
+                    input_path,
+                    target_bytes,
+                    out_dir,
+                    opts.hwaccel.as_deref(),
+                    Some(&mut on_progress),
+                )
             } else if is_image_ext(&ext) {
                 image::compress_image_to_size(input_path, target_bytes, out_dir)
             } else if ext == "pdf" {
                 document::compress_pdf_to_size(input_path, target_bytes, out_dir)
             } else {
                 bail!(
-                    "Bu format için hedef boyut sıkıştırması desteklenmiyor: .{}",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_compression"),
                     ext
                 )
             }
@@ -782,7 +805,8 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 image::web_optimize_image(input_path, out_dir)
             } else {
                 bail!(
-                    "Web optimizasyonu sadece görsel ve videolar için geçerlidir (.{})",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_web_opt"),
                     ext
                 )
             }
@@ -792,7 +816,8 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 video::extract_audio(input_path, out_dir)
             } else {
                 bail!(
-                    "Videodan ses ayıklama sadece video dosyaları için geçerlidir (.{})",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_audio_extract"),
                     ext
                 )
             }
@@ -802,17 +827,25 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 video::extract_frames(input_path, out_dir)
             } else {
                 bail!(
-                    "Kare çıkarma sadece video dosyaları için geçerlidir (.{})",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_frame_extract"),
                     ext
                 )
             }
         }
         TargetAction::Gif => {
             if is_video_ext(&ext) {
-                video::convert_to_gif(input_path, out_dir, opts.gif_duration, opts.gif_fps)
+                video::convert_to_gif_with_progress(
+                    input_path,
+                    out_dir,
+                    opts.gif_duration,
+                    opts.gif_fps,
+                    Some(&mut on_progress),
+                )
             } else {
                 bail!(
-                    "GIF dönüşümü sadece video dosyaları için geçerlidir (.{})",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_gif_convert"),
                     ext
                 )
             }
@@ -822,7 +855,8 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                 audio::convert_audio_to_video(input_path, out_dir)
             } else {
                 bail!(
-                    "Ses dalgası videosu oluşturmak için bir ses dosyası gereklidir (.{})",
+                    "{}: .{}",
+                    crate::i18n::t("err_unsupported_audio_to_video"),
                     ext
                 )
             }
@@ -851,14 +885,16 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
                     opts.image_lossless,
                     out_dir,
                 )
-            } else if is_video_ext(&ext) && video::is_supported_video_target(&target_fmt) {
-                video::convert_video(
+            } else if (is_video_ext(&ext) || ext == "gif") && video::is_supported_video_target(&target_fmt) {
+                video::convert_video_with_progress(
                     input_path,
                     &target_fmt,
                     opts.crf,
                     opts.preset.as_deref(),
                     opts.video_lossless,
+                    opts.hwaccel.as_deref(),
                     out_dir,
+                    Some(&mut on_progress),
                 )
             } else if is_video_ext(&ext) && audio::is_supported_audio_target(&target_fmt) {
                 // Videodan doğrudan ses çıkarma (ör. `-t mp3 video.mp4`).
@@ -866,7 +902,7 @@ pub fn convert_single(input_path: &Path, opts: &ConvertOptions) -> Result<PathBu
             } else if is_audio_ext(&ext) && audio::is_supported_audio_target(&target_fmt) {
                 audio::convert_audio(input_path, &target_fmt, opts.bitrate.as_deref(), out_dir)
             } else {
-                bail!("Desteklenmeyen dönüştürme: .{} -> .{}", ext, target_fmt)
+                bail!("{}: .{} -> .{}", crate::i18n::t("err_unsupported_conversion"), ext, target_fmt)
             }
         }
     }
@@ -951,6 +987,7 @@ pub fn is_image_ext(ext: &str) -> bool {
             | "svg"
             | "heic"
             | "heif"
+            | "gif"
     )
 }
 
@@ -986,6 +1023,8 @@ mod tests {
         assert!(is_image_ext("bmp"));
         assert!(is_image_ext("ico"));
         assert!(is_image_ext("svg"));
+        assert!(is_image_ext("gif"));
+        assert!(is_image_ext("GIF"));
         assert!(!is_image_ext("mp4"));
         assert!(!is_image_ext("pdf"));
     }
@@ -1275,6 +1314,7 @@ mod tests {
             bitrate: None,
             dpi: None,
             custom_output_dir: None,
+            hwaccel: None,
         };
         let result = convert_batch_with_progress(&[], &opts, |_, _, _, _| {});
         assert!(result.succeeded.is_empty());
@@ -1303,6 +1343,7 @@ mod tests {
                 bitrate: None,
                 dpi: None,
                 custom_output_dir: None,
+                hwaccel: None,
             };
             let res = convert_single(&test_img, &opts);
             if let Ok(pdf_path) = res {
@@ -1336,6 +1377,7 @@ mod tests {
             bitrate: None,
             dpi: None,
             custom_output_dir: None,
+            hwaccel: None,
         };
 
         // force = false -> collision detected, new name predicted

@@ -520,18 +520,18 @@ QWidget* MainWindow::createVideosTab() {
     ), 2, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
-        "to_gif",
-        lang == "tr" ? "GIF'e Dönüştür" : "Convert to GIF",
-        lang == "tr" ? "İki geçişli renk paleti analiziyle videonun ilk 15 saniyesini yüksek kaliteli animasyonlu GIF'e dönüştürür." : "Converts the first 15 seconds of video to a high-quality animated GIF using two-pass palette optimization.",
+        "to_av1",
+        lang == "tr" ? "AV1'e Dönüştür" : "Convert to AV1",
+        lang == "tr" ? "Modern açık AV1 formatına dönüştürür. Donanım hızlandırma veya SVT-AV1 ile yüksek sıkıştırma verimliliği sağlar." : "Converts to modern open AV1 video format with high compression efficiency via hardware acceleration or SVT-AV1.",
         "konvert-video",
         actionsWidget
     ), 2, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
-        "extract_frames",
-        lang == "tr" ? "Kareleri Klasöre Aktar" : "Export Frames to Folder",
-        lang == "tr" ? "Videonun her video karesini PNG resimleri olarak yeni bir klasöre döker." : "Exports all video frames as individual PNG images to a dedicated folder.",
-        "konvert-folder",
+        "to_gif",
+        lang == "tr" ? "GIF'e Dönüştür" : "Convert to GIF",
+        lang == "tr" ? "İki geçişli renk paleti analiziyle videonun ilk 15 saniyesini yüksek kaliteli animasyonlu GIF'e dönüştürür." : "Converts the first 15 seconds of video to a high-quality animated GIF using two-pass palette optimization.",
+        "konvert-video",
         actionsWidget
     ), 3, 0);
 
@@ -558,6 +558,14 @@ QWidget* MainWindow::createVideosTab() {
         "konvert-mail",
         actionsWidget
     ), 4, 1);
+
+    actionsGrid->addWidget(createActionCheckBox(
+        "extract_frames",
+        lang == "tr" ? "Kareleri Klasöre Aktar" : "Export Frames to Folder",
+        lang == "tr" ? "Videonun her video karesini PNG resimleri olarak yeni bir klasöre döker." : "Exports all video frames as individual PNG images to a dedicated folder.",
+        "konvert-folder",
+        actionsWidget
+    ), 5, 0, 1, 2);
 
     layout->addWidget(createCard(trKey("card_actions", lang), actionsWidget));
 
@@ -607,6 +615,33 @@ QWidget* MainWindow::createVideosTab() {
     });
     presetRow->addWidget(m_videoPresetCombo);
     compLayout->addLayout(presetRow);
+
+    auto *hwaccelRow = new QHBoxLayout();
+    auto *hwaccelLabel = new QLabel(trKey("lbl_video_hwaccel", lang), compWidget);
+    hwaccelLabel->setToolTip(lang == "tr" ? "GPU donanım hızlandırma kodlayıcısı (NVIDIA NVENC veya Intel/AMD VA-API). Desteklenmeyen sistemlerde otomatik olarak CPU'ya geri döner." : "GPU hardware acceleration encoder (NVIDIA NVENC or Intel/AMD VA-API). Automatically falls back to CPU if unsupported.");
+    hwaccelRow->addWidget(hwaccelLabel);
+
+    m_videoHwaccelCombo = new QComboBox(compWidget);
+    hwaccelLabel->setBuddy(m_videoHwaccelCombo);
+    m_videoHwaccelCombo->addItem(trKey("hwaccel_auto", lang), "auto");
+    m_videoHwaccelCombo->addItem("NVIDIA NVENC", "nvenc");
+    m_videoHwaccelCombo->addItem("VA-API (Intel / AMD)", "vaapi");
+    m_videoHwaccelCombo->addItem(trKey("hwaccel_none", lang), "none");
+
+    int hwIdx = 0;
+    for (int i = 0; i < m_videoHwaccelCombo->count(); ++i) {
+        if (m_videoHwaccelCombo->itemData(i).toString() == m_config.videoHwaccel) {
+            hwIdx = i;
+            break;
+        }
+    }
+    m_videoHwaccelCombo->setCurrentIndex(hwIdx);
+    connect(m_videoHwaccelCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
+        m_config.videoHwaccel = m_videoHwaccelCombo->itemData(idx).toString();
+        saveSettings();
+    });
+    hwaccelRow->addWidget(m_videoHwaccelCombo);
+    compLayout->addLayout(hwaccelRow);
 
     m_videoLosslessCheck = new QCheckBox(trKey("lbl_video_lossless", lang), compWidget);
     m_videoLosslessCheck->setToolTip(lang == "tr" ? "CRF 0 ile x264 RGB kayıpsız kodlama yapar." : "Encodes using x264 RGB with CRF 0 without lossy compression artifacts.");
@@ -739,6 +774,20 @@ QWidget* MainWindow::createDocumentsTab() {
         lang == "tr" ? "PDF Sayfalarını PNG'ye Çıkar" : "Extract PDF Pages to PNG",
         lang == "tr" ? "PDF belgesinin her bir sayfasını yüksek çözünürlüklü PNG resimleri olarak ayrı ayrı klasöre aktarır." : "Renders all pages of a PDF document into high-resolution PNG image files.",
         "konvert-image",
+        actionsWidget
+    ));
+    actionsLayout->addWidget(createActionCheckBox(
+        "docx_to_pdf",
+        lang == "tr" ? "DOCX'i PDF'e Dönüştür" : "Convert DOCX to PDF",
+        lang == "tr" ? "Microsoft Word (.docx) belgelerini LibreOffice motoruyla PDF belgesine dönüştürür." : "Converts Microsoft Word (.docx) documents to PDF using LibreOffice.",
+        "konvert-document",
+        actionsWidget
+    ));
+    actionsLayout->addWidget(createActionCheckBox(
+        "docx_to_txt",
+        lang == "tr" ? "DOCX'i Metne Dönüştür" : "Convert DOCX to Text",
+        lang == "tr" ? "DOCX belgesinin metin içeriğini ayrıştırarak .txt dosyası olarak kaydeder." : "Extracts text content from .docx documents into a standard text file.",
+        "konvert-document",
         actionsWidget
     ));
 
@@ -1183,7 +1232,7 @@ QWidget* MainWindow::createAboutTab() {
     auto *lblAuthTitle = new QLabel(QString("<b>%1</b>").arg(lang == "tr" ? "Geliştirici" : "Author"), authorBox);
     auto *lblAuthDetail = new QLabel(
         QString(
-            "<b>enesehs</b> &lt;<a href='mailto:enesehs@protonmail.com'>enesehs@protonmail.com</a>&gt;<br>"
+            "<b>enesehs</b> &lt;<a href='https://enesehs.dev'>https://enesehs.dev</a>&gt;<br>"
             "<span style='font-size: 12px; opacity: 0.8;'>%1</span>"
         ).arg(lang == "tr" ? "Çekirdek mimari, Rust dönüştürme motoru ve Qt6 arayüz tasarımı." : "Core architecture, Rust conversion engine, and Qt6 GUI design."),
         authorBox
@@ -1216,10 +1265,12 @@ QWidget* MainWindow::createAboutTab() {
 
     addCompRow(0, "Rust & Rayon", lang == "tr" ? "Paralel çok çekirdekli sistem motoru ve güvenli bellek yönetimi." : "Multi-threaded parallel systems engine and memory safety.");
     addCompRow(1, "Qt 6 Widgets", lang == "tr" ? "KDE Breeze ile kusursuz uyumlu yerel grafik kullanıcı arayüzü." : "Native KDE Breeze compliant graphical user interface.");
-    addCompRow(2, "FFmpeg", lang == "tr" ? "Gelişmiş video ve ses kodlama altyapısı, dalga formu üretimi." : "High performance video & audio transcoding framework.");
-    addCompRow(3, "libjxl (JPEG XL)", lang == "tr" ? "Yeni nesil yüksek verimli görsel sıkıştırma ve kod çözücü." : "Next-gen high efficiency image coding and compression.");
-    addCompRow(4, "Poppler & Ghostscript", lang == "tr" ? "PDF sayfa ayrıştırma, metin çıkarma ve belge sıkıştırma." : "PDF page rasterization, text extraction, and document compression.");
-    addCompRow(5, "ImageMagick", lang == "tr" ? "Görsel format dönüşümleri, PDF birleştirme ve metadata temizleme." : "Image manipulation, PDF merging, and metadata stripping.");
+    addCompRow(2, "zbus & D-Bus", lang == "tr" ? "KDE Plasma 6 JobView (kuiserver) yerel ilerleme ve bildirim entegrasyonu." : "Native KDE Plasma 6 JobView (kuiserver) progress and notification integration.");
+    addCompRow(3, "FFmpeg", lang == "tr" ? "Gelişmiş video ve ses kodlama altyapısı, dalga formu üretimi." : "High performance video & audio transcoding framework.");
+    addCompRow(4, "Potrace & Oxipng", lang == "tr" ? "Vektörleştirme (bitmap'ten SVG'ye) ve kayıpsız PNG optimizasyonu." : "Vector tracing (bitmap to SVG) and lossless PNG optimization.");
+    addCompRow(5, "libjxl (JPEG XL)", lang == "tr" ? "Yeni nesil yüksek verimli görsel sıkıştırma ve kod çözücü." : "Next-gen high efficiency image coding and compression.");
+    addCompRow(6, "Poppler & Ghostscript", lang == "tr" ? "PDF sayfa ayrıştırma, metin çıkarma ve belge sıkıştırma." : "PDF page rasterization, text extraction, and document compression.");
+    addCompRow(7, "ImageMagick", lang == "tr" ? "Görsel format dönüşümleri, PDF birleştirme ve metadata temizleme." : "Image manipulation, PDF merging, and metadata stripping.");
 
     compLayout->addLayout(compGrid);
     compLayout->addStretch();
@@ -1477,7 +1528,7 @@ QWidget* MainWindow::createSettingsTab() {
     connect(checkDepsBtn, &QPushButton::clicked, this, [this]() {
         const QString lang = currentLanguage();
         QProcess proc;
-        proc.start(findKonvertBinary(), {"--check-deps"});
+        proc.start(findKonvertBinary(), {"--doctor"});
         if (proc.waitForFinished(5000)) {
             QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
             if (out.isEmpty()) {
@@ -1614,6 +1665,14 @@ void MainWindow::reloadConfigToUi() {
         if (idx >= 0) m_videoPresetCombo->setCurrentIndex(idx);
     }
     if (m_videoLosslessCheck) m_videoLosslessCheck->setChecked(m_config.videoLossless);
+    if (m_videoHwaccelCombo) {
+        for (int i = 0; i < m_videoHwaccelCombo->count(); ++i) {
+            if (m_videoHwaccelCombo->itemData(i).toString() == m_config.videoHwaccel) {
+                m_videoHwaccelCombo->setCurrentIndex(i);
+                break;
+            }
+        }
+    }
     if (m_audioBitrateCombo) {
         int idx = m_audioBitrateCombo->findText(m_config.audioBitrate);
         if (idx >= 0) m_audioBitrateCombo->setCurrentIndex(idx);

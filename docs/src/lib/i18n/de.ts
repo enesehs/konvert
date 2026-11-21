@@ -4,7 +4,7 @@ export const de: Translations = {
   meta: {
     title: "Konvert — Nativer Rechtsklick-Dateikonverter für Linux",
     description:
-      "Keine Terminal-Parameter mehr auswendig lernen. Konvertieren Sie 50+ Formate offline direkt im Kontextmenü von Dolphin, Nautilus, Nemo und Thunar mit 0 MB RAM im Leerlauf.",
+      "Keine Terminal-Parameter mehr auswendig lernen. Konvertieren Sie 35+ Formate offline direkt im Kontextmenü von Dolphin, Nautilus, Nemo und Thunar.",
     keywords: [
       "Konvert",
       "Linux",
@@ -36,7 +36,7 @@ export const de: Translations = {
     displayTitle1: "Rechtsklick.",
     displayTitle2: "Konvertieren.",
     valueProposition:
-      "Hören Sie auf, Terminalbefehle zu memorieren oder Dateien ins Internet hochzuladen. Konvertieren Sie über 50 Formate offline direkt in Dolphin, Nautilus, Nemo und Thunar.",
+      "Hören Sie auf, Terminalbefehle zu memorieren oder Dateien ins Internet hochzuladen. Konvertieren Sie 35+ Formate offline direkt in Dolphin, Nautilus, Nemo und Thunar.",
     oneLinerLabel: "EINZEILIGE INSTALLATION",
     oneLinerCommand: "curl -fsSL https://enesehs.dev/konvert/install.sh | bash",
     copied: "Kopiert!",

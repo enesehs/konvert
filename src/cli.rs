@@ -88,6 +88,13 @@ pub struct Cli {
     )]
     pub preset: Option<String>,
 
+    /// Hardware acceleration mode for video encoding (auto, vaapi, nvenc, none, cpu)
+    #[arg(
+        long = "hwaccel",
+        value_parser = ["auto", "vaapi", "nvenc", "none", "cpu"]
+    )]
+    pub hwaccel: Option<String>,
+
     /// Audio bitrate value (e.g. 128k, 192k, 320k)
     #[arg(short = 'b', long = "bitrate", value_parser = parse_bitrate)]
     pub bitrate: Option<String>,
@@ -132,6 +139,10 @@ pub struct Cli {
     #[arg(long = "completions", value_name = "SHELL")]
     pub completions: Option<clap_complete::Shell>,
 
+    /// Run system diagnostic doctor and check external tool dependencies
+    #[arg(long = "doctor")]
+    pub doctor: bool,
+
     /// Check external tool dependencies (ffmpeg, ImageMagick, ghostscript, ...)
     #[arg(long = "check-deps")]
     pub check_deps: bool,
@@ -143,6 +154,18 @@ pub struct Cli {
     /// Open Qt6 Settings GUI
     #[arg(short = 's', long = "settings")]
     pub settings: bool,
+
+    /// Set a configuration value (e.g. image.quality=90, general.notification_enabled=false)
+    #[arg(long = "config-set", value_name = "KEY=VALUE")]
+    pub config_set: Option<String>,
+
+    /// Get a configuration value by key (e.g. image.quality)
+    #[arg(long = "config-get", value_name = "KEY")]
+    pub config_get: Option<String>,
+
+    /// Save configuration payload from JSON string or stdin ('-') and sync menus
+    #[arg(long = "save-config-json", value_name = "JSON")]
+    pub save_config_json: Option<String>,
 
     /// Re-synchronize right-click context menu according to config
     #[arg(long = "sync-menu")]

@@ -2,12 +2,14 @@
 
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub struct Dependency {
     pub tool: &'static str,
     pub required: bool,
     pub purpose: &'static str,
 }
 
+#[allow(dead_code)]
 pub const DEPENDENCIES: &[Dependency] = &[
     Dependency {
         tool: "ffmpeg",
@@ -69,6 +71,7 @@ pub fn imagemagick_available() -> bool {
     command_exists("magick") || command_exists("convert")
 }
 
+#[allow(dead_code)]
 pub fn check() -> Vec<(String, bool, bool, String)> {
     DEPENDENCIES
         .iter()

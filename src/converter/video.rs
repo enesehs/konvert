@@ -1,61 +1,374 @@
 use anyhow::{Context, Result, bail};
 use std::fs;
+use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HwAccel {
+    Nvenc,
+    Vaapi,
+    #[default]
+    None,
+}
+
+static DETECTED_HWACCEL: std::sync::OnceLock<HwAccel> = std::sync::OnceLock::new();
+static DETECTED_AV1_NVENC: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+static DETECTED_AV1_VAAPI: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+
+pub fn probe_nvenc() -> bool {
+    let has_nvidia = Path::new("/dev/nvidia0").exists()
+        || Path::new("/dev/nvidiactl").exists()
+        || Path::new("/dev/nvhost-ctrl").exists();
+    if !has_nvidia {
+        return false;
+    }
+    let status = Command::new("ffmpeg")
+        .arg("-nostdin")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-f")
+        .arg("lavfi")
+        .arg("-i")
+        .arg("color=c=black:s=256x256:d=0.04")
+        .arg("-c:v")
+        .arg("h264_nvenc")
+        .arg("-f")
+        .arg("null")
+        .arg("-")
+        .status();
+    matches!(status, Ok(s) if s.success())
+}
+
+pub fn probe_av1_nvenc() -> bool {
+    *DETECTED_AV1_NVENC.get_or_init(|| {
+        if !probe_nvenc() {
+            return false;
+        }
+        let status = Command::new("ffmpeg")
+            .arg("-nostdin")
+            .arg("-loglevel")
+            .arg("error")
+            .arg("-f")
+            .arg("lavfi")
+            .arg("-i")
+            .arg("color=c=black:s=256x256:d=0.04")
+            .arg("-c:v")
+            .arg("av1_nvenc")
+            .arg("-f")
+            .arg("null")
+            .arg("-")
+            .status();
+        matches!(status, Ok(s) if s.success())
+    })
+}
+
+pub fn probe_vaapi() -> bool {
+    let render_node = if Path::new("/dev/dri/renderD128").exists() {
+        "/dev/dri/renderD128"
+    } else if Path::new("/dev/dri/renderD129").exists() {
+        "/dev/dri/renderD129"
+    } else {
+        return false;
+    };
+    let status = Command::new("ffmpeg")
+        .arg("-nostdin")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-vaapi_device")
+        .arg(render_node)
+        .arg("-f")
+        .arg("lavfi")
+        .arg("-i")
+        .arg("color=c=black:s=256x256:d=0.04")
+        .arg("-vf")
+        .arg("format=nv12,hwupload")
+        .arg("-c:v")
+        .arg("h264_vaapi")
+        .arg("-f")
+        .arg("null")
+        .arg("-")
+        .status();
+    matches!(status, Ok(s) if s.success())
+}
+
+pub fn probe_av1_vaapi() -> bool {
+    *DETECTED_AV1_VAAPI.get_or_init(|| {
+        let render_node = if Path::new("/dev/dri/renderD128").exists() {
+            "/dev/dri/renderD128"
+        } else if Path::new("/dev/dri/renderD129").exists() {
+            "/dev/dri/renderD129"
+        } else {
+            return false;
+        };
+        let status = Command::new("ffmpeg")
+            .arg("-nostdin")
+            .arg("-loglevel")
+            .arg("error")
+            .arg("-vaapi_device")
+            .arg(render_node)
+            .arg("-f")
+            .arg("lavfi")
+            .arg("-i")
+            .arg("color=c=black:s=256x256:d=0.04")
+            .arg("-vf")
+            .arg("format=nv12,hwupload")
+            .arg("-c:v")
+            .arg("av1_vaapi")
+            .arg("-f")
+            .arg("null")
+            .arg("-")
+            .status();
+        matches!(status, Ok(s) if s.success())
+    })
+}
+
+pub fn detect_hardware_acceleration() -> HwAccel {
+    *DETECTED_HWACCEL.get_or_init(|| {
+        if probe_nvenc() {
+            crate::logger::info("Hardware acceleration detected: NVIDIA NVENC");
+            HwAccel::Nvenc
+        } else if probe_vaapi() {
+            crate::logger::info("Hardware acceleration detected: VA-API");
+            HwAccel::Vaapi
+        } else {
+            crate::logger::info("No hardware acceleration detected; using CPU software encoders");
+            HwAccel::None
+        }
+    })
+}
+
+pub fn resolve_hwaccel(mode_opt: Option<&str>) -> HwAccel {
+    match mode_opt.map(|s| s.trim().to_lowercase()).as_deref() {
+        Some("nvenc") => {
+            if probe_nvenc() {
+                HwAccel::Nvenc
+            } else {
+                crate::logger::warn(
+                    "NVENC requested but not supported on this device, falling back to CPU",
+                );
+                HwAccel::None
+            }
+        }
+        Some("vaapi") => {
+            if probe_vaapi() {
+                HwAccel::Vaapi
+            } else {
+                crate::logger::warn(
+                    "VA-API requested but not supported on this device, falling back to CPU",
+                );
+                HwAccel::None
+            }
+        }
+        Some("none") | Some("cpu") => HwAccel::None,
+        Some("auto") | None | Some("") => detect_hardware_acceleration(),
+        _ => detect_hardware_acceleration(),
+    }
+}
 
 pub fn is_supported_video_target(target: &str) -> bool {
     matches!(
         target.to_lowercase().as_str(),
-        "mp4" | "mkv" | "webm" | "avi" | "mov" | "flv"
+        "mp4" | "mkv" | "webm" | "avi" | "mov" | "flv" | "av1"
     )
 }
 
-pub fn convert_video(
+pub type VideoProgressFn<'a> = &'a mut (dyn FnMut(i32, &str) + 'a);
+
+pub fn run_ffmpeg_command<F>(
+    mut cmd: Command,
+    duration_secs: Option<f64>,
+    on_progress: Option<&mut F>,
+) -> Result<()>
+where
+    F: FnMut(i32, &str) + ?Sized,
+{
+    if let Some(cb) = on_progress {
+        cmd.arg("-nostdin")
+            .arg("-progress")
+            .arg("pipe:1")
+            .arg("-nostats");
+        cmd.stdout(std::process::Stdio::piped());
+        cmd.stderr(std::process::Stdio::null());
+
+        let mut child = cmd.spawn().with_context(|| "ffmpeg çalıştırılamadı")?;
+
+        if let Some(stdout) = child.stdout.take() {
+            let reader = std::io::BufReader::new(stdout);
+            let mut last_emit = std::time::Instant::now();
+            let mut current_speed = 1.0f64;
+
+            for line in reader.lines().map_while(Result::ok) {
+                if let Some((k, v)) = line.split_once('=') {
+                    let k = k.trim();
+                    let v = v.trim();
+                    if k == "speed"
+                        && let Some(s) = v.strip_suffix('x')
+                        && let Ok(sp) = s.parse::<f64>()
+                        && sp > 0.05
+                    {
+                        current_speed = sp;
+                    } else if (k == "out_time_us" || k == "out_time_ms")
+                        && let Ok(us) = v.parse::<i64>()
+                    {
+                        let cur_secs = (us as f64) / 1_000_000.0;
+                        if let Some(total_dur) = duration_secs
+                            && total_dur > 0.0
+                        {
+                            let pct = ((cur_secs / total_dur) * 100.0).clamp(0.0, 99.0) as i32;
+                            let remaining = ((total_dur - cur_secs) / current_speed).max(0.0);
+                            if last_emit.elapsed().as_millis() >= 250 {
+                                let rem_secs = remaining.round() as u64;
+                                let eta_str = if rem_secs < 60 {
+                                    format!(" (ETA: {}s)", rem_secs)
+                                } else {
+                                    format!(" (ETA: {}m {}s)", rem_secs / 60, rem_secs % 60)
+                                };
+                                let detail = format!("{}%{}", pct, eta_str);
+                                cb(pct, &detail);
+                                last_emit = std::time::Instant::now();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let status = child.wait().with_context(|| "ffmpeg işlemi beklenemedi")?;
+        if !status.success() {
+            bail!("{}", crate::i18n::t("err_ffmpeg_failed"));
+        }
+    } else {
+        cmd.arg("-nostdin");
+        let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı")?;
+        if !status.success() {
+            bail!("{}", crate::i18n::t("err_ffmpeg_failed"));
+        }
+    }
+    Ok(())
+}
+
+fn build_convert_command(
     input_path: &Path,
-    target_ext: &str,
+    output_path: &Path,
+    target: &str,
     crf: Option<u8>,
     preset: Option<&str>,
     lossless: bool,
-    custom_output_dir: Option<&Path>,
-) -> Result<PathBuf> {
-    let target = target_ext.to_lowercase();
-    let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
-        input_path,
-        &target,
-        custom_output_dir,
-    ));
-    crate::converter::ensure_parent_dir(&output_path)?;
-    let pending = crate::converter::PendingOutput::new(&output_path);
-
+    hwaccel: HwAccel,
+) -> Command {
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-nostdin")
-        .arg("-y")
-        .arg("-i")
+    cmd.arg("-y");
+
+    let vaapi_node = if Path::new("/dev/dri/renderD128").exists() {
+        "/dev/dri/renderD128"
+    } else {
+        "/dev/dri/renderD129"
+    };
+
+    if hwaccel == HwAccel::Vaapi {
+        cmd.arg("-vaapi_device").arg(vaapi_node);
+    }
+
+    cmd.arg("-i")
         .arg(input_path)
         .arg("-threads")
         .arg(crate::converter::ffmpeg_threads().to_string());
 
     if lossless {
-        match target.as_str() {
+        match target {
             "webm" => {
                 cmd.arg("-c:v").arg("libvpx-vp9").arg("-lossless").arg("1");
             }
-            _ => {
-                cmd.arg("-c:v").arg("libx264").arg("-crf").arg("0");
+            "av1" => {
+                cmd.arg("-c:v")
+                    .arg("libsvtav1")
+                    .arg("-crf")
+                    .arg("0")
+                    .arg("-c:a")
+                    .arg("flac");
             }
+            _ => match hwaccel {
+                HwAccel::Nvenc => {
+                    cmd.arg("-c:v")
+                        .arg("h264_nvenc")
+                        .arg("-preset")
+                        .arg("p7")
+                        .arg("-tune")
+                        .arg("lossless")
+                        .arg("-c:a")
+                        .arg("aac");
+                }
+                _ => {
+                    cmd.arg("-c:v").arg("libx264").arg("-crf").arg("0");
+                }
+            },
         }
     } else {
-        match target.as_str() {
+        match target {
+            "av1" => {
+                let crf_val = crf.unwrap_or(28);
+                match hwaccel {
+                    HwAccel::Nvenc if probe_av1_nvenc() => {
+                        cmd.arg("-c:v")
+                            .arg("av1_nvenc")
+                            .arg("-preset")
+                            .arg("p4")
+                            .arg("-cq:v")
+                            .arg(crf_val.to_string())
+                            .arg("-pix_fmt")
+                            .arg("yuv420p")
+                            .arg("-c:a")
+                            .arg("aac");
+                    }
+                    HwAccel::Vaapi if probe_av1_vaapi() => {
+                        cmd.arg("-vf")
+                            .arg("format=nv12,hwupload")
+                            .arg("-c:v")
+                            .arg("av1_vaapi")
+                            .arg("-qp")
+                            .arg(crf_val.to_string())
+                            .arg("-c:a")
+                            .arg("aac");
+                    }
+                    _ => {
+                        cmd.arg("-c:v")
+                            .arg("libsvtav1")
+                            .arg("-crf")
+                            .arg(crf_val.to_string())
+                            .arg("-preset")
+                            .arg(preset.unwrap_or("6"))
+                            .arg("-pix_fmt")
+                            .arg("yuv420p")
+                            .arg("-c:a")
+                            .arg("aac");
+                    }
+                }
+            }
             "webm" => {
                 let crf_val = crf.unwrap_or(30);
-                cmd.arg("-c:v")
-                    .arg("libvpx-vp9")
-                    .arg("-b:v")
-                    .arg("0")
-                    .arg("-crf")
-                    .arg(crf_val.to_string())
-                    .arg("-c:a")
-                    .arg("libopus");
+                match hwaccel {
+                    HwAccel::Vaapi => {
+                        cmd.arg("-vf")
+                            .arg("format=nv12,hwupload")
+                            .arg("-c:v")
+                            .arg("vp9_vaapi")
+                            .arg("-qp")
+                            .arg(crf_val.to_string())
+                            .arg("-c:a")
+                            .arg("libopus");
+                    }
+                    _ => {
+                        cmd.arg("-c:v")
+                            .arg("libvpx-vp9")
+                            .arg("-b:v")
+                            .arg("0")
+                            .arg("-crf")
+                            .arg(crf_val.to_string())
+                            .arg("-c:a")
+                            .arg("libopus");
+                    }
+                }
             }
             "avi" => {
                 cmd.arg("-c:v")
@@ -75,37 +388,156 @@ pub fn convert_video(
             }
             _ => {
                 let crf_val = crf.unwrap_or(23);
-                cmd.arg("-c:v")
-                    .arg("libx264")
-                    .arg("-crf")
-                    .arg(crf_val.to_string())
-                    .arg("-c:a")
-                    .arg("aac");
-                if let Some(p) = preset {
-                    cmd.arg("-preset").arg(p);
+                match hwaccel {
+                    HwAccel::Nvenc => {
+                        cmd.arg("-c:v")
+                            .arg("h264_nvenc")
+                            .arg("-preset")
+                            .arg("p4")
+                            .arg("-cq:v")
+                            .arg(crf_val.to_string())
+                            .arg("-pix_fmt")
+                            .arg("yuv420p")
+                            .arg("-c:a")
+                            .arg("aac");
+                    }
+                    HwAccel::Vaapi => {
+                        cmd.arg("-vf")
+                            .arg("format=nv12,hwupload")
+                            .arg("-c:v")
+                            .arg("h264_vaapi")
+                            .arg("-qp")
+                            .arg(crf_val.to_string())
+                            .arg("-c:a")
+                            .arg("aac");
+                    }
+                    HwAccel::None => {
+                        cmd.arg("-c:v")
+                            .arg("libx264")
+                            .arg("-crf")
+                            .arg(crf_val.to_string())
+                            .arg("-pix_fmt")
+                            .arg("yuv420p")
+                            .arg("-c:a")
+                            .arg("aac");
+                        if let Some(p) = preset {
+                            cmd.arg("-preset").arg(p);
+                        }
+                    }
                 }
             }
         }
     }
 
-    cmd.arg(pending.path());
+    cmd.arg(output_path);
+    cmd
+}
 
-    let status = cmd.status().with_context(|| "ffmpeg çalıştırılamadı")?;
-    if !status.success() {
-        bail!(
-            "Video dönüştürme işlemi başarısız oldu: {}",
-            output_path.display()
+#[allow(dead_code)]
+pub fn convert_video(
+    input_path: &Path,
+    target_ext: &str,
+    crf: Option<u8>,
+    preset: Option<&str>,
+    lossless: bool,
+    custom_output_dir: Option<&Path>,
+) -> Result<PathBuf> {
+    convert_video_with_progress(
+        input_path,
+        target_ext,
+        crf,
+        preset,
+        lossless,
+        None,
+        custom_output_dir,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn convert_video_with_progress(
+    input_path: &Path,
+    target_ext: &str,
+    crf: Option<u8>,
+    preset: Option<&str>,
+    lossless: bool,
+    hwaccel_mode: Option<&str>,
+    custom_output_dir: Option<&Path>,
+    mut on_progress: Option<VideoProgressFn<'_>>,
+) -> Result<PathBuf> {
+    let target = target_ext.to_lowercase();
+    let output_path = if target == "av1" {
+        crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
+            input_path,
+            "av1",
+            "mp4",
+            custom_output_dir,
+        ))
+    } else {
+        crate::converter::claim_output_path(crate::converter::determine_output_path(
+            input_path,
+            &target,
+            custom_output_dir,
+        ))
+    };
+    crate::converter::ensure_parent_dir(&output_path)?;
+    let pending = crate::converter::PendingOutput::new(&output_path);
+
+    let duration = if on_progress.is_some() {
+        get_video_duration(input_path).ok()
+    } else {
+        None
+    };
+
+    let effective_hwaccel = resolve_hwaccel(hwaccel_mode);
+    let cmd = build_convert_command(
+        input_path,
+        pending.path(),
+        &target,
+        crf,
+        preset,
+        lossless,
+        effective_hwaccel,
+    );
+
+    let res = run_ffmpeg_command(cmd, duration, on_progress.as_deref_mut());
+    if res.is_err() && effective_hwaccel != HwAccel::None {
+        crate::logger::warn(
+            "Hardware acceleration conversion failed, falling back to CPU encoder...",
         );
+        let fallback_cmd = build_convert_command(
+            input_path,
+            pending.path(),
+            &target,
+            crf,
+            preset,
+            lossless,
+            HwAccel::None,
+        );
+        run_ffmpeg_command(fallback_cmd, duration, on_progress)?;
+    } else {
+        res?;
     }
 
     pending.commit()
 }
 
+#[allow(dead_code)]
 pub fn convert_to_gif(
     input_path: &Path,
     custom_output_dir: Option<&Path>,
     duration_secs: f64,
     fps: u32,
+) -> Result<PathBuf> {
+    convert_to_gif_with_progress(input_path, custom_output_dir, duration_secs, fps, None)
+}
+
+pub fn convert_to_gif_with_progress(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+    duration_secs: f64,
+    fps: u32,
+    on_progress: Option<VideoProgressFn<'_>>,
 ) -> Result<PathBuf> {
     let output_path = crate::converter::claim_output_path(crate::converter::determine_output_path(
         input_path,
@@ -116,7 +548,7 @@ pub fn convert_to_gif(
     let pending = crate::converter::PendingOutput::new(&output_path);
 
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-nostdin").arg("-y");
+    cmd.arg("-y");
     if duration_secs > 0.0 {
         // `--gif-duration 0` verilirse video tamamı dönüştürülür.
         cmd.arg("-t").arg(duration_secs.to_string());
@@ -139,13 +571,13 @@ pub fn convert_to_gif(
         );
     }
 
-    let status = cmd
-        .status()
-        .with_context(|| "ffmpeg çalıştırılamadı (GIF)")?;
+    let total_dur = if duration_secs > 0.0 {
+        Some(duration_secs)
+    } else {
+        get_video_duration(input_path).ok()
+    };
 
-    if !status.success() {
-        bail!("GIF dönüştürme işlemi başarısız oldu");
-    }
+    run_ffmpeg_command(cmd, total_dur, on_progress)?;
 
     pending.commit()
 }
@@ -177,7 +609,7 @@ pub fn extract_frames(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
         .with_context(|| "ffmpeg çalıştırılamadı (kare çıkarma)")?;
 
     if !status.success() {
-        bail!("Video kareleri PNG olarak çıkarılamadı");
+        bail!("{}", crate::i18n::t("err_extract_frames"));
     }
 
     Ok(frames_dir)
@@ -187,7 +619,17 @@ pub fn extract_audio(input_path: &Path, custom_output_dir: Option<&Path>) -> Res
     crate::converter::audio::convert_audio(input_path, "mp3", Some("256k"), custom_output_dir)
 }
 
+#[allow(dead_code)]
 pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
+    compress_video_with_progress(input_path, custom_output_dir, None, None)
+}
+
+pub fn compress_video_with_progress(
+    input_path: &Path,
+    custom_output_dir: Option<&Path>,
+    hwaccel_mode: Option<&str>,
+    mut on_progress: Option<VideoProgressFn<'_>>,
+) -> Result<PathBuf> {
     let output_path =
         crate::converter::claim_output_path(crate::converter::determine_suffixed_output_path(
             input_path,
@@ -198,29 +640,88 @@ pub fn compress_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Re
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
-    let status = Command::new("ffmpeg")
-        .arg("-nostdin")
-        .arg("-y")
-        .arg("-i")
-        .arg(input_path)
-        .arg("-threads")
-        .arg(crate::converter::ffmpeg_threads().to_string())
-        .arg("-c:v")
-        .arg("libx264")
-        .arg("-crf")
-        .arg("28")
-        .arg("-preset")
-        .arg("slow")
-        .arg("-c:a")
-        .arg("aac")
-        .arg("-b:a")
-        .arg("128k")
-        .arg(pending.path())
-        .status()
-        .with_context(|| "ffmpeg çalıştırılamadı")?;
+    let duration = if on_progress.is_some() {
+        get_video_duration(input_path).ok()
+    } else {
+        None
+    };
 
-    if !status.success() {
-        bail!("Video sıkıştırma başarısız oldu");
+    let effective_hwaccel = resolve_hwaccel(hwaccel_mode);
+
+    let build_compress_cmd = |hw: HwAccel| {
+        let mut cmd = Command::new("ffmpeg");
+        cmd.arg("-y");
+        let vaapi_node = if Path::new("/dev/dri/renderD128").exists() {
+            "/dev/dri/renderD128"
+        } else {
+            "/dev/dri/renderD129"
+        };
+        if hw == HwAccel::Vaapi {
+            cmd.arg("-vaapi_device").arg(vaapi_node);
+        }
+        cmd.arg("-i")
+            .arg(input_path)
+            .arg("-threads")
+            .arg(crate::converter::ffmpeg_threads().to_string());
+
+        match hw {
+            HwAccel::Nvenc => {
+                cmd.arg("-c:v")
+                    .arg("h264_nvenc")
+                    .arg("-preset")
+                    .arg("p4")
+                    .arg("-cq:v")
+                    .arg("28")
+                    .arg("-pix_fmt")
+                    .arg("yuv420p")
+                    .arg("-c:a")
+                    .arg("aac")
+                    .arg("-b:a")
+                    .arg("128k");
+            }
+            HwAccel::Vaapi => {
+                cmd.arg("-vf")
+                    .arg("format=nv12,hwupload")
+                    .arg("-c:v")
+                    .arg("h264_vaapi")
+                    .arg("-qp")
+                    .arg("28")
+                    .arg("-c:a")
+                    .arg("aac")
+                    .arg("-b:a")
+                    .arg("128k");
+            }
+            HwAccel::None => {
+                cmd.arg("-c:v")
+                    .arg("libx264")
+                    .arg("-crf")
+                    .arg("28")
+                    .arg("-preset")
+                    .arg("slow")
+                    .arg("-pix_fmt")
+                    .arg("yuv420p")
+                    .arg("-c:a")
+                    .arg("aac")
+                    .arg("-b:a")
+                    .arg("128k");
+            }
+        }
+        cmd.arg(pending.path());
+        cmd
+    };
+
+    let res = run_ffmpeg_command(
+        build_compress_cmd(effective_hwaccel),
+        duration,
+        on_progress.as_deref_mut(),
+    );
+    if res.is_err() && effective_hwaccel != HwAccel::None {
+        crate::logger::warn(
+            "Hardware accelerated compression failed, falling back to CPU encoder...",
+        );
+        run_ffmpeg_command(build_compress_cmd(HwAccel::None), duration, on_progress)?;
+    } else {
+        res?;
     }
 
     pending.commit()
@@ -261,7 +762,7 @@ pub fn strip_video_metadata(
         .with_context(|| "ffmpeg çalıştırılamadı (video metadata temizleme)")?;
 
     if !status.success() {
-        bail!("Video metadata temizleme başarısız oldu");
+        bail!("{}", crate::i18n::t("err_video_strip_metadata"));
     }
 
     pending.commit()
@@ -280,7 +781,7 @@ pub fn get_video_duration(input_path: &Path) -> Result<f64> {
         .with_context(|| "ffprobe çalıştırılamadı")?;
 
     if !output.status.success() {
-        bail!("Video süresi okunamadı: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_video_duration"), input_path.display());
     }
 
     let s = String::from_utf8_lossy(&output.stdout);
@@ -289,7 +790,7 @@ pub fn get_video_duration(input_path: &Path) -> Result<f64> {
         .parse()
         .with_context(|| "Video süresi çözümlenemedi")?;
     if duration <= 0.0 {
-        bail!("Geçersiz video süresi: {}", duration);
+        bail!("{}: {}", crate::i18n::t("err_invalid_duration"), duration);
     }
     Ok(duration)
 }
@@ -299,10 +800,10 @@ pub fn calculate_video_bitrates(
     duration: f64,
 ) -> Result<(u32, u32, &'static str)> {
     if target_bytes == 0 {
-        bail!("Hedef dosya boyutu 0 olamaz");
+        bail!("{}", crate::i18n::t("err_target_size_zero"));
     }
     if duration <= 0.0 {
-        bail!("Geçersiz video süresi: {}", duration);
+        bail!("{}: {}", crate::i18n::t("err_invalid_duration"), duration);
     }
 
     let target_mb = (target_bytes as f64) / (1024.0 * 1024.0);
@@ -312,7 +813,8 @@ pub fn calculate_video_bitrates(
     // Minimum 114 kbps (50 video + 64 audio) gerekir, altı hedef boyutu garanti edemez
     if total_kbps < 114 {
         bail!(
-            "Video süresi ({:.0} sn) bu hedef boyut ({:.1} MB) için çok uzun; hedefe ulaşmak mümkün değil",
+            "{}: {:.0}s -> {:.1} MB",
+            crate::i18n::t("err_target_size_not_reached"),
             duration,
             target_mb
         );
@@ -349,60 +851,110 @@ fn build_target_size_command(
     output_path: &Path,
     video_kbps: u32,
     audio_kbps: u32,
+    hwaccel: HwAccel,
 ) -> Command {
     let mut cmd = Command::new("ffmpeg");
-    cmd.arg("-nostdin")
-        .arg("-y")
-        .arg("-i")
+    cmd.arg("-y");
+
+    let vaapi_node = if Path::new("/dev/dri/renderD128").exists() {
+        "/dev/dri/renderD128"
+    } else {
+        "/dev/dri/renderD129"
+    };
+
+    if hwaccel == HwAccel::Vaapi {
+        cmd.arg("-vaapi_device").arg(vaapi_node);
+    }
+
+    cmd.arg("-i")
         .arg(input_path)
         .arg("-threads")
-        .arg(crate::converter::ffmpeg_threads().to_string())
-        .arg("-c:v")
-        .arg("libx264")
-        .arg("-b:v")
-        .arg(format!("{}k", video_kbps))
-        .arg("-maxrate")
-        .arg(format!("{}k", (video_kbps as f64 * 1.25) as u32))
-        .arg("-bufsize")
-        .arg(format!("{}k", video_kbps * 2))
-        .arg("-c:a")
+        .arg(crate::converter::ffmpeg_threads().to_string());
+
+    match hwaccel {
+        HwAccel::Nvenc => {
+            cmd.arg("-c:v")
+                .arg("h264_nvenc")
+                .arg("-preset")
+                .arg("p4")
+                .arg("-b:v")
+                .arg(format!("{}k", video_kbps))
+                .arg("-maxrate")
+                .arg(format!("{}k", (video_kbps as f64 * 1.25) as u32))
+                .arg("-bufsize")
+                .arg(format!("{}k", video_kbps * 2))
+                .arg("-pix_fmt")
+                .arg("yuv420p");
+        }
+        HwAccel::Vaapi => {
+            cmd.arg("-vf")
+                .arg("format=nv12,hwupload")
+                .arg("-c:v")
+                .arg("h264_vaapi")
+                .arg("-b:v")
+                .arg(format!("{}k", video_kbps))
+                .arg("-maxrate")
+                .arg(format!("{}k", (video_kbps as f64 * 1.25) as u32));
+        }
+        HwAccel::None => {
+            cmd.arg("-c:v")
+                .arg("libx264")
+                .arg("-b:v")
+                .arg(format!("{}k", video_kbps))
+                .arg("-maxrate")
+                .arg(format!("{}k", (video_kbps as f64 * 1.25) as u32))
+                .arg("-bufsize")
+                .arg(format!("{}k", video_kbps * 2))
+                .arg("-preset")
+                .arg("medium");
+
+            if video_kbps < 400 {
+                cmd.arg("-vf")
+                    .arg("scale='trunc(min(iw,854)/2)*2:trunc(min(ih,480)/2)*2'");
+            } else if video_kbps < 900 {
+                cmd.arg("-vf")
+                    .arg("scale='trunc(min(iw,1280)/2)*2:trunc(min(ih,720)/2)*2'");
+            }
+        }
+    }
+
+    cmd.arg("-c:a")
         .arg("aac")
         .arg("-b:a")
         .arg(format!("{}k", audio_kbps))
-        .arg("-preset")
-        .arg("medium");
-
-    // yuv420p için hem genişlik hem yükseklik çift sayı olmak zorundadır
-    if video_kbps < 400 {
-        cmd.arg("-vf")
-            .arg("scale='trunc(min(iw,854)/2)*2:trunc(min(ih,480)/2)*2'");
-    } else if video_kbps < 900 {
-        cmd.arg("-vf")
-            .arg("scale='trunc(min(iw,1280)/2)*2:trunc(min(ih,720)/2)*2'");
-    }
-
-    cmd.arg(output_path);
+        .arg(output_path);
     cmd
 }
 
+#[allow(dead_code)]
 pub fn compress_video_to_size(
     input_path: &Path,
     target_bytes: u64,
     custom_output_dir: Option<&Path>,
 ) -> Result<PathBuf> {
+    compress_video_to_size_with_progress(input_path, target_bytes, custom_output_dir, None, None)
+}
+
+pub fn compress_video_to_size_with_progress(
+    input_path: &Path,
+    target_bytes: u64,
+    custom_output_dir: Option<&Path>,
+    hwaccel_mode: Option<&str>,
+    mut on_progress: Option<VideoProgressFn<'_>>,
+) -> Result<PathBuf> {
     if target_bytes == 0 {
-        bail!("Hedef dosya boyutu 0 olamaz");
+        bail!("{}", crate::i18n::t("err_target_size_zero"));
     }
 
     let current_bytes = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     if current_bytes == 0 {
-        bail!("Dosya boş veya boyutu okunamadı: {}", input_path.display());
+        bail!("{}: {}", crate::i18n::t("err_file_empty_or_unreadable"), input_path.display());
     }
 
     if current_bytes <= target_bytes {
         bail!(
-            "Video zaten hedef boyuttan ({}) daha küçük ({}). Hedef boyut sıkıştırması için dosyanın {}'dan büyük olması gerekir.",
-            crate::history::format_bytes(target_bytes),
+            "{} ({} <= {}).",
+            crate::i18n::t("err_file_already_smaller"),
             crate::history::format_bytes(current_bytes),
             crate::history::format_bytes(target_bytes)
         );
@@ -422,6 +974,8 @@ pub fn compress_video_to_size(
     crate::converter::ensure_parent_dir(&output_path)?;
     let pending = crate::converter::PendingOutput::new(&output_path);
 
+    let effective_hwaccel = resolve_hwaccel(hwaccel_mode);
+
     // Tek geçiş hedefi aşabilir: çıktıyı ölç, aşarsa bit hızını düşürüp
     // en fazla 3 kez dene (hedef boyut sözleşmesi).
     let mut video_kbps = initial_video_kbps;
@@ -435,12 +989,30 @@ pub fn compress_video_to_size(
             }
         }
 
-        let mut cmd = build_target_size_command(input_path, pending.path(), video_kbps, audio_kbps);
-        let status = cmd
-            .status()
-            .with_context(|| "ffmpeg çalıştırılamadı (hedef boyut)")?;
-        if !status.success() {
-            bail!("Hedef boyut video sıkıştırma işlemi başarısız oldu");
+        let cmd = build_target_size_command(
+            input_path,
+            pending.path(),
+            video_kbps,
+            audio_kbps,
+            effective_hwaccel,
+        );
+        let prog_cb = on_progress.as_deref_mut();
+        let res = run_ffmpeg_command(cmd, Some(duration), prog_cb);
+        if res.is_err() && effective_hwaccel != HwAccel::None {
+            crate::logger::warn(
+                "Hardware acceleration failed for target size compression, falling back to CPU encoder...",
+            );
+            let fallback_cmd = build_target_size_command(
+                input_path,
+                pending.path(),
+                video_kbps,
+                audio_kbps,
+                HwAccel::None,
+            );
+            let prog_cb2 = on_progress.as_deref_mut();
+            run_ffmpeg_command(fallback_cmd, Some(duration), prog_cb2)?;
+        } else {
+            res?;
         }
 
         let Ok(meta) = fs::metadata(pending.path()) else {
@@ -456,12 +1028,13 @@ pub fn compress_video_to_size(
     drop(pending);
     if let Some(size) = best_size {
         bail!(
-            "Video hedef boyuta ({}) sıkıştırılamadı. Ulaşılan en küçük boyut: {}",
+            "{}: {} -> {}",
+            crate::i18n::t("err_target_size_not_reached"),
             crate::history::format_bytes(target_bytes),
             crate::history::format_bytes(size)
         );
     }
-    bail!("Video hedef boyuta sıkıştırılamadı: hiçbir kodlama denemesi sonuç üretmedi")
+    bail!("{}", crate::i18n::t("err_video_target_size_failed"))
 }
 
 pub fn web_optimize_video(input_path: &Path, custom_output_dir: Option<&Path>) -> Result<PathBuf> {
@@ -500,7 +1073,7 @@ pub fn web_optimize_video(input_path: &Path, custom_output_dir: Option<&Path>) -
         .status()
         .with_context(|| "ffmpeg çalıştırılamadı (web video optimizasyonu)")?;
     if !status.success() {
-        bail!("Web video optimizasyonu başarısız oldu");
+        bail!("{}", crate::i18n::t("err_web_video_opt"));
     }
 
     pending.commit()
@@ -540,8 +1113,15 @@ mod tests {
         assert!(is_supported_video_target("mp4"));
         assert!(is_supported_video_target("mkv"));
         assert!(is_supported_video_target("webm"));
+        assert!(is_supported_video_target("av1"));
         assert!(!is_supported_video_target("compress"));
         assert!(!is_supported_video_target("discord_8mb"));
+    }
+
+    #[test]
+    fn test_hwaccel_resolve() {
+        assert_eq!(resolve_hwaccel(Some("none")), HwAccel::None);
+        assert_eq!(resolve_hwaccel(Some("cpu")), HwAccel::None);
     }
 
     #[test]
@@ -554,7 +1134,7 @@ mod tests {
         let res = compress_video_to_size(&test_file, 8 * 1024 * 1024, None);
         assert!(res.is_err());
         let err_msg = res.unwrap_err().to_string();
-        assert!(err_msg.contains("zaten hedef boyuttan"));
+        assert!(err_msg.contains("zaten hedef boyuttan") || err_msg.contains("already smaller"));
 
         // 0 hedef boyutu -> hata vermeli
         assert!(compress_video_to_size(&test_file, 0, None).is_err());

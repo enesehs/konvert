@@ -11,7 +11,7 @@ BUILD_DIR="${ROOT_DIR}/build-deb-tmp"
 if [ -f "${ROOT_DIR}/VERSION" ]; then
     VERSION="$(tr -d 'v' < "${ROOT_DIR}/VERSION" | tr -d ' \n\r')"
 else
-    VERSION="0.3.0"
+    VERSION="0.4.0"
 fi
 PKG_NAME="konvert"
 ARCH="${DEB_ARCH:-$(dpkg --print-architecture 2>/dev/null || echo amd64)}"
@@ -71,6 +71,11 @@ chmod 644 "${BUILD_DIR}/usr/share/fish/vendor_completions.d/konvert.fish"
 # 3. Simgeleri yerleştir
 cp "${ROOT_DIR}/assets/logo.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/konvert.svg"
 cp "${ROOT_DIR}/assets/logo.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg"
+[ -f "${ROOT_DIR}/assets/icons/konvert-symbolic.svg" ] && cp "${ROOT_DIR}/assets/icons/konvert-symbolic.svg" "${BUILD_DIR}/usr/share/icons/hicolor/scalable/apps/konvert-symbolic.svg"
+
+# MIME veritabanı tanımı (örn. *.udf için application/x-udf)
+mkdir -p "${BUILD_DIR}/usr/share/mime/packages"
+[ -f "${ROOT_DIR}/packaging/konvert-mime.xml" ] && cp "${ROOT_DIR}/packaging/konvert-mime.xml" "${BUILD_DIR}/usr/share/mime/packages/konvert-mime.xml"
 
 mkdir -p "${BUILD_DIR}/usr/share/icons/hicolor/scalable/actions"
 if [ -d "${ROOT_DIR}/assets/icons" ]; then
@@ -102,8 +107,8 @@ Maintainer: enesehs <enesehs@protonmail.com>
 Depends: libc6, libqt6core6, libqt6gui6, libqt6widgets6, libqt6svg6, ffmpeg, imagemagick
 Recommends: poppler-utils, ghostscript, libreoffice, libjxl-tools
 Homepage: https://github.com/enesehs/konvert
-Description: High performance file converter and optimizer for Linux and KDE Plasma
- Konvert is an ultra-fast, offline, multi-threaded file conversion and optimization
+Description: Fast, lightweight file converter and optimizer for Linux and KDE Plasma
+ Konvert is a fast, lightweight, offline, multi-threaded file conversion and optimization
  utility with Dolphin context menu integration, smart sizing presets, and zero telemetry.
 EOF
 
@@ -113,6 +118,9 @@ cat << 'EOF' > "${BUILD_DIR}/DEBIAN/postinst"
 set -e
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
     gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+fi
+if command -v update-mime-database >/dev/null 2>&1; then
+    update-mime-database /usr/share/mime 2>/dev/null || true
 fi
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database -q /usr/share/applications 2>/dev/null || true
@@ -146,6 +154,6 @@ fi
 
 rm -rf "${BUILD_DIR}"
 
-echo "✨ Debian package created successfully:"
+echo "[OK] Debian package created successfully:"
 echo "   ${OUTPUT_DEB}"
 ls -lh "${OUTPUT_DEB}"

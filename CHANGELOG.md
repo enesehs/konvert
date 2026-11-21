@@ -5,6 +5,27 @@ All notable changes to **Konvert** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-11-19
+
+### Added
+- **Single Source of Truth (SSoT) Architecture:** Single-writer configuration persistence via `konvert --save-config-json -` and `#[serde(flatten)] extra` preserving custom profile sections (`[profiles.*]`) across updates.
+- **KDE Plasma Live D-Bus Progress & ETA Notifications:** In-place notification updates with dynamic `"x-kde-progress"` hints, real ETA reporting, and smooth visual feedback without flooding the notification center.
+- **True Potrace SVG Vector Tracing:** Integrated `magick -> flatten pbm:- | potrace -s - -o output.svg` vector pipeline with graceful bitmap embed fallback when Potrace is absent.
+- **System Diagnostic Doctor CLI (`konvert --doctor`):** Comprehensive system environment diagnostics verifying 10 external tool dependencies with one-click copyable package manager commands (Arch, Debian/Ubuntu, Fedora) and Qt6 GUI integration.
+- **KDE Plasma 6 Accent Color Integration:** Dynamic symbolic icon (`konvert-symbolic.svg`) bound to `.ColorScheme-Highlight` and native theme CSS classes.
+- **Security & Threat Model Documentation:** Formal threat model covering Ghostscript/ImageMagick delegate CVE risks, direct POSIX exec injection protection, and 50 MB DoS bounds.
+
+### Changed
+- **Modular CLI Architecture:** Refactored 1,200+ line monolithic `src/main.rs` into specialized submodules (`src/process.rs`, `src/gui.rs`, `src/update.rs`, `src/dispatcher.rs`).
+- **Core Engine i18n Standardization:** Replaced 35+ hardcoded error messages across `src/converter/` with localized `crate::i18n::t(...)` keys.
+- **Benchmark Baselines & Speedup Grounding:** Added bare CLI baseline single-file execution metrics (`cjxl`, `magick`, `ffmpeg`) proving Rayon batch throughput gains (~7-8x speedup).
+- **Hype-Free Grounded Terminology:** Replaced "ultra-fast" with "fast, lightweight" and unified supported formats count to "35+ format".
+
+### Fixed
+- Fixed critical config data loss bug where Qt6 GUI `ConfigManager::save()` wiped out custom profile tables.
+- Fixed 7 dead language selector links in documentation headers.
+- Fixed `Cargo.toml` metadata to explicitly list all 4 supported desktop file managers.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added

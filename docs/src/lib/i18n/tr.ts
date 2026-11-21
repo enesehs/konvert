@@ -4,7 +4,7 @@ export const tr: Translations = {
   meta: {
     title: "Konvert — Linux İçin Yerel Sağ Tık Dosya Dönüştürücü",
     description:
-      "Terminal parametrelerini ezberlemeyi bırakın. Dolphin, Nautilus, Nemo ve Thunar sağ tık menüsünden 50+ formatı çevrimdışı, 0 MB boşta RAM ile dönüştürün.",
+      "Terminal parametrelerini ezberlemeyi bırakın. Dolphin, Nautilus, Nemo ve Thunar sağ tık menüsünden 35+ formatı çevrimdışı dönüştürün.",
     keywords: [
       "Konvert",
       "Linux",
@@ -36,7 +36,7 @@ export const tr: Translations = {
     displayTitle1: "Sağ tıkla.",
     displayTitle2: "Dönüştür.",
     valueProposition:
-      "Terminal parametrelerini ezberlemeyi ve dosyalarını internete yüklemeyi bırak. Doğrudan dosya yöneticinden (Dolphin, Nautilus, Nemo, Thunar) 50+ formatı çevrimdışı dönüştür.",
+      "Terminal parametrelerini ezberlemeyi ve dosyalarını internete yüklemeyi bırak. Doğrudan dosya yöneticinden (Dolphin, Nautilus, Nemo, Thunar) 35+ formatı çevrimdışı dönüştür.",
     oneLinerLabel: "TEK KOMUTLA KURULUM",
     oneLinerCommand: "curl -fsSL https://enesehs.dev/konvert/install.sh | bash",
     copied: "Kopyalandı!",
@@ -149,7 +149,7 @@ export const tr: Translations = {
   },
   formats: {
     badge: "DESTEKLENEN FORMATLAR VE MOTORLAR",
-    title: "50+ Format. Zaten güvendiğiniz CLI motorlarıyla güçlendirildi.",
+    title: "35+ Format. Zaten güvendiğiniz CLI motorlarıyla güçlendirildi.",
     subtitle:
       "Görsel, video, ses ve belgeler için optimize edilmiş yerel araç zinciri.",
     tabs: {
@@ -287,7 +287,7 @@ export const tr: Translations = {
       },
       {
         q: "Windows veya macOS desteği var mı?",
-        a: "Konvert doğrudan Linux masaüstü ortamlarının (KDE ServiceMenus, Nautilus Python/Scripts, Nemo eylemleri) mimarisine özel olarak tasarlanmıştır. Odak noktamız saf ve kusursuz bir Linux deneyimidir.",
+        a: "Konvert doğrudan Linux masaüstü ortamlarının (KDE ServiceMenus, Nautilus Python/Scripts, Nemo eylemleri) mimarisine özel olarak tasarlanmıştır. Odak noktamız doğrudan ve tam entegre bir Linux deneyimidir.",
       },
     ],
   },

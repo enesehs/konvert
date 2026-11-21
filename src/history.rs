@@ -63,6 +63,9 @@ fn lock_history(path: &Path) -> Option<fs::File> {
         .truncate(false)
         .open(lock_path)
         .ok()?;
+    // SAFETY: as_raw_fd() returns a valid file descriptor owned by 'file'.
+    // flock is an advisory kernel lock that blocks until acquired and is automatically
+    // released by the OS when the file descriptor is closed when 'file' is dropped.
     unsafe {
         libc::flock(file.as_raw_fd(), libc::LOCK_EX);
     }

@@ -15,7 +15,7 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 export const metadata: Metadata = {
   title: "Konvert — Native Right-Click File Converter for Linux",
   description:
-    "Stop memorizing terminal flags and uploading files to ad-filled websites. Convert 50+ formats offline directly from Dolphin, Nautilus, Nemo, and Thunar with 0 MB idle RAM.",
+    "Stop memorizing terminal flags and uploading files to ad-filled websites. Convert 35+ formats offline directly from Dolphin, Nautilus, Nemo, and Thunar.",
   keywords: [
     "Konvert",
     "Linux",

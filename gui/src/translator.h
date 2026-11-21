@@ -166,6 +166,27 @@ public:
             if (lang == "es") return "Velocidad / Ajuste:";
             return "Compression Speed / Preset:";
         }
+        if (key == "lbl_video_hwaccel") {
+            if (lang == "tr") return "Donanım Hızlandırma (GPU):";
+            if (lang == "de") return "Hardwarebeschleunigung (GPU):";
+            if (lang == "fr") return "Accélération matérielle (GPU) :";
+            if (lang == "es") return "Aceleración por hardware (GPU):";
+            return "Hardware Acceleration (GPU):";
+        }
+        if (key == "hwaccel_auto") {
+            if (lang == "tr") return "Otomatik (VA-API / NVENC)";
+            if (lang == "de") return "Automatisch (VA-API / NVENC)";
+            if (lang == "fr") return "Automatique (VA-API / NVENC)";
+            if (lang == "es") return "Automático (VA-API / NVENC)";
+            return "Auto (VA-API / NVENC)";
+        }
+        if (key == "hwaccel_none") {
+            if (lang == "tr") return "Devre Dışı (Sadece CPU)";
+            if (lang == "de") return "Deaktiviert (Nur CPU)";
+            if (lang == "fr") return "Désactivé (CPU uniquement)";
+            if (lang == "es") return "Desactivado (Solo CPU)";
+            return "Disabled (CPU Only)";
+        }
         if (key == "lbl_video_lossless") {
             if (lang == "tr") return "Kayıpsız Video Modu";
             if (lang == "de") return "Verlustfreier Videomodus";
@@ -296,12 +317,12 @@ public:
             if (lang == "es") return "Acerca de";
             return "About";
         }
-        if (key == "about_tab_community") {
-            if (lang == "tr") return "Yazarlar & Topluluk";
-            if (lang == "de") return "Autoren & Community";
-            if (lang == "fr") return "Auteurs & Communauté";
-            if (lang == "es") return "Autores y Comunidad";
-            return "Authors & Community";
+        if (key == "about_tab_authors" || key == "about_tab_community") {
+            if (lang == "tr") return "Yazarlar";
+            if (lang == "de") return "Autoren";
+            if (lang == "fr") return "Auteurs";
+            if (lang == "es") return "Autores";
+            return "Authors";
         }
         if (key == "about_tab_components") {
             if (lang == "tr") return "Bileşenler & Teşekkür";
