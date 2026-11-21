@@ -84,10 +84,10 @@ version = 2
         toml::from_str(&serialized_toml).expect("Failed to parse serialized TOML");
 
     // Assert GUI changes took effect
-    assert_eq!(reloaded.general.notification_enabled, false);
+    assert!(!reloaded.general.notification_enabled);
     assert_eq!(reloaded.general.language.as_deref(), Some("en"));
     assert_eq!(reloaded.image.quality, 95);
-    assert_eq!(reloaded.image.lossless, true);
+    assert!(reloaded.image.lossless);
     assert_eq!(reloaded.video.crf, 18);
     assert_eq!(reloaded.video.preset, "slow");
     assert_eq!(reloaded.video.hwaccel, "nvenc");

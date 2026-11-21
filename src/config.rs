@@ -550,7 +550,7 @@ author = "custom"
 
         // Deserialize again
         let reloaded: Config = toml::from_str(&serialized).expect("Reload parse failed");
-        assert_eq!(reloaded.general.notification_enabled, false);
+        assert!(!reloaded.general.notification_enabled);
         assert_eq!(reloaded.image.quality, 92);
         assert!(reloaded.profiles.contains_key("discord_preset"));
         assert_eq!(reloaded.profiles["discord_preset"].quality, Some(70));
@@ -576,7 +576,7 @@ author = "custom"
             cfg.get_key_value("general.notification_enabled"),
             Some("false".to_string())
         );
-        assert_eq!(cfg.general.notification_enabled, false);
+        assert!(!cfg.general.notification_enabled);
 
         cfg.set_key_value("video.hwaccel", "nvenc").unwrap();
         assert_eq!(
@@ -597,7 +597,7 @@ author = "custom"
 
         cfg.update_from_json(json_update).unwrap();
         assert_eq!(cfg.image.quality, 88);
-        assert_eq!(cfg.image.lossless, true);
+        assert!(cfg.image.lossless);
         assert_eq!(cfg.video.crf, 18);
         assert_eq!(cfg.video.preset, "slow");
         assert_eq!(cfg.video.hwaccel, "vaapi");
