@@ -117,18 +117,18 @@ export function Install() {
                       <button
                         type="button"
                         onClick={() => copyText(cmd, tab.key)}
-                        aria-label="Komutu kopyala"
+                        aria-label={t.install.copyCommandAria}
                         className="inline-flex items-center gap-1.5 border border-border bg-white text-slate-800 hover:bg-slate-50 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/20 px-2 py-0.5 font-mono text-[10.5px] transition-colors"
                       >
                         {isCopied ? (
                           <>
                             <Check className="h-3 w-3 text-emerald-500" aria-hidden="true" />
-                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Kopyalandı</span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{t.install.copiedShort}</span>
                           </>
                         ) : (
                           <>
                             <Copy className="h-3 w-3" aria-hidden="true" />
-                            <span>Kopyala</span>
+                            <span>{t.install.copyShort}</span>
                           </>
                         )}
                       </button>
@@ -167,7 +167,7 @@ export function Install() {
               <button
                 type="button"
                 onClick={() => copyText(t.install.integrationCmd, "integrate")}
-                aria-label="Entegrasyon komutunu kopyala"
+                aria-label={t.install.copyIntegrationAria}
                 className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
               >
                 {copiedKey === "integrate" ? (

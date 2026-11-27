@@ -11,7 +11,7 @@
 
   <description>
     <p>
-      Konvert is an ultra-fast, lightweight, offline, and native file conversion and optimization utility crafted for Linux and KDE Plasma.
+      Konvert is a fast, lightweight, offline, and native file conversion and optimization utility crafted for Linux and KDE Plasma.
     </p>
     <p>Key features include:</p>
     <ul>
@@ -53,7 +53,7 @@
       <image type="source">https://raw.githubusercontent.com/enesehs/konvert/main/assets/screenshots/screenshot_history.png</image>
     </screenshot>
     <screenshot>
-      <caption>Settings: per-file-manager context menu actions</caption>
+      <caption>Settings: context menu actions and conversion quality options</caption>
       <image type="source">https://raw.githubusercontent.com/enesehs/konvert/main/assets/screenshots/screenshot_convert.png</image>
     </screenshot>
   </screenshots>
@@ -61,6 +61,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.5.0" date="2026-11-27">
+      <description>
+        <p>Release 0.5.0 delivering live pause/resume/cancel job control across CLI, KDE JobViewV2, and Qt6 GUI, hardware-accelerated video encoder fixes (NVENC VBR, VA-API VP9/AV1, SVT-AV1 preset mapping, 2-pass target sizing), full CLI/doctor/GUI i18n parity, single-instance GUI activation, hardened desktop integrations, and expanded test coverage.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-11-19">
       <description>
         <p>Release 0.4.0 delivering Single Source of Truth (SSoT) config persistence, live KDE Plasma progress bar and D-Bus ETA notifications, true vector Potrace tracing for SVG output, konvert --doctor system diagnostics, full converter error i18n localization, native symbolic icon support for KDE accent color binding, and modular CLI architecture.</p>

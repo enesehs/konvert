@@ -112,7 +112,10 @@ impl TargetAction {
                     }
                 }
             }
-            _ if t.starts_with("target_") || t.ends_with("mb") || t.ends_with("gb") => {
+            _ if t.starts_with("target_")
+                || (t.as_bytes().first().is_some_and(u8::is_ascii_digit)
+                    && parse_size_bytes(&t).is_some()) =>
+            {
                 let raw = t.strip_prefix("target_").unwrap_or(&t);
                 match parse_size_bytes(raw) {
                     Some(bytes) => Ok(TargetAction::TargetSize(bytes)),
@@ -125,14 +128,18 @@ impl TargetAction {
 }
 
 pub fn sanitize_cli_path(path: &Path) -> PathBuf {
-    let s = path.as_os_str().to_string_lossy();
-    if s == "-" {
-        PathBuf::from("-")
-    } else if s.starts_with('-') {
-        PathBuf::from(format!("./{}", s))
-    } else {
-        path.to_path_buf()
+    if path.as_os_str() == "-" {
+        return PathBuf::from("-");
     }
+    if path.is_absolute()
+        || matches!(
+            path.components().next(),
+            Some(std::path::Component::CurDir | std::path::Component::ParentDir)
+        )
+    {
+        return path.to_path_buf();
+    }
+    Path::new(".").join(path)
 }
 
 /// Girdi baytlarından (magic bytes) dosya uzantısını tahmin eder.
@@ -152,8 +159,26 @@ pub fn detect_extension_from_bytes(bytes: &[u8]) -> &'static str {
         "mp3"
     } else if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WAVE" {
         "wav"
+    } else if bytes.len() >= 12 && &bytes[4..8] == b"ftyp" {
+        match &bytes[8..12] {
+            b"avif" | b"avis" => "avif",
+            b"heic" | b"heix" | b"hevc" | b"hevx" | b"mif1" | b"msf1" => "heic",
+            b"M4A " | b"M4B " => "m4a",
+            b"qt  " => "mov",
+            _ => "mp4",
+        }
     } else if bytes.len() >= 8 && (&bytes[4..8] == b"ftyp" || &bytes[4..8] == b"moov") {
         "mp4"
+    } else if bytes.starts_with(b"\x1A\x45\xDF\xA3") {
+        if bytes.windows(4).any(|w| w == b"webm") {
+            "webm"
+        } else {
+            "mkv"
+        }
+    } else if bytes.starts_with(b"\xFF\x0A")
+        || bytes.starts_with(b"\x00\x00\x00\x0C\x4A\x58\x4C\x20\x0D\x0A\x87\x0A")
+    {
+        "jxl"
     } else if bytes.starts_with(b"OggS") {
         "ogg"
     } else if bytes.starts_with(b"fLaC") {
@@ -195,6 +220,45 @@ pub fn ensure_parent_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn normalize_logical_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for comp in path.components() {
+        match comp {
+            std::path::Component::CurDir => {}
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    if normalized.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        normalized
+    }
+}
+
+fn paths_refer_to_same_target(a: &Path, b: &Path) -> bool {
+    let na = normalize_logical_path(a);
+    let nb = normalize_logical_path(b);
+    if na == nb {
+        return true;
+    }
+    if na.is_absolute() != nb.is_absolute()
+        && let Ok(cwd) = std::env::current_dir()
+    {
+        let abs_a = if na.is_absolute() {
+            na
+        } else {
+            normalize_logical_path(&cwd.join(&na))
+        };
+        let abs_b = if nb.is_absolute() {
+            nb
+        } else {
+            normalize_logical_path(&cwd.join(&nb))
+        };
+        return abs_a == abs_b;
+    }
+    false
+}
+
 pub fn determine_output_path(
     input_path: &Path,
     target_ext: &str,
@@ -207,7 +271,7 @@ pub fn determine_output_path(
 
     let target_dir = get_output_dir(input_path, custom_output_dir);
     let candidate = target_dir.join(format!("{}.{}", file_stem, target_ext));
-    if candidate == input_path {
+    if paths_refer_to_same_target(&candidate, input_path) {
         target_dir.join(format!("{}_konvert.{}", file_stem, target_ext))
     } else {
         candidate
@@ -232,7 +296,7 @@ pub fn determine_suffixed_output_path(
         format!("{}_{}.{}", file_stem, suffix, target_ext)
     };
     let candidate = target_dir.join(candidate_name);
-    if candidate == input_path {
+    if paths_refer_to_same_target(&candidate, input_path) {
         target_dir.join(format!("{}_{}_konvert.{}", file_stem, suffix, target_ext))
     } else {
         candidate
@@ -259,30 +323,55 @@ pub fn plan_output_path(
             determine_suffixed_output_path(input_path, "clean", &ext, out_dir)
         }
         TargetAction::Resize(_) => {
-            determine_suffixed_output_path(input_path, "resized", &ext, out_dir)
+            let resize_ext = if ext == "svg" { "png" } else { &ext };
+            determine_suffixed_output_path(input_path, "resized", resize_ext, out_dir)
         }
         TargetAction::Compress => {
             if is_image_ext(&ext) {
                 determine_suffixed_output_path(input_path, "compressed", "webp", out_dir)
             } else if ext == "pdf" {
                 determine_suffixed_output_path(input_path, "compressed", "pdf", out_dir)
+            } else if is_video_ext(&ext) {
+                determine_suffixed_output_path(input_path, "compressed", "mp4", out_dir)
             } else {
                 determine_suffixed_output_path(input_path, "compressed", &ext, out_dir)
             }
         }
         TargetAction::TargetSize(bytes) => {
-            let suffix = if bytes == 8 * 1024 * 1024 {
-                "8mb"
-            } else if bytes == 25 * 1024 * 1024 {
-                "25mb"
+            if is_video_ext(&ext) {
+                let suffix = if bytes == 8 * 1024 * 1024 {
+                    "discord_8mb"
+                } else if bytes == 25 * 1024 * 1024 {
+                    "email_25mb"
+                } else {
+                    "target_size"
+                };
+                determine_suffixed_output_path(input_path, suffix, "mp4", out_dir)
+            } else if ext == "pdf" {
+                determine_suffixed_output_path(input_path, "compressed", "pdf", out_dir)
             } else {
-                "target"
-            };
-            determine_suffixed_output_path(input_path, suffix, &ext, out_dir)
+                let suffix = if bytes == 8 * 1024 * 1024 {
+                    "8mb"
+                } else if bytes == 25 * 1024 * 1024 {
+                    "25mb"
+                } else {
+                    "target"
+                };
+                let target_ext = if is_image_ext(&ext)
+                    && matches!(ext.as_str(), "png" | "bmp" | "tiff" | "tif" | "qoi")
+                {
+                    "webp"
+                } else {
+                    &ext
+                };
+                determine_suffixed_output_path(input_path, suffix, target_ext, out_dir)
+            }
         }
         TargetAction::WebOpt => {
             if is_image_ext(&ext) {
                 determine_suffixed_output_path(input_path, "web", "webp", out_dir)
+            } else if is_video_ext(&ext) {
+                determine_suffixed_output_path(input_path, "web", "mp4", out_dir)
             } else {
                 determine_suffixed_output_path(input_path, "web", &ext, out_dir)
             }
@@ -307,6 +396,11 @@ pub fn plan_output_path(
                 get_output_dir(input_path, out_dir).join(format!("{}_pages", stem))
             } else if target_fmt == "av1" {
                 determine_suffixed_output_path(input_path, "av1", "mp4", out_dir)
+            } else if is_image_ext(&ext)
+                && target_fmt.eq_ignore_ascii_case("jxl")
+                && opts.image_lossless
+            {
+                determine_suffixed_output_path(input_path, "jxl_lossless", "jxl", out_dir)
             } else {
                 determine_output_path(input_path, &target_fmt, out_dir)
             }
@@ -333,7 +427,7 @@ pub fn expand_files_recursive(
         if path.is_file() {
             collected.push(path.clone());
         } else if path.is_dir() {
-            collect_dir_recursive(path, target_action, &mut collected);
+            collect_dir_recursive(path, target_action, &mut collected, 0);
         }
     }
     collected.sort();
@@ -341,7 +435,17 @@ pub fn expand_files_recursive(
     collected
 }
 
-fn collect_dir_recursive(dir: &Path, target_action: Option<&TargetAction>, out: &mut Vec<PathBuf>) {
+const MAX_EXPAND_DEPTH: usize = 64;
+
+fn collect_dir_recursive(
+    dir: &Path,
+    target_action: Option<&TargetAction>,
+    out: &mut Vec<PathBuf>,
+    depth: usize,
+) {
+    if depth >= MAX_EXPAND_DEPTH {
+        return;
+    }
     let Ok(entries) = std::fs::read_dir(dir) else {
         return;
     };
@@ -352,9 +456,15 @@ fn collect_dir_recursive(dir: &Path, target_action: Option<&TargetAction>, out: 
         {
             continue;
         }
-        if p.is_dir() {
-            collect_dir_recursive(&p, target_action, out);
-        } else if p.is_file() {
+        let Ok(ft) = entry.file_type() else {
+            continue;
+        };
+        if ft.is_symlink() {
+            continue;
+        }
+        if ft.is_dir() {
+            collect_dir_recursive(&p, target_action, out, depth + 1);
+        } else if ft.is_file() {
             let ext = p
                 .extension()
                 .and_then(|e| e.to_str())
@@ -362,14 +472,23 @@ fn collect_dir_recursive(dir: &Path, target_action: Option<&TargetAction>, out: 
                 .to_lowercase();
             let is_match = match target_action {
                 Some(TargetAction::Convert(target_fmt)) => {
-                    if is_image_ext(target_fmt) || target_fmt == "pdf" {
-                        is_image_ext(&ext) || ext == "docx" || ext == "udf" || ext == "pdf"
-                    } else if is_video_ext(target_fmt) {
-                        is_video_ext(&ext)
-                    } else if is_audio_ext(target_fmt) {
+                    if target_fmt == "pdf" {
+                        is_image_ext(&ext) || matches!(ext.as_str(), "docx" | "udf" | "pdf")
+                    } else if matches!(target_fmt.as_str(), "txt" | "html" | "htm") {
+                        matches!(ext.as_str(), "pdf" | "docx" | "udf")
+                    } else if is_image_ext(target_fmt) {
+                        is_image_ext(&ext)
+                            || (ext == "pdf"
+                                && matches!(target_fmt.as_str(), "png" | "jpg" | "jpeg"))
+                    } else if video::is_supported_video_target(target_fmt) {
+                        is_video_ext(&ext) || ext == "gif"
+                    } else if audio::is_supported_audio_target(target_fmt) {
                         is_audio_ext(&ext) || is_video_ext(&ext)
                     } else {
-                        is_image_ext(&ext) || is_video_ext(&ext) || is_audio_ext(&ext)
+                        is_image_ext(&ext)
+                            || is_video_ext(&ext)
+                            || is_audio_ext(&ext)
+                            || matches!(ext.as_str(), "pdf" | "docx" | "udf")
                     }
                 }
                 Some(TargetAction::Compress) => {
@@ -388,7 +507,10 @@ fn collect_dir_recursive(dir: &Path, target_action: Option<&TargetAction>, out: 
                 | Some(TargetAction::Gif) => is_video_ext(&ext),
                 Some(TargetAction::AudioToVideo) => is_audio_ext(&ext),
                 None => {
-                    is_image_ext(&ext) || is_video_ext(&ext) || is_audio_ext(&ext) || ext == "pdf"
+                    is_image_ext(&ext)
+                        || is_video_ext(&ext)
+                        || is_audio_ext(&ext)
+                        || matches!(ext.as_str(), "pdf" | "docx" | "udf")
                 }
             };
             if is_match {
@@ -447,6 +569,14 @@ fn claimed_outputs() -> &'static Mutex<HashSet<PathBuf>> {
     CLAIMED.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
+pub fn reset_claimed_outputs() {
+    let mut claimed = match claimed_outputs().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    claimed.clear();
+}
+
 /// Aynı süreç içinde iki işin aynı çıktı yoluna yazmasını engeller.
 ///
 /// Toplu dönüşümde aynı gövdeye sahip dosyalar (örn. `a/photo.png` ve
@@ -501,6 +631,37 @@ fn pending_temps_file() -> Option<PathBuf> {
         .map(|dirs| dirs.cache_dir().join("pending-temps"))
 }
 
+fn pending_temps_lock_file() -> Option<PathBuf> {
+    directories::ProjectDirs::from("", "", "konvert")
+        .map(|dirs| dirs.cache_dir().join("pending-temps.lock"))
+}
+
+fn with_pending_temps_lock<F, R>(f: F) -> R
+where
+    F: FnOnce() -> R,
+{
+    #[cfg(unix)]
+    let _lock_file = pending_temps_lock_file().and_then(|lock_path| {
+        if let Some(parent) = lock_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let file = fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&lock_path)
+            .ok()?;
+        use std::os::unix::io::AsRawFd;
+        // SAFETY: Calling POSIX flock with valid file descriptor and LOCK_EX; unlocked on close.
+        unsafe {
+            libc::flock(file.as_raw_fd(), libc::LOCK_EX);
+        }
+        Some(file)
+    });
+    f()
+}
+
 fn temp_owner_pid(path: &Path) -> Option<u32> {
     let name = path.file_name()?.to_str()?;
     let rest = name.strip_prefix(".konvert-tmp-")?;
@@ -518,14 +679,16 @@ fn record_temp_file(temp: &Path) {
     if let Some(parent) = file_path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    if let Ok(mut file) = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&file_path)
-    {
-        use std::io::Write;
-        let _ = writeln!(file, "{}", temp.display());
-    }
+    with_pending_temps_lock(|| {
+        if let Ok(mut file) = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&file_path)
+        {
+            use std::io::Write;
+            let _ = writeln!(file, "{}", temp.display());
+        }
+    });
 }
 
 /// Önceki çalışmalardan (çökme/iptal) kalan geçici çıktıları temizler.
@@ -537,34 +700,36 @@ pub fn cleanup_recorded_temps() {
     let Some(file_path) = pending_temps_file() else {
         return;
     };
-    let Ok(content) = fs::read_to_string(&file_path) else {
-        return;
-    };
+    with_pending_temps_lock(|| {
+        let Ok(content) = fs::read_to_string(&file_path) else {
+            return;
+        };
 
-    let mut keep = String::new();
-    for line in content.lines() {
-        let path = Path::new(line);
-        let is_temp = path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with(".konvert-tmp-"));
-        if !is_temp {
-            continue;
+        let mut keep = String::new();
+        for line in content.lines() {
+            let path = Path::new(line);
+            let is_temp = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.starts_with(".konvert-tmp-"));
+            if !is_temp {
+                continue;
+            }
+
+            match temp_owner_pid(path) {
+                Some(pid) if process_alive(pid) => {
+                    keep.push_str(line);
+                    keep.push('\n');
+                }
+                Some(_) => {
+                    let _ = fs::remove_file(path);
+                }
+                None => {}
+            }
         }
 
-        match temp_owner_pid(path) {
-            Some(pid) if process_alive(pid) => {
-                keep.push_str(line);
-                keep.push('\n');
-            }
-            Some(_) => {
-                let _ = fs::remove_file(path);
-            }
-            None => {}
-        }
-    }
-
-    let _ = fs::write(&file_path, keep);
+        let _ = fs::write(&file_path, keep);
+    });
 }
 
 /// Yazma sırasında hedef dosyayı doğrudan açmak yerine geçici bir dosyaya
@@ -584,10 +749,13 @@ impl PendingOutput {
         static TEMP_COUNTER: std::sync::atomic::AtomicUsize =
             std::sync::atomic::AtomicUsize::new(0);
         let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
-        let parent = final_path.parent().unwrap_or_else(|| Path::new(""));
+        let parent = match final_path.parent() {
+            Some(p) if !p.as_os_str().is_empty() => p,
+            _ => Path::new("."),
+        };
         let file_name = final_path
             .file_name()
-            .map(|name| name.to_string_lossy().to_string())
+            .map(|name| name.to_string_lossy().replace(['%', ':'], "_"))
             .unwrap_or_else(|| "output".to_string());
         let temp = parent.join(format!(
             ".konvert-tmp-{}-{}-{}",
@@ -610,7 +778,8 @@ impl PendingOutput {
     pub fn commit(mut self) -> Result<PathBuf> {
         if self.final_path.exists() && create_backup_enabled() {
             let backup_path = PathBuf::from(format!("{}.bak", self.final_path.to_string_lossy()));
-            let _ = fs::copy(&self.final_path, &backup_path);
+            fs::copy(&self.final_path, &backup_path)
+                .with_context(|| format!("Yedek oluşturulamadı: {}", backup_path.display()))?;
         }
         fs::rename(&self.temp, &self.final_path).with_context(|| {
             format!(
@@ -653,11 +822,24 @@ where
     I: IntoIterator<Item = S> + Clone,
     S: AsRef<std::ffi::OsStr>,
 {
-    let output = Command::new("magick")
-        .args(args.clone())
-        .output()
-        .or_else(|_| Command::new("convert").args(args).output())
-        .with_context(|| "ImageMagick (magick veya convert) çalıştırılamadı")?;
+    let mut magick_cmd = Command::new("magick");
+    magick_cmd.args(args.clone());
+    let output = match crate::process::run_tracked_output(&mut magick_cmd) {
+        Ok(out) => out,
+        Err(err) => {
+            if crate::process::is_cancelled_error(&err) {
+                return Err(err);
+            }
+            let mut convert_cmd = Command::new("convert");
+            convert_cmd.args(args);
+            crate::process::run_tracked_output(&mut convert_cmd)
+                .with_context(|| "ImageMagick (magick veya convert) çalıştırılamadı")?
+        }
+    };
+
+    if crate::process::is_job_cancelled() {
+        return Err(crate::process::cancelled_error());
+    }
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -685,6 +867,7 @@ where
 pub struct BatchResult {
     pub succeeded: Vec<PathBuf>,
     pub failed: Vec<(PathBuf, String)>,
+    pub cancelled: bool,
 }
 
 #[derive(Clone)]
@@ -723,6 +906,8 @@ pub fn convert_single_with_progress<F>(
 where
     F: FnMut(i32, &str),
 {
+    crate::process::wait_if_paused_or_cancelled()?;
+
     let sanitized_input = sanitize_cli_path(input_path);
     let input_path = &sanitized_input;
 
@@ -935,46 +1120,78 @@ where
         return BatchResult {
             succeeded: Vec::new(),
             failed: Vec::new(),
+            cancelled: false,
         };
     }
 
+    reset_claimed_outputs();
     let progress_state = Mutex::new((0usize, progress_callback));
     let jobs = opts.jobs.max(1);
+    set_job_count(jobs);
 
-    let mut results: Vec<Result<PathBuf, (PathBuf, String)>> = Vec::with_capacity(total);
-    for chunk in files.chunks(jobs) {
-        let mut chunk_results: Vec<Result<PathBuf, (PathBuf, String)>> = chunk
+    enum BatchItem {
+        Succeeded(PathBuf),
+        Failed(PathBuf, String),
+        Cancelled,
+    }
+
+    let run_par = || {
+        files
             .par_iter()
             .map(|file| {
+                if crate::process::wait_if_paused_or_cancelled().is_err() {
+                    return BatchItem::Cancelled;
+                }
+
                 let res = convert_single(file, opts);
 
-                if let Ok(mut lock) = progress_state.lock() {
-                    lock.0 += 1;
-                    let curr = lock.0;
-                    let percent = ((curr as f32 / total as f32) * 100.0) as i32;
-                    (lock.1)(curr, total, file, percent);
-                }
-
                 match res {
-                    Ok(p) => Ok(p),
-                    Err(e) => Err((file.clone(), format!("{:#}", e))),
+                    Ok(p) => {
+                        if let Ok(mut lock) = progress_state.lock() {
+                            lock.0 += 1;
+                            let curr = lock.0;
+                            let percent = ((curr as f32 / total as f32) * 100.0) as i32;
+                            (lock.1)(curr, total, file, percent);
+                        }
+                        BatchItem::Succeeded(p)
+                    }
+                    Err(e) if crate::process::is_cancelled_error(&e) => BatchItem::Cancelled,
+                    Err(e) => {
+                        if let Ok(mut lock) = progress_state.lock() {
+                            lock.0 += 1;
+                            let curr = lock.0;
+                            let percent = ((curr as f32 / total as f32) * 100.0) as i32;
+                            (lock.1)(curr, total, file, percent);
+                        }
+                        BatchItem::Failed(file.clone(), format!("{:#}", e))
+                    }
                 }
             })
-            .collect();
-        results.append(&mut chunk_results);
-    }
+            .collect::<Vec<BatchItem>>()
+    };
+
+    let results = match rayon::ThreadPoolBuilder::new().num_threads(jobs).build() {
+        Ok(pool) => pool.install(run_par),
+        Err(_) => run_par(),
+    };
 
     let mut succeeded = Vec::with_capacity(total);
     let mut failed = Vec::new();
+    let mut any_cancelled = crate::process::is_job_cancelled();
 
     for r in results {
         match r {
-            Ok(p) => succeeded.push(p),
-            Err(f) => failed.push(f),
+            BatchItem::Succeeded(p) => succeeded.push(p),
+            BatchItem::Failed(f, err) => failed.push((f, err)),
+            BatchItem::Cancelled => any_cancelled = true,
         }
     }
 
-    BatchResult { succeeded, failed }
+    BatchResult {
+        succeeded,
+        failed,
+        cancelled: any_cancelled,
+    }
 }
 
 pub fn is_image_ext(ext: &str) -> bool {
@@ -1079,10 +1296,22 @@ mod tests {
     #[test]
     fn test_sanitize_cli_path() {
         let normal = Path::new("file.jpg");
-        assert_eq!(sanitize_cli_path(normal), PathBuf::from("file.jpg"));
+        assert_eq!(sanitize_cli_path(normal), PathBuf::from("./file.jpg"));
 
         let dash = Path::new("-dash_file.mp4");
         assert_eq!(sanitize_cli_path(dash), PathBuf::from("./-dash_file.mp4"));
+
+        let colon = Path::new("12:30.mp4");
+        assert_eq!(sanitize_cli_path(colon), PathBuf::from("./12:30.mp4"));
+
+        let protocol = Path::new("ephemeral:x");
+        assert_eq!(sanitize_cli_path(protocol), PathBuf::from("./ephemeral:x"));
+
+        let at_list = Path::new("@list.txt");
+        assert_eq!(sanitize_cli_path(at_list), PathBuf::from("./@list.txt"));
+
+        let abs = Path::new("/tmp/video.mp4");
+        assert_eq!(sanitize_cli_path(abs), PathBuf::from("/tmp/video.mp4"));
 
         let stdin_dash = Path::new("-");
         assert_eq!(sanitize_cli_path(stdin_dash), PathBuf::from("-"));
@@ -1239,14 +1468,26 @@ mod tests {
         );
     }
 
+    fn unique_test_dir(tag: &str) -> PathBuf {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+        let dir = std::env::temp_dir().join(format!(
+            "konvert_mod_test_{}_{}_{}",
+            tag,
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    static GLOBAL_FLAG_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_claim_output_path_avoids_existing_files_unless_forced() {
-        let dir = std::env::temp_dir().join(format!(
-            "konvert_overwrite_test_{}_{}",
-            std::process::id(),
-            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
+        let _guard = GLOBAL_FLAG_TEST_LOCK.lock().unwrap();
+        let dir = unique_test_dir("overwrite");
         let candidate = dir.join("existing.webp");
         std::fs::write(&candidate, b"old").unwrap();
 
@@ -1265,12 +1506,8 @@ mod tests {
 
     #[test]
     fn test_pending_output_creates_backup_when_enabled() {
-        let dir = std::env::temp_dir().join(format!(
-            "konvert_backup_test_{}_{}",
-            std::process::id(),
-            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
+        let _guard = GLOBAL_FLAG_TEST_LOCK.lock().unwrap();
+        let dir = unique_test_dir("backup");
         let target = dir.join("file.txt");
         std::fs::write(&target, b"original content").unwrap();
 
@@ -1294,15 +1531,14 @@ mod tests {
 
     #[test]
     fn test_claim_output_path_is_unique_within_process() {
-        let base = std::env::temp_dir().join(format!(
-            "konvert_claim_test_{}_{}.webp",
-            std::process::id(),
-            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
-        ));
+        let _guard = GLOBAL_FLAG_TEST_LOCK.lock().unwrap();
+        let dir = unique_test_dir("claim");
+        let base = dir.join("sample.webp");
         let first = claim_output_path(base.clone());
         let second = claim_output_path(base.clone());
         assert_ne!(first, second);
         assert!(second.to_string_lossy().contains("_2"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1330,8 +1566,8 @@ mod tests {
 
     #[test]
     fn test_convert_single_image_to_pdf() {
-        let temp_dir = std::env::temp_dir();
-        let test_img = temp_dir.join("konvert_test_single_to_pdf.png");
+        let temp_dir = unique_test_dir("single_to_pdf");
+        let test_img = temp_dir.join("single_to_pdf.png");
         let img = ::image::DynamicImage::new_rgb8(10, 10);
         img.save(&test_img).unwrap();
 
@@ -1356,15 +1592,15 @@ mod tests {
             if let Ok(pdf_path) = res {
                 assert!(pdf_path.exists());
                 assert_eq!(pdf_path.extension().and_then(|e| e.to_str()), Some("pdf"));
-                let _ = fs::remove_file(pdf_path);
             }
         }
-        let _ = fs::remove_file(test_img);
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 
     #[test]
     fn test_plan_output_path_detects_collision() {
-        let temp_dir = std::env::temp_dir();
+        let _guard = GLOBAL_FLAG_TEST_LOCK.lock().unwrap();
+        let temp_dir = unique_test_dir("dry_collision");
         let in_file = temp_dir.join("konvert_dry_input.png");
         let existing_out = temp_dir.join("konvert_dry_input.webp");
         fs::write(&in_file, b"test").unwrap();
@@ -1397,13 +1633,68 @@ mod tests {
         assert!(exists_force);
         assert_eq!(pred_force, existing_out);
 
-        let _ = fs::remove_file(in_file);
-        let _ = fs::remove_file(existing_out);
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_determine_output_path_relative_same_file_guard() {
+        let out = determine_output_path(Path::new("photo.jpg"), "jpg", None);
+        assert_eq!(out, PathBuf::from("./photo_konvert.jpg"));
+    }
+
+    #[test]
+    fn test_plan_output_path_matches_all_five_actions() {
+        let base_opts = ConvertOptions {
+            target: "compress".to_string(),
+            quality: None,
+            image_lossless: false,
+            video_lossless: false,
+            jobs: 1,
+            gif_duration: 15.0,
+            gif_fps: 15,
+            max_pages: 200,
+            crf: None,
+            preset: None,
+            bitrate: None,
+            dpi: None,
+            custom_output_dir: Some(PathBuf::from("/tmp")),
+            hwaccel: None,
+        };
+
+        let (p_vid_comp, _) = plan_output_path(Path::new("clip.mkv"), &base_opts, true).unwrap();
+        assert_eq!(p_vid_comp, PathBuf::from("/tmp/clip_compressed.mp4"));
+
+        let mut web_opts = base_opts.clone();
+        web_opts.target = "web_opt".to_string();
+        let (p_vid_web, _) = plan_output_path(Path::new("clip.webm"), &web_opts, true).unwrap();
+        assert_eq!(p_vid_web, PathBuf::from("/tmp/clip_web.mp4"));
+
+        let mut disc_opts = base_opts.clone();
+        disc_opts.target = "discord_8mb".to_string();
+        let (p_vid_8, _) = plan_output_path(Path::new("clip.mov"), &disc_opts, true).unwrap();
+        assert_eq!(p_vid_8, PathBuf::from("/tmp/clip_discord_8mb.mp4"));
+
+        let (p_pdf_8, _) = plan_output_path(Path::new("doc.pdf"), &disc_opts, true).unwrap();
+        assert_eq!(p_pdf_8, PathBuf::from("/tmp/doc_compressed.pdf"));
+
+        let (p_png_8, _) = plan_output_path(Path::new("img.png"), &disc_opts, true).unwrap();
+        assert_eq!(p_png_8, PathBuf::from("/tmp/img_8mb.webp"));
+
+        let mut resize_opts = base_opts.clone();
+        resize_opts.target = "resize_1080p".to_string();
+        let (p_svg_res, _) = plan_output_path(Path::new("icon.svg"), &resize_opts, true).unwrap();
+        assert_eq!(p_svg_res, PathBuf::from("/tmp/icon_resized.png"));
+
+        let mut jxl_opts = base_opts;
+        jxl_opts.target = "jxl".to_string();
+        jxl_opts.image_lossless = true;
+        let (p_jxl_l, _) = plan_output_path(Path::new("pic.png"), &jxl_opts, true).unwrap();
+        assert_eq!(p_jxl_l, PathBuf::from("/tmp/pic_jxl_lossless.jxl"));
     }
 
     #[test]
     fn test_expand_files_recursive_finds_nested_files() {
-        let temp_dir = std::env::temp_dir().join("konvert_test_rec_expand");
+        let temp_dir = unique_test_dir("rec_expand");
         let sub_dir = temp_dir.join("sub");
         let hidden_dir = temp_dir.join(".hidden");
         fs::create_dir_all(&sub_dir).unwrap();
@@ -1430,5 +1721,115 @@ mod tests {
         assert!(!expanded.contains(&txt));
 
         let _ = fs::remove_dir_all(temp_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_expand_files_recursive_skips_symlink_loops() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("konvert_test_symlink_loop_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+        let img = temp_dir.join("ok.png");
+        fs::write(&img, b"png").unwrap();
+        std::os::unix::fs::symlink(&temp_dir, temp_dir.join("loop")).unwrap();
+
+        let expanded = expand_files_recursive(std::slice::from_ref(&temp_dir), None);
+        assert_eq!(expanded, vec![img]);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_target_action_parse_size_units() {
+        assert!(matches!(
+            TargetAction::parse("500kb"),
+            Ok(TargetAction::TargetSize(512_000))
+        ));
+        assert!(matches!(
+            TargetAction::parse("2m"),
+            Ok(TargetAction::TargetSize(2_097_152))
+        ));
+        assert!(matches!(
+            TargetAction::parse("1gb"),
+            Ok(TargetAction::TargetSize(1_073_741_824))
+        ));
+    }
+
+    #[test]
+    fn test_detect_extension_from_bytes_ftyp_ebml_jxl() {
+        assert_eq!(
+            detect_extension_from_bytes(b"\x00\x00\x00\x1cftypavif\x00\x00"),
+            "avif"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"\x00\x00\x00\x1cftypheic\x00\x00"),
+            "heic"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"\x00\x00\x00\x20ftypM4A \x00\x00"),
+            "m4a"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"\x00\x00\x00\x14ftypqt  \x00\x00"),
+            "mov"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"\x1A\x45\xDF\xA3\x9FwebmB\x82"),
+            "webm"
+        );
+        assert_eq!(
+            detect_extension_from_bytes(b"\x1A\x45\xDF\xA3matroska"),
+            "mkv"
+        );
+        assert_eq!(detect_extension_from_bytes(b"\xFF\x0A\x00\x00"), "jxl");
+        assert_eq!(
+            detect_extension_from_bytes(b"\x00\x00\x00\x0CJXL \r\n\x87\n\x00\x00"),
+            "jxl"
+        );
+    }
+
+    #[test]
+    fn test_expand_files_recursive_matches_docs_and_gif_av1() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("konvert_test_rec_docs_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let docx = temp_dir.join("note.docx");
+        let udf = temp_dir.join("filing.udf");
+        let gif = temp_dir.join("anim.gif");
+        let png = temp_dir.join("pic.png");
+        fs::write(&docx, b"d").unwrap();
+        fs::write(&udf, b"u").unwrap();
+        fs::write(&gif, b"g").unwrap();
+        fs::write(&png, b"p").unwrap();
+
+        let txt_action = TargetAction::Convert("txt".to_string());
+        let txt_files = expand_files_recursive(std::slice::from_ref(&temp_dir), Some(&txt_action));
+        assert!(txt_files.contains(&docx));
+        assert!(txt_files.contains(&udf));
+        assert!(!txt_files.contains(&gif));
+        assert!(!txt_files.contains(&png));
+
+        let av1_action = TargetAction::Convert("av1".to_string());
+        let av1_files = expand_files_recursive(std::slice::from_ref(&temp_dir), Some(&av1_action));
+        assert!(av1_files.contains(&gif));
+        assert!(!av1_files.contains(&png));
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_reset_claimed_outputs_clears_state() {
+        let _guard = GLOBAL_FLAG_TEST_LOCK.lock().unwrap();
+        let dir = unique_test_dir("reset_claim");
+        let path = dir.join("unique_test.webp");
+        assert_eq!(claim_output_path(path.clone()), path);
+        assert_ne!(claim_output_path(path.clone()), path);
+        reset_claimed_outputs();
+        assert_eq!(claim_output_path(path.clone()), path);
+        reset_claimed_outputs();
+        let _ = fs::remove_dir_all(&dir);
     }
 }

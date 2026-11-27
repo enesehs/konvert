@@ -8,6 +8,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build & Package (Linux ${{ matrix.target.arch }})
@@ -30,7 +33,7 @@ jobs:
       - name: Validate Flatpak Manifest & Packaging Metadata
         run: |
           python3 -m json.tool packaging/io.github.enesehs.konvert.json > /dev/null
-          chmod +x packaging/build-deb.sh packaging/update-checksums.sh scripts/*.sh
+          chmod +x packaging/build-deb.sh packaging/build-appimage.sh packaging/update-checksums.sh scripts/*.sh
 
       - name: Install System Dependencies
         run: |
@@ -41,7 +44,11 @@ jobs:
             librsvg2-bin \
             cmake \
             ninja-build \
-            libpoppler-cpp-dev \
+            poppler-utils \
+            ghostscript \
+            desktop-file-utils \
+            appstream \
+            shellcheck \
             libjxl-tools \
             ffmpeg \
             imagemagick \
@@ -54,7 +61,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Build Rust CLI (konvert)
-        run: cargo build --release
+        run: cargo build --release --locked
 
       - name: Rustfmt Check
         run: cargo fmt --check
@@ -63,7 +70,20 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
       - name: Run Tests
-        run: cargo test --release
+        run: cargo test --release --locked
+
+      - name: Validate Metadata, Scripts & Checksums
+        run: |
+          desktop-file-validate io.github.enesehs.konvert.desktop
+          appstreamcli validate --no-net packaging/io.github.enesehs.konvert.metainfo.xml
+          shellcheck -S warning scripts/install.sh scripts/uninstall.sh docs/public/install.sh docs/public/uninstall.sh packaging/build-deb.sh packaging/build-appimage.sh
+          (cd docs/public && sha256sum -c install.sh.sha256)
+
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
+
+      - name: Security Audit (cargo audit)
+        run: cargo audit
 
       - name: Build Qt6 Settings GUI (konvert-settings)
         run: |
@@ -75,7 +95,16 @@ jobs:
         run: |
           rm -f packaging/*.deb packaging/*.sha256 *.deb *.sha256
           DEB_ARCH="${{ matrix.target.deb_arch }}" ./packaging/build-deb.sh
-          cp packaging/*.deb .
+          mv packaging/*.deb .
+
+      - name: Build AppImage Package
+        run: |
+          rm -f packaging/*.AppImage *.AppImage ./appimagetool
+          curl -fsSL "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${{ matrix.target.arch }}.AppImage" -o ./appimagetool
+          chmod +x ./appimagetool
+          APPIMAGE_EXTRACT_AND_RUN=1 ./packaging/build-appimage.sh
+          rm -f ./appimagetool
+          mv packaging/*.AppImage .
 
       - name: Package Release Bundle
         run: |
@@ -85,16 +114,17 @@ jobs:
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
             PKG_NAME="konvert-${{ github.ref_name }}-linux-${ARCH}"
           fi
-          mkdir -p "${PKG_NAME}"
+          mkdir -p "${PKG_NAME}/assets" "${PKG_NAME}/packaging" "${PKG_NAME}/docs"
           cp target/release/konvert "${PKG_NAME}/"
           cp gui/build/konvert-settings "${PKG_NAME}/"
           cp scripts/install.sh "${PKG_NAME}/"
           cp scripts/uninstall.sh "${PKG_NAME}/"
           chmod +x "${PKG_NAME}/install.sh" "${PKG_NAME}/uninstall.sh" 2>/dev/null || true
           cp io.github.enesehs.konvert.desktop "${PKG_NAME}/"
-          cp -r assets "${PKG_NAME}/"
-          cp -r packaging "${PKG_NAME}/"
-          mkdir -p "${PKG_NAME}/docs"
+          cp assets/logo.svg "${PKG_NAME}/assets/"
+          cp -r assets/icons "${PKG_NAME}/assets/"
+          cp packaging/io.github.enesehs.konvert.metainfo.xml "${PKG_NAME}/packaging/"
+          cp packaging/konvert-mime.xml "${PKG_NAME}/packaging/"
           cp docs/konvert.1 "${PKG_NAME}/docs/"
           cp README.md "${PKG_NAME}/"
           if [ -f LICENSE ]; then cp LICENSE "${PKG_NAME}/"; fi
@@ -109,6 +139,7 @@ jobs:
           path: |
             konvert-*.tar.gz
             *.deb
+            *.AppImage
 
   release:
     name: Create GitHub Release
@@ -132,7 +163,8 @@ jobs:
         run: |
           # 1. Generate clean unified SHA256SUMS.txt
           rm -f *.sha256 SHA256SUMS.txt
-          sha256sum konvert-*.tar.gz *.deb > SHA256SUMS.txt
+          sha256sum konvert-*.tar.gz *.deb *.AppImage > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
 
           # 2. Extract release notes from CHANGELOG.md for the current tag
           VERSION="${GITHUB_REF_NAME#v}"
@@ -161,6 +193,7 @@ jobs:
           files: |
             konvert-*.tar.gz
             *.deb
+            *.AppImage
             SHA256SUMS.txt
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}

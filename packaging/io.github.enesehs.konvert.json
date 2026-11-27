@@ -34,13 +34,15 @@
         "install -Dm644 packaging/io.github.enesehs.konvert.metainfo.xml /app/share/metainfo/io.github.enesehs.konvert.metainfo.xml",
         "install -Dm644 assets/logo.svg /app/share/icons/hicolor/scalable/apps/io.github.enesehs.konvert.svg",
         "install -Dm644 assets/logo.svg /app/share/icons/hicolor/scalable/apps/konvert.svg",
-        "install -Dm644 assets/icons/*.svg -t /app/share/icons/hicolor/scalable/actions/"
+        "install -Dm644 assets/icons/konvert-symbolic.svg /app/share/icons/hicolor/scalable/apps/konvert-symbolic.svg",
+        "install -Dm644 assets/icons/*.svg -t /app/share/icons/hicolor/scalable/actions/",
+        "install -Dm644 packaging/konvert-mime.xml /app/share/mime/packages/konvert-mime.xml"
       ],
       "sources": [
         {
           "type": "git",
           "url": "https://github.com/enesehs/konvert.git",
-          "tag": "v0.4.0"
+          "tag": "v0.5.0"
         }
       ]
     }

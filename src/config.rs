@@ -4,6 +4,39 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+pub fn validate_custom_profile(name: &str, profile: &ProfileConfig) -> Result<String> {
+    let trimmed = name.trim();
+    anyhow::ensure!(!trimmed.is_empty(), "Profil adı boş olamaz");
+    anyhow::ensure!(
+        trimmed.len() <= 64,
+        "Profil adı 64 karakteri aşamaz: '{}'",
+        trimmed
+    );
+    anyhow::ensure!(
+        trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'),
+        "Profil adı yalnızca harf, rakam, '_' ve '-' içerebilir: '{}'",
+        trimmed
+    );
+    let lower = trimmed.to_ascii_lowercase();
+    anyhow::ensure!(
+        !matches!(lower.as_str(), "web" | "balanced" | "archive" | "lossless"),
+        "Yerleşik profil adı ('{}') üzerine yazılamaz",
+        trimmed
+    );
+    anyhow::ensure!(
+        profile.quality.is_some()
+            || profile.crf.is_some()
+            || profile.preset.is_some()
+            || profile.bitrate.is_some()
+            || profile.dpi.is_some()
+            || profile.lossless.is_some(),
+        "Profil en az bir ayar içermelidir (--quality, --crf, --preset, --bitrate, --dpi veya --lossless)"
+    );
+    Ok(trimmed.to_string())
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 pub struct ProfileConfig {
     pub quality: Option<u8>,
@@ -14,7 +47,8 @@ pub struct ProfileConfig {
     pub lossless: Option<bool>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(default)]
 pub struct Config {
     pub general: GeneralConfig,
     pub context_menu: ContextMenuConfig,
@@ -22,89 +56,211 @@ pub struct Config {
     pub video: VideoConfig,
     pub audio: AudioConfig,
     pub document: DocumentConfig,
-    #[serde(default)]
     pub profiles: std::collections::HashMap<String, ProfileConfig>,
-    #[serde(default, flatten)]
+    #[serde(flatten)]
     pub extra: std::collections::BTreeMap<String, toml::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct GeneralConfig {
     pub notification_enabled: bool,
     pub output_directory: Option<String>,
     /// GUI'de seçilen arayüz dili (ör. "tr", "en"). Boşsa sistem yereli kullanılır.
-    #[serde(default)]
     pub language: Option<String>,
 }
 
+impl Default for GeneralConfig {
+    fn default() -> Self {
+        Self {
+            notification_enabled: true,
+            output_directory: None,
+            language: None,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct ContextMenuConfig {
     pub enabled_actions: Vec<String>,
 }
 
+impl Default for ContextMenuConfig {
+    fn default() -> Self {
+        Self {
+            // Tek kaynak: desktop::dolphin::ALL_ACTIONS (yalnızca default_enabled olanlar)
+            enabled_actions: crate::desktop::dolphin::ALL_ACTIONS
+                .iter()
+                .filter(|action| action.default_enabled)
+                .map(|action| action.id.to_string())
+                .collect(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct ImageConfig {
     pub quality: u8,
     pub lossless: bool,
 }
 
-fn default_hwaccel() -> String {
-    "auto".to_string()
+impl Default for ImageConfig {
+    fn default() -> Self {
+        Self {
+            quality: 85,
+            lossless: false,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct VideoConfig {
     pub crf: u8,
     pub preset: String,
     pub lossless: bool,
-    #[serde(default = "default_hwaccel")]
     pub hwaccel: String,
 }
 
+impl Default for VideoConfig {
+    fn default() -> Self {
+        Self {
+            crf: 23,
+            preset: "medium".into(),
+            lossless: false,
+            hwaccel: "auto".into(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct AudioConfig {
     pub bitrate: String,
 }
 
+impl Default for AudioConfig {
+    fn default() -> Self {
+        Self {
+            bitrate: "320k".into(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct DocumentConfig {
     pub pdf_dpi: u32,
 }
 
-impl Default for Config {
+impl Default for DocumentConfig {
     fn default() -> Self {
-        Self {
-            general: GeneralConfig {
-                notification_enabled: true,
-                output_directory: None,
-                language: None,
-            },
-            context_menu: ContextMenuConfig {
-                // Tek kaynak: desktop::dolphin::ALL_ACTIONS (extract_frames hariç)
-                enabled_actions: crate::desktop::dolphin::ALL_ACTIONS
-                    .iter()
-                    .filter(|action| action.id != "extract_frames")
-                    .map(|action| action.id.to_string())
-                    .collect(),
-            },
-            image: ImageConfig {
-                quality: 85,
-                lossless: false,
-            },
-            video: VideoConfig {
-                crf: 23,
-                preset: "medium".into(),
-                lossless: false,
-                hwaccel: "auto".into(),
-            },
-            audio: AudioConfig {
-                bitrate: "320k".into(),
-            },
-            document: DocumentConfig { pdf_dpi: 300 },
-            profiles: std::collections::HashMap::new(),
-            extra: std::collections::BTreeMap::new(),
+        Self { pdf_dpi: 300 }
+    }
+}
+
+fn validate_quality(q: u8) -> Result<u8> {
+    anyhow::ensure!(
+        (1..=100).contains(&q),
+        "Kalite 1 ile 100 arasında olmalıdır"
+    );
+    Ok(q)
+}
+
+fn validate_crf(crf: u8) -> Result<u8> {
+    anyhow::ensure!(crf <= 51, "CRF 0 ile 51 arasında olmalıdır");
+    Ok(crf)
+}
+
+fn validate_preset(preset: &str) -> Result<String> {
+    let trimmed = preset.trim().to_ascii_lowercase();
+    anyhow::ensure!(
+        matches!(
+            trimmed.as_str(),
+            "ultrafast"
+                | "superfast"
+                | "veryfast"
+                | "faster"
+                | "fast"
+                | "medium"
+                | "slow"
+                | "slower"
+                | "veryslow"
+                | "placebo"
+        ),
+        "Geçersiz video önayarı: '{}'",
+        preset
+    );
+    Ok(trimmed)
+}
+
+fn validate_hwaccel(hwaccel: &str) -> Result<String> {
+    let trimmed = hwaccel.trim().to_ascii_lowercase();
+    anyhow::ensure!(
+        matches!(
+            trimmed.as_str(),
+            "auto" | "vaapi" | "nvenc" | "none" | "cpu"
+        ),
+        "Geçersiz donanım hızlandırma kipi: '{}'",
+        hwaccel
+    );
+    Ok(trimmed)
+}
+
+fn validate_bitrate(bitrate: &str) -> Result<String> {
+    let trimmed = bitrate.trim().to_ascii_lowercase();
+    let num_part = trimmed
+        .strip_suffix('k')
+        .or_else(|| trimmed.strip_suffix('m'))
+        .unwrap_or(&trimmed);
+    let parsed: f64 = num_part
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Geçersiz bit hızı değeri: '{}'", bitrate))?;
+    anyhow::ensure!(
+        parsed.is_finite() && parsed > 0.0 && parsed <= 1024.0,
+        "Geçersiz bit hızı aralığı: '{}'",
+        bitrate
+    );
+    Ok(trimmed)
+}
+
+fn validate_pdf_dpi(dpi: u32) -> Result<u32> {
+    anyhow::ensure!(
+        (1..=2400).contains(&dpi),
+        "DPI 1 ile 2400 arasında olmalıdır"
+    );
+    Ok(dpi)
+}
+
+fn validate_language(lang: Option<String>) -> Result<Option<String>> {
+    match lang {
+        None => Ok(None),
+        Some(raw) => {
+            let trimmed = raw.trim();
+            if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("auto") {
+                Ok(None)
+            } else {
+                anyhow::ensure!(
+                    trimmed.len() <= 16
+                        && trimmed
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
+                    "Geçersiz dil kodu: '{}'",
+                    raw
+                );
+                Ok(Some(trimmed.to_ascii_lowercase()))
+            }
         }
     }
+}
+
+fn deserialize_double_option<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer).map(Some)
 }
 
 impl Config {
@@ -153,7 +309,47 @@ impl Config {
         Some(proj_dirs.config_dir().join("config.toml"))
     }
 
+    pub fn to_toml_string(&self) -> Result<String> {
+        let mut scalar_extra = toml::Table::new();
+        let mut table_extra = std::collections::BTreeMap::new();
+        for (k, v) in &self.extra {
+            let is_table_like = v.is_table()
+                || matches!(v, toml::Value::Array(arr) if arr.iter().any(|item| item.is_table()));
+            if is_table_like {
+                table_extra.insert(k.clone(), v.clone());
+            } else {
+                scalar_extra.insert(k.clone(), v.clone());
+            }
+        }
+
+        let clean_copy = Config {
+            general: self.general.clone(),
+            context_menu: self.context_menu.clone(),
+            image: self.image.clone(),
+            video: self.video.clone(),
+            audio: self.audio.clone(),
+            document: self.document.clone(),
+            profiles: self.profiles.clone(),
+            extra: table_extra,
+        };
+        let body = toml::to_string_pretty(&clean_copy)?;
+        if scalar_extra.is_empty() {
+            Ok(body)
+        } else {
+            let header = toml::to_string_pretty(&scalar_extra)?;
+            Ok(format!("{}\n{}", header.trim_end(), body))
+        }
+    }
+
     pub fn load() -> Self {
+        Self::load_inner(true)
+    }
+
+    pub fn load_readonly() -> Self {
+        Self::load_inner(false)
+    }
+
+    fn load_inner(allow_writes: bool) -> Self {
         if let Some(path) = Self::config_path()
             && path.exists()
         {
@@ -161,28 +357,42 @@ impl Config {
                 Ok(content) => match toml::from_str::<Config>(&content) {
                     Ok(cfg) => return cfg,
                     Err(err) => {
+                        if !allow_writes {
+                            eprintln!(
+                                "Uyarı: {} ayrıştırılamadı ({}). Varsayılan ayarlar kullanılacak.",
+                                path.display(),
+                                err
+                            );
+                            return Self::default();
+                        }
                         // Bozuk ayar dosyasını sessizce ezmek yerine yedekle.
+                        let bak = path.with_extension("toml.bak");
                         eprintln!(
                             "Uyarı: {} ayrıştırılamadı ({}). Yedekleniyor: {}",
                             path.display(),
                             err,
-                            path.with_extension("toml.bak").display()
+                            bak.display()
                         );
-                        let _ = fs::rename(&path, path.with_extension("toml.bak"));
+                        if fs::rename(&path, &bak).is_err() {
+                            return Self::default();
+                        }
                     }
                 },
                 Err(err) => {
                     eprintln!(
-                        "Uyarı: {} okunamadı ({}). Varsayılan ayarlar kullanılacak.",
+                        "Uyarı: {} okunamadı ({}). Mevcut dosya korunarak varsayılan ayarlar kullanılacak.",
                         path.display(),
                         err
                     );
+                    return Self::default();
                 }
             }
         }
 
         let default_config = Self::default();
-        let _ = default_config.save();
+        if allow_writes {
+            let _ = default_config.save();
+        }
         default_config
     }
 
@@ -191,8 +401,26 @@ impl Config {
             if let Some(parent) = path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            let toml_str = toml::to_string_pretty(self)?;
-            let tmp = path.with_extension("toml.tmp");
+            let toml_str = self.to_toml_string()?;
+
+            #[cfg(unix)]
+            let _lock_file = {
+                use std::os::unix::io::AsRawFd;
+                let lock_path = path.with_extension("toml.lock");
+                let file = fs::OpenOptions::new()
+                    .create(true)
+                    .read(true)
+                    .write(true)
+                    .truncate(false)
+                    .open(&lock_path)?;
+                // SAFETY: Valid file descriptor locked exclusively for config write; unlocked on drop.
+                unsafe {
+                    libc::flock(file.as_raw_fd(), libc::LOCK_EX);
+                }
+                file
+            };
+
+            let tmp = path.with_extension(format!("toml.{}.tmp", std::process::id()));
             fs::write(&tmp, toml_str)?;
             fs::rename(&tmp, &path)?;
         }
@@ -202,59 +430,70 @@ impl Config {
     pub fn update_from_json(&mut self, json_str: &str) -> Result<()> {
         let payload: ConfigUpdatePayload = serde_json::from_str(json_str)
             .map_err(|e| anyhow::anyhow!("Geçersiz ayar JSON verisi: {:#}", e))?;
-        self.apply_update(payload);
-        Ok(())
+        self.apply_update(payload)
     }
 
-    pub fn apply_update(&mut self, update: ConfigUpdatePayload) {
+    pub fn apply_update(&mut self, update: ConfigUpdatePayload) -> Result<()> {
+        let mut next = self.clone();
+
         if let Some(general_cfg) = update.general {
             if let Some(notif) = general_cfg.notification_enabled {
-                self.general.notification_enabled = notif;
+                next.general.notification_enabled = notif;
             }
             if let Some(out_dir) = general_cfg.output_directory {
-                self.general.output_directory = out_dir;
+                next.general.output_directory = out_dir.and_then(|s| {
+                    let t = s.trim();
+                    if t.is_empty() {
+                        None
+                    } else {
+                        Some(t.to_string())
+                    }
+                });
             }
             if let Some(lang) = general_cfg.language {
-                self.general.language = lang;
+                next.general.language = validate_language(lang)?;
             }
         }
         if let Some(ctx) = update.context_menu
             && let Some(actions) = ctx.enabled_actions
         {
-            self.context_menu.enabled_actions = actions;
+            next.context_menu.enabled_actions = actions;
         }
         if let Some(img) = update.image {
             if let Some(q) = img.quality {
-                self.image.quality = q;
+                next.image.quality = validate_quality(q)?;
             }
             if let Some(l) = img.lossless {
-                self.image.lossless = l;
+                next.image.lossless = l;
             }
         }
         if let Some(vid) = update.video {
             if let Some(crf) = vid.crf {
-                self.video.crf = crf;
+                next.video.crf = validate_crf(crf)?;
             }
             if let Some(preset) = vid.preset {
-                self.video.preset = preset;
+                next.video.preset = validate_preset(&preset)?;
             }
             if let Some(lossless) = vid.lossless {
-                self.video.lossless = lossless;
+                next.video.lossless = lossless;
             }
             if let Some(hwaccel) = vid.hwaccel {
-                self.video.hwaccel = hwaccel;
+                next.video.hwaccel = validate_hwaccel(&hwaccel)?;
             }
         }
         if let Some(aud) = update.audio
             && let Some(bitrate) = aud.bitrate
         {
-            self.audio.bitrate = bitrate;
+            next.audio.bitrate = validate_bitrate(&bitrate)?;
         }
         if let Some(doc) = update.document
             && let Some(dpi) = doc.pdf_dpi
         {
-            self.document.pdf_dpi = dpi;
+            next.document.pdf_dpi = validate_pdf_dpi(dpi)?;
         }
+
+        *self = next;
+        Ok(())
     }
 
     pub fn set_key_value(&mut self, key: &str, value: &str) -> Result<()> {
@@ -273,21 +512,13 @@ impl Config {
                 };
             }
             "general.language" => {
-                self.general.language = if trimmed_val.is_empty() || trimmed_val == "auto" {
-                    None
-                } else {
-                    Some(trimmed_val.to_string())
-                };
+                self.general.language = validate_language(Some(trimmed_val.to_string()))?;
             }
             "image.quality" => {
                 let q = trimmed_val
                     .parse::<u8>()
                     .map_err(|_| anyhow::anyhow!("Geçersiz kalite değeri (1-100): '{}'", value))?;
-                anyhow::ensure!(
-                    (1..=100).contains(&q),
-                    "Kalite 1 ile 100 arasında olmalıdır"
-                );
-                self.image.quality = q;
+                self.image.quality = validate_quality(q)?;
             }
             "image.lossless" => {
                 self.image.lossless = trimmed_val
@@ -298,11 +529,10 @@ impl Config {
                 let crf = trimmed_val
                     .parse::<u8>()
                     .map_err(|_| anyhow::anyhow!("Geçersiz CRF değeri (0-51): '{}'", value))?;
-                anyhow::ensure!(crf <= 51, "CRF 0 ile 51 arasında olmalıdır");
-                self.video.crf = crf;
+                self.video.crf = validate_crf(crf)?;
             }
             "video.preset" => {
-                self.video.preset = trimmed_val.to_string();
+                self.video.preset = validate_preset(trimmed_val)?;
             }
             "video.lossless" => {
                 self.video.lossless = trimmed_val
@@ -310,17 +540,16 @@ impl Config {
                     .map_err(|_| anyhow::anyhow!("Geçersiz boolean değer: '{}'", value))?;
             }
             "video.hwaccel" => {
-                self.video.hwaccel = trimmed_val.to_string();
+                self.video.hwaccel = validate_hwaccel(trimmed_val)?;
             }
             "audio.bitrate" => {
-                self.audio.bitrate = trimmed_val.to_string();
+                self.audio.bitrate = validate_bitrate(trimmed_val)?;
             }
             "document.pdf_dpi" => {
                 let dpi = trimmed_val
                     .parse::<u32>()
                     .map_err(|_| anyhow::anyhow!("Geçersiz DPI değeri: '{}'", value))?;
-                anyhow::ensure!(dpi > 0 && dpi <= 2400, "DPI 1 ile 2400 arasında olmalıdır");
-                self.document.pdf_dpi = dpi;
+                self.document.pdf_dpi = validate_pdf_dpi(dpi)?;
             }
             "context_menu.enabled_actions" => {
                 self.context_menu.enabled_actions = trimmed_val
@@ -375,7 +604,9 @@ pub struct ConfigUpdatePayload {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct GeneralConfigUpdate {
     pub notification_enabled: Option<bool>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
     pub output_directory: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_double_option")]
     pub language: Option<Option<String>>,
 }
 
@@ -434,10 +665,11 @@ mod tests {
     #[test]
     fn test_default_actions_exist_in_registry() {
         let cfg = Config::default();
-        assert_eq!(
-            cfg.context_menu.enabled_actions.len(),
-            crate::desktop::dolphin::ALL_ACTIONS.len() - 1
-        );
+        let expected_len = crate::desktop::dolphin::ALL_ACTIONS
+            .iter()
+            .filter(|a| a.default_enabled)
+            .count();
+        assert_eq!(cfg.context_menu.enabled_actions.len(), expected_len);
         for id in &cfg.context_menu.enabled_actions {
             assert!(
                 crate::desktop::dolphin::find_action(id).is_some(),
@@ -445,9 +677,19 @@ mod tests {
             );
         }
         assert!(
+            cfg.context_menu
+                .enabled_actions
+                .contains(&"strip_metadata_video".to_string())
+        );
+        assert!(
             !cfg.context_menu
                 .enabled_actions
                 .contains(&"extract_frames".to_string())
+        );
+        assert!(
+            !cfg.context_menu
+                .enabled_actions
+                .contains(&"to_bmp".to_string())
         );
     }
 
@@ -604,6 +846,95 @@ author = "custom"
         assert_eq!(
             cfg.context_menu.enabled_actions,
             vec!["convert_webp", "convert_avif"]
+        );
+    }
+
+    #[test]
+    fn test_config_json_null_clears_optional_fields_and_rejects_invalid_values() {
+        let mut cfg = Config::default();
+        cfg.general.output_directory = Some("/tmp/out".to_string());
+        cfg.general.language = Some("tr".to_string());
+
+        // Null resets both fields without wiping sibling keys
+        cfg.update_from_json(r#"{"general": {"output_directory": null, "language": null}}"#)
+            .unwrap();
+        assert_eq!(cfg.general.output_directory, None);
+        assert_eq!(cfg.general.language, None);
+
+        // Omitting them does not alter newly set values
+        cfg.general.output_directory = Some("/tmp/keep".to_string());
+        cfg.update_from_json(r#"{"general": {"notification_enabled": false}}"#)
+            .unwrap();
+        assert_eq!(cfg.general.output_directory.as_deref(), Some("/tmp/keep"));
+
+        // Invalid values fail atomically without partial mutation
+        let prev_q = cfg.image.quality;
+        assert!(
+            cfg.update_from_json(r#"{"image": {"quality": 0}, "video": {"crf": 99}}"#)
+                .is_err()
+        );
+        assert_eq!(cfg.image.quality, prev_q);
+        assert!(cfg.set_key_value("video.preset", "invalid_preset").is_err());
+        assert!(cfg.set_key_value("video.hwaccel", "vulkan").is_err());
+        assert!(cfg.set_key_value("audio.bitrate", "0k").is_err());
+    }
+
+    #[test]
+    fn test_config_partial_toml_and_top_level_scalar_extra_roundtrip() {
+        let partial = r#"
+z_scalar = 42
+alpha_flag = true
+
+[image]
+quality = 77
+"#;
+        let cfg: Config = toml::from_str(partial).expect("Partial TOML must parse");
+        assert_eq!(cfg.image.quality, 77);
+        assert_eq!(cfg.video.preset, "medium");
+        assert_eq!(cfg.document.pdf_dpi, 300);
+        assert_eq!(cfg.extra.get("z_scalar"), Some(&toml::Value::Integer(42)));
+
+        let serialized = cfg
+            .to_toml_string()
+            .expect("Top-level scalar extra must serialize before tables");
+        let reloaded: Config = toml::from_str(&serialized).expect("Roundtrip parse failed");
+        assert_eq!(reloaded.image.quality, 77);
+        assert_eq!(
+            reloaded.extra.get("z_scalar"),
+            Some(&toml::Value::Integer(42))
+        );
+        assert_eq!(
+            reloaded.extra.get("alpha_flag"),
+            Some(&toml::Value::Boolean(true))
+        );
+    }
+
+    #[test]
+    fn test_validate_custom_profile_rejects_invalid_and_accepts_valid() {
+        let valid_profile = ProfileConfig {
+            quality: Some(88),
+            crf: None,
+            preset: None,
+            bitrate: None,
+            dpi: None,
+            lossless: None,
+        };
+        assert!(validate_custom_profile("", &valid_profile).is_err());
+        assert!(validate_custom_profile("   ", &valid_profile).is_err());
+        assert!(validate_custom_profile("bad/name", &valid_profile).is_err());
+        assert!(validate_custom_profile("has space", &valid_profile).is_err());
+        assert!(validate_custom_profile(&"a".repeat(65), &valid_profile).is_err());
+
+        for builtin in ["web", "balanced", "archive", "lossless", "WEB", "Balanced"] {
+            assert!(validate_custom_profile(builtin, &valid_profile).is_err());
+        }
+
+        let empty_profile = ProfileConfig::default();
+        assert!(validate_custom_profile("my_profile", &empty_profile).is_err());
+
+        assert_eq!(
+            validate_custom_profile("  social-hq_1  ", &valid_profile).unwrap(),
+            "social-hq_1"
         );
     }
 }

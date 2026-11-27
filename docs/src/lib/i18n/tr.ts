@@ -30,6 +30,13 @@ export const tr: Translations = {
     openMenu: "Menüyü Aç",
     mobileMenu: "Mobil Menü",
     skipLink: "İçeriğe Atla",
+    mainNavAria: "Ana menü",
+    langSelectionAria: "Dil seçimi / Language selection",
+    langLabel: "DİL",
+    switchToLight: "Aydınlık temaya geç",
+    switchToDark: "Karanlık temaya geç",
+    starProject: "GitHub'da Yıldızla",
+    supportProject: "Projeyi Destekle",
   },
   hero: {
     seoH1: "Linux İçin Yerel Sağ Tık Dosya Dönüştürücü",
@@ -76,6 +83,13 @@ export const tr: Translations = {
     localDisk: "Yerel Disk",
     hint: "Aşağıdaki menüden bir format seçerek canlı dönüşümü test edin:",
     interactiveHint: "ETKİLEŞİMLİ DEMO: TIKLAYARAK TEST EDİN",
+    itemCountSummary: "6 öğe (2 seçildi)",
+    processingLabel: "işleniyor...",
+    doneSummaryTemplate: "2 dosya başarıyla {target} formatına dönüştürüldü ({total}).",
+    footerIdle: "Hazır — Menüden format seçerek canlı dönüşümü test edin",
+    footerConvertingTemplate: "Rust Rayon iş parçacığı dönüştürüyor: {target}...",
+    footerDoneTemplate: "Tamamlandı: %{saved} disk tasarrufu sağlandı.",
+    resetShort: "Sıfırla",
   },
   comparison: {
     badge: "FFMPEG EZBERİNE VE ŞÜPHELİ SİTELERE SON",
@@ -96,7 +110,7 @@ export const tr: Translations = {
     newWaySubtitle: "Tamamen çevrimdışı, sıfır hafıza yükü, 1 saniyede yerel çıktı.",
     newWayPoints: [
       "Dosya yöneticinde dosyaya sağ tıkla -> hedef formatı seç -> 1 saniyede yerel dönüştür",
-      "%100 Çevrimdışı & Yerel: Dosyaların diskinden asla ayrılmaz, sıfır telemetri, sıfır sunucu",
+      "%100 Çevrimdışı & Yerel: Dosyaların diskinden asla ayrılmaz, sıfır telemetri, sıfır arka plan yüklemesi",
       "Donanım hızlandırmalı Rust motoru: Boşta 0 MB RAM, sadece tıklandığında çalışır ve anında kapanır",
       "Sistem bildirimiyle anında hazır: Yeni dosya orijinalin hemen altında belirir",
     ],
@@ -136,15 +150,20 @@ export const tr: Translations = {
       {
         value: "%100",
         label: "Yerel & Çevrimdışı",
-        desc: "Sıfır telemetri, sıfır sunucu isteği. Dosyalarınız cihazınızdan asla ayrılmaz. Uçak modunda veya izole ağlarda tam kapasite çalışır.",
+        desc: "Sıfır telemetri ve sıfır analitik. Dosyalarınız cihazınızdan asla ayrılmaz; tüm dönüştürmeler çevrimdışı çalışır (yalnızca --check-update elle çalıştırılırsa sürüm sorgular).",
         tag: "Tam Gizlilik",
       },
       {
         value: "Açık Kaynak",
         label: "GPL-3.0-or-later Lisansı",
-        desc: "Every single line is auditable and community-driven. Free from proprietary locks, telemetry, advertisements, and paywalls.",
+        desc: "Her satır bağımsız olarak denetlenebilir ve topluluk odaklıdır. Sahipli kilitler, telemetri, reklamlar ve ödeme duvarları içermez.",
         tag: "Bağımsız Denetlenebilir",
       },
+    ],
+    specs: [
+      "POSIX EXEC · DAEMON YOK · 0 SYSTEMD SERVİSİ",
+      "ÇEVRİMDIŞI DÖNÜŞÜM · SIFIR TELEMETRİ · AIR-GAP UYUMLU",
+      "GPL-3.0-or-later · BAĞIMSIZ DENETLENEBİLİR DERLEME",
     ],
   },
   formats: {
@@ -165,27 +184,33 @@ export const tr: Translations = {
       audio: "Stüdyo doğruluğunda ses akışı, kayıpsız format dönüştürme ve ID3 etiket koruması.",
       doc: "Vektörel font sadakati, yüksek DPI render ve doğrudan yerel doküman ayrıştırma.",
     },
-    profilesTitle: "3 Akıllı Kalite Profili",
+    profilesTitle: "4 Akıllı Kalite Profili",
     profilesDesc:
       "İster web için minimum boyut, ister arşiv için kayıpsız netlik.",
     profiles: [
       {
         label: "WEB OPTİMİZE",
-        name: "Akıllı Sıkıştırma",
-        desc: "Görsel algıyı bozmadan dosya boyutunu %80'e kadar azaltır. Web sayfaları ve hızlı paylaşımlar için ideal.",
+        name: "web (Akıllı Sıkıştırma)",
+        desc: "Görsel kalite 80, CRF 28, 150 DPI ile web sayfaları ve hızlı paylaşım için minimum boyut üretir.",
       },
       {
-        label: "ORİJİNAL KALİTE",
-        name: "Dengeli Standart",
-        desc: "Piksel ve ses sadakatini maksimum düzeyde korurken evrensel uyumluluk sunar.",
+        label: "VARSAYILAN DENGE",
+        name: "balanced (Dengeli Standart)",
+        desc: "Görsel kalite 85, CRF 23, 300 DPI ve evrensel uyumluluk ile günlük işlerde yüksek sadakat sunar.",
+      },
+      {
+        label: "ARŞİV KALİTESİ",
+        name: "archive (Yüksek Kalite)",
+        desc: "Görsel kalite 95, CRF 18, 600 DPI ve 320k ses ile baskı ve uzun süreli arşivleme için tasarlanmıştır.",
       },
       {
         label: "KAYIPSIZ",
-        name: "Arşivleme & Baskı",
-        desc: "Sıfır kayıp algoritmasıyla profesyonel baskı, arşivleme ve düzenleme işleri için tam detay sağlar.",
+        name: "lossless (Matematiksel Kayıpsız)",
+        desc: "Görsel ve videoda kayıpsız kodlama (CRF 0, 320k ses) ile piksel ve ses detayını sıfır kayıpla korur.",
       },
     ],
     defaultRayon: "VARSAYILAN: ÇOK ÇEKİRDEKLİ PARALEL RAYON",
+    perPage: "/sayfa",
     params: {
       losslessRgba: "Kayıpsız / RGBA",
       jxlNextGen: "Yeni Nesil JPEG XL / VarDCT",
@@ -238,7 +263,7 @@ export const tr: Translations = {
     comingSoonBadge: "Yakında",
     commands: {
       script: "curl -fsSL https://enesehs.dev/konvert/install.sh | bash",
-      arch: "paru -S konvert-bin\n# veya yay ile:\nyay -S konvert-bin",
+      arch: "paru -S konvert\n# veya yay ile:\nyay -S konvert",
       debian: "# Debian / Ubuntu resmi deposu hazırlanıyor (Yakında)\n# Şimdilik bağımsız kurucu betiği kullanabilirsiniz:\ncurl -fsSL https://enesehs.dev/konvert/install.sh | bash",
       fedora: "# Fedora / RHEL COPR deposu hazırlanıyor (Yakında)\n# Şimdilik bağımsız kurucu betiği kullanabilirsiniz:\ncurl -fsSL https://enesehs.dev/konvert/install.sh | bash",
       uninstall: "konvert --uninstall-all\n# veya uzaktan betik ile:\ncurl -fsSL https://enesehs.dev/konvert/uninstall.sh | bash",
@@ -259,6 +284,10 @@ export const tr: Translations = {
     licenseTag: "GPL-3.0-or-later",
     sourceContribDesc:
       "Tüm kaynak kodu, ServiceMenu .desktop dosyaları ve Rust ikilisi bağımsız olarak denetlenebilir ve derlenebilir.",
+    copyCommandAria: "Komutu kopyala",
+    copyIntegrationAria: "Entegrasyon komutunu kopyala",
+    copiedShort: "Kopyalandı",
+    copyShort: "Kopyala",
   },
   faq: {
     badge: "SIKÇA SORULAN SORULAR",
@@ -271,7 +300,7 @@ export const tr: Translations = {
       },
       {
         q: "Konvert internet bağlantısı gerektirir mi ya da telemetri toplar mı?",
-        a: "Kesinlikle hayır. Konvert %100 yerel ve çevrimdışı çalışır. Kod tabanında hiçbir analitik, telemetri veya harici ağ isteği bulunmaz. Uçak modunda dahi tüm işlevleri tam kapasite çalışır.",
+        a: "Hayır. Tüm dosya dönüştürme işlemleri %100 yerel ve çevrimdışı çalışır; arka planda hiçbir telemetri veya analitik yoktur (ağ bağlantısı yalnızca kullanıcı açıkça konvert --check-update çalıştırdığında kurulur).",
       },
       {
         q: "Arka planda RAM veya CPU tüketir mi?",
@@ -287,7 +316,7 @@ export const tr: Translations = {
       },
       {
         q: "Windows veya macOS desteği var mı?",
-        a: "Konvert doğrudan Linux masaüstü ortamlarının (KDE ServiceMenus, Nautilus Python/Scripts, Nemo eylemleri) mimarisine özel olarak tasarlanmıştır. Odak noktamız doğrudan ve tam entegre bir Linux deneyimidir.",
+        a: "Konvert doğrudan Linux masaüstü ortamlarının (KDE ServiceMenus, Nautilus betikleri, Nemo eylemleri, Thunar UCA) mimarisine özel olarak tasarlanmıştır. Odak noktamız doğrudan ve tam entegre bir Linux deneyimidir.",
       },
     ],
   },

@@ -29,16 +29,24 @@ else
   REAL_HOME="${HOME}"
 fi
 
+run_as_real_user() {
+  if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    sudo -u "${REAL_USER}" env HOME="${REAL_HOME}" PATH="${REAL_HOME}/.cargo/bin:${PATH}" "$@"
+  else
+    "$@"
+  fi
+}
+
 if [ "${PREBUILT}" -eq 1 ]; then
   echo "==> 1. Using prebuilt binaries from ${SCRIPT_DIR} (no compilation needed)."
 else
   echo "==> 1. Building Rust Core Engine (konvert)..."
-  cargo build --release
+  run_as_real_user cargo build --release
 
   echo "==> 2. Building Qt6 / KDE Settings GUI (konvert-settings)..."
   if command -v cmake >/dev/null 2>&1; then
-    cmake -B gui/build -S gui -DCMAKE_BUILD_TYPE=Release
-    cmake --build gui/build
+    run_as_real_user cmake -B gui/build -S gui -DCMAKE_BUILD_TYPE=Release
+    run_as_real_user cmake --build gui/build
   else
     echo "Warning: cmake not found; the settings GUI will not be installed." >&2
   fi
@@ -122,16 +130,49 @@ cp -f io.github.enesehs.konvert.desktop "${DESKTOP_DIR}/"
 cp -f packaging/io.github.enesehs.konvert.metainfo.xml "${METAINFO_DIR}/"
 chmod 644 "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" 2>/dev/null || true
 
-MAN_DIR="${REAL_HOME}/.local/share/man/man1"
-if [ -f "${ROOT_DIR}/docs/konvert.1" ]; then
-  mkdir -p "${MAN_DIR}"
-  cp -f "${ROOT_DIR}/docs/konvert.1" "${MAN_DIR}/konvert.1"
-fi
-
-echo "==> Synchronizing Dolphin right-click context menus..."
+echo "==> Synchronizing desktop file manager context menus..."
 rm -f "${SERVICEMENU_DIR}/konvert.desktop" 2>/dev/null || true
-"${INSTALL_DIR}/konvert" --sync-menu --menu-dir "${SERVICEMENU_DIR}" || true
+run_as_real_user "${INSTALL_DIR}/konvert" --install-all >/dev/null 2>&1 || true
+run_as_real_user "${INSTALL_DIR}/konvert" --sync-menu --menu-dir "${SERVICEMENU_DIR}" || true
 chmod -f 755 "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
+
+# Verify Qt6 runtime shared libraries for konvert-settings
+if [ -f "${INSTALL_DIR}/konvert-settings" ] && command -v ldd >/dev/null 2>&1; then
+  if ldd "${INSTALL_DIR}/konvert-settings" 2>/dev/null | grep -q "not found"; then
+    echo ""
+    echo "[WARN] Missing Qt6 runtime libraries detected for konvert-settings:"
+    ldd "${INSTALL_DIR}/konvert-settings" 2>/dev/null | grep "not found" || true
+    INSTALL_CMD=""
+    if command -v apt-get >/dev/null 2>&1; then
+      if command -v apt-cache >/dev/null 2>&1 && apt-cache show libqt6widgets6t64 >/dev/null 2>&1; then
+        INSTALL_CMD="apt-get update && apt-get install -y libqt6widgets6t64 libqt6gui6t64 libqt6core6t64 libqt6network6t64 libqt6svg6"
+      else
+        INSTALL_CMD="apt-get update && apt-get install -y libqt6widgets6 libqt6gui6 libqt6core6 libqt6network6 libqt6svg6"
+      fi
+    elif command -v dnf >/dev/null 2>&1; then
+      INSTALL_CMD="dnf install -y qt6-qtbase qt6-qtsvg"
+    elif command -v pacman >/dev/null 2>&1; then
+      INSTALL_CMD="pacman -S --needed qt6-base qt6-svg"
+    fi
+
+    if [ -n "${INSTALL_CMD}" ]; then
+      if [ "$(id -u)" -eq 0 ]; then
+        echo "==> Installing missing Qt6 runtime libraries..."
+        sh -c "${INSTALL_CMD}" || echo "[WARN] Automatic installation failed. Run: sudo ${INSTALL_CMD}" >&2
+      elif command -v sudo >/dev/null 2>&1 && [ -r /dev/tty ]; then
+        printf "Install missing Qt6 runtime libraries now with sudo? [Y/n] " > /dev/tty
+        read -r REPLY < /dev/tty || REPLY="n"
+        if [ -z "${REPLY}" ] || [[ "${REPLY}" =~ ^[YyEe]$ ]]; then
+          sudo sh -c "${INSTALL_CMD}" || echo "[WARN] Run manually: sudo ${INSTALL_CMD}" >&2
+        else
+          echo "[WARN] To fix konvert-settings, run: sudo ${INSTALL_CMD}" >&2
+        fi
+      else
+        echo "[WARN] To fix konvert-settings, run: sudo ${INSTALL_CMD}" >&2
+      fi
+    fi
+  fi
+fi
 
 # Man page & Shell completions
 MAN_DIR="${REAL_HOME}/.local/share/man/man1"
@@ -140,6 +181,7 @@ FISH_COMP_DIR="${REAL_HOME}/.config/fish/completions"
 ZSH_COMP_DIR="${REAL_HOME}/.local/share/zsh/site-functions"
 mkdir -p "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
 [ -f "${ROOT_DIR}/docs/konvert.1" ] && cp -f "${ROOT_DIR}/docs/konvert.1" "${MAN_DIR}/konvert.1" 2>/dev/null || true
+chmod 644 "${MAN_DIR}/konvert.1" 2>/dev/null || true
 "${INSTALL_DIR}/konvert" --completions bash > "${BASH_COMP_DIR}/konvert" 2>/dev/null || true
 "${INSTALL_DIR}/konvert" --completions fish > "${FISH_COMP_DIR}/konvert.fish" 2>/dev/null || true
 "${INSTALL_DIR}/konvert" --completions zsh > "${ZSH_COMP_DIR}/_konvert" 2>/dev/null || true
@@ -150,8 +192,8 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
   chown -R "${REAL_USER}:" "${INSTALL_DIR}/konvert" 2>/dev/null || true
   [ -f "${INSTALL_DIR}/konvert-settings" ] && chown -R "${REAL_USER}:" "${INSTALL_DIR}/konvert-settings" 2>/dev/null || true
   chown -R "${REAL_USER}:" "${DESKTOP_DIR}/io.github.enesehs.konvert.desktop" "${METAINFO_DIR}/io.github.enesehs.konvert.metainfo.xml" 2>/dev/null || true
-  chown -R "${REAL_USER}:" "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
-  chown -R "${REAL_USER}:" "${ICON_DIR}" "${MIME_DIR}" 2>/dev/null || true
+  chown -R "${REAL_USER}:" "${SERVICEMENU_DIR}" 2>/dev/null || true
+  chown -R "${REAL_USER}:" "${ICON_DIR}" "${REAL_HOME}/.local/share/mime" 2>/dev/null || true
   chown -R "${REAL_USER}:" "${MAN_DIR}" "${BASH_COMP_DIR}" "${FISH_COMP_DIR}" "${ZSH_COMP_DIR}" 2>/dev/null || true
 fi
 

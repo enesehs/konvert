@@ -33,7 +33,16 @@ pub fn load_history() -> Vec<HistoryEntry> {
     if !path.exists() {
         return Vec::new();
     }
-    let Ok(content) = fs::read_to_string(&path) else {
+    #[cfg(unix)]
+    let _lock = lock_history(&path);
+    load_history_unlocked(&path)
+}
+
+fn load_history_unlocked(path: &Path) -> Vec<HistoryEntry> {
+    if !path.exists() {
+        return Vec::new();
+    }
+    let Ok(content) = fs::read_to_string(path) else {
         return Vec::new();
     };
     match serde_json::from_str::<Vec<HistoryEntry>>(&content) {
@@ -46,7 +55,7 @@ pub fn load_history() -> Vec<HistoryEntry> {
                 err,
                 backup.display()
             );
-            let _ = fs::rename(&path, &backup);
+            let _ = fs::rename(path, &backup);
             Vec::new()
         }
     }
@@ -64,10 +73,14 @@ fn lock_history(path: &Path) -> Option<fs::File> {
         .open(lock_path)
         .ok()?;
     // SAFETY: as_raw_fd() returns a valid file descriptor owned by 'file'.
-    // flock is an advisory kernel lock that blocks until acquired and is automatically
-    // released by the OS when the file descriptor is closed when 'file' is dropped.
+    // flock is an advisory kernel lock retried on EINTR and released when 'file' drops.
     unsafe {
-        libc::flock(file.as_raw_fd(), libc::LOCK_EX);
+        while libc::flock(file.as_raw_fd(), libc::LOCK_EX) != 0 {
+            let err = std::io::Error::last_os_error();
+            if err.raw_os_error() != Some(libc::EINTR) {
+                break;
+            }
+        }
     }
     Some(file)
 }
@@ -76,15 +89,19 @@ pub fn add_history_entry(entry: HistoryEntry) -> Result<()> {
     let Some(path) = get_history_path() else {
         return Ok(());
     };
+    add_history_entry_at(&path, entry)
+}
+
+fn add_history_entry_at(path: &Path, entry: HistoryEntry) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
 
     // Oku-değiştir-yaz yarışını önlemek için süreçler arası kilit.
     #[cfg(unix)]
-    let _lock = lock_history(&path);
+    let _lock = lock_history(path);
 
-    let mut history: VecDeque<HistoryEntry> = load_history().into();
+    let mut history: VecDeque<HistoryEntry> = load_history_unlocked(path).into();
     history.push_front(entry); // O(1) front insertion
 
     // En fazla son 100 işlemi sakla
@@ -93,18 +110,23 @@ pub fn add_history_entry(entry: HistoryEntry) -> Result<()> {
     }
 
     let json = serde_json::to_string(&history)?;
-    let tmp = path.with_extension("json.tmp");
+    let tmp = path.with_extension(format!("json.{}.tmp", std::process::id()));
     fs::write(&tmp, json)?;
-    fs::rename(&tmp, &path)?;
+    fs::rename(&tmp, path)?;
     Ok(())
 }
 
 #[allow(dead_code)]
 pub fn clear_history() -> Result<()> {
-    if let Some(path) = get_history_path()
-        && path.exists()
-    {
-        fs::remove_file(path)?;
+    if let Some(path) = get_history_path() {
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        #[cfg(unix)]
+        let _lock = lock_history(&path);
+        if path.exists() {
+            fs::remove_file(path)?;
+        }
     }
     Ok(())
 }
@@ -113,18 +135,28 @@ pub fn current_timestamp() -> String {
     chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
-/// Bir dosyanın veya dizinin toplam boyutu (dizinlerde alt dosyalar toplanır).
+const MAX_PATH_SIZE_DEPTH: usize = 64;
+
+/// Bir dosyanın veya dizinin toplam boyutu (dizinlerde alt dosyalar toplanır; symlink döngüleri atlanır).
 ///
 /// Dizin çıktılarında (kare çıkarma, PDF→PNG) `metadata().len()` anlamsız
 /// (4-64 KB) değer döndürdüğü için geçmiş/istatistiklerde bu fonksiyon kullanılır.
 pub fn path_size_bytes(path: &std::path::Path) -> u64 {
-    match fs::metadata(path) {
+    path_size_bytes_bounded(path, 0)
+}
+
+fn path_size_bytes_bounded(path: &std::path::Path, depth: usize) -> u64 {
+    if depth >= MAX_PATH_SIZE_DEPTH {
+        return 0;
+    }
+    match fs::symlink_metadata(path) {
+        Ok(meta) if meta.file_type().is_symlink() => 0,
         Ok(meta) if meta.is_file() => meta.len(),
         Ok(meta) if meta.is_dir() => fs::read_dir(path)
             .map(|entries| {
                 entries
                     .flatten()
-                    .map(|entry| path_size_bytes(&entry.path()))
+                    .map(|entry| path_size_bytes_bounded(&entry.path(), depth + 1))
                     .sum()
             })
             .unwrap_or(0),
@@ -183,5 +215,80 @@ mod tests {
         let ts = current_timestamp();
         assert!(ts.contains("-"));
         assert!(ts.contains(":"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_path_size_bytes_ignores_symlink_loops() {
+        let dir = std::env::temp_dir().join(format!(
+            "konvert_symlink_size_test_{}_{}",
+            std::process::id(),
+            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("real.bin"), vec![1u8; 42]).unwrap();
+        std::os::unix::fs::symlink(&dir, dir.join("loop")).unwrap();
+
+        assert_eq!(path_size_bytes(&dir), 42);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_add_history_entry_at_truncates_to_100_newest_entries() {
+        let dir = std::env::temp_dir().join(format!(
+            "konvert_history_limit_test_{}_{}",
+            std::process::id(),
+            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let history_path = dir.join("history.json");
+
+        for i in 0..105 {
+            add_history_entry_at(
+                &history_path,
+                HistoryEntry {
+                    timestamp: format!("2026-11-27 10:{:02}:00", i % 60),
+                    target: format!("target_{i}"),
+                    file_count: 1,
+                    original_size_bytes: 1000,
+                    output_size_bytes: 500,
+                    savings_percent: 50.0,
+                    status: "Success".to_string(),
+                    output_path: None,
+                },
+            )
+            .unwrap();
+        }
+
+        let loaded = load_history_unlocked(&history_path);
+        assert_eq!(loaded.len(), 100);
+        assert_eq!(loaded.first().unwrap().target, "target_104");
+        assert_eq!(loaded.last().unwrap().target, "target_5");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_history_unlocked_backs_up_corrupt_json() {
+        let dir = std::env::temp_dir().join(format!(
+            "konvert_history_corrupt_test_{}_{}",
+            std::process::id(),
+            chrono::Local::now().timestamp_nanos_opt().unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let history_path = dir.join("history.json");
+        std::fs::write(&history_path, "{ not valid json").unwrap();
+
+        let loaded = load_history_unlocked(&history_path);
+        assert!(loaded.is_empty());
+
+        let backup = history_path.with_extension("json.corrupt");
+        assert!(backup.exists(), "corrupt history JSON must be backed up");
+        assert_eq!(
+            std::fs::read_to_string(&backup).unwrap(),
+            "{ not valid json"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

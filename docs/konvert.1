@@ -1,4 +1,4 @@
-.TH KONVERT 1 "2026-11-19" "konvert 0.4.0" "User Commands"
+.TH KONVERT 1 "2026-11-27" "konvert 0.5.0" "User Commands"
 .SH NAME
 konvert \- fast, offline file converter and optimizer for Linux
 .SH SYNOPSIS
@@ -84,18 +84,63 @@ Video CRF value.
 .BR \-\-preset " " \fINAME\fR
 x264 preset (ultrafast ... veryslow).
 .TP
-.BR \-\-bitrate " " \fIRATE\fR
+.BR \-\-hwaccel " " \fIMODE\fR
+Hardware acceleration mode for video encoding (\fBauto\fR, \fBvaapi\fR, \fBnvenc\fR, \fBnone\fR, or \fBcpu\fR).
+.TP
+.BR \-b ", " \-\-bitrate " " \fIRATE\fR
 Audio bitrate, e.g. \fB192k\fR.
 .TP
 .BR \-\-dpi " " \fIN\fR
 PDF rendering DPI (36\-1200, default: 300).
 .TP
+.B \-\-pause
+Pause the running background conversion process.
+.TP
+.B \-\-resume
+Resume a paused background conversion process.
+.TP
 .B \-\-cancel
 Stop the running conversion (validated by PID; kills the process group).
+.TP
+.B \-\-no\-notify
+Disable desktop system notifications for the current invocation.
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose diagnostic logging to terminal and \fI~/.cache/konvert/konvert.log\fR.
+.TP
+.BR \-\-lang " " \fICODE\fR
+Override interface language (\fBen\fR, \fBtr\fR, \fBde\fR, \fBfr\fR, \fBes\fR, \fBit\fR, \fBru\fR, \fBzh\fR, or \fBja\fR).
+.TP
+.B \-\-doctor
+Run full system environment and GPU hardware acceleration diagnostics.
 .TP
 .B \-\-check\-deps
 Report whether ffmpeg, ImageMagick, ghostscript, poppler, LibreOffice,
 cjxl/djxl are available.
+.TP
+.BR \-\-config\-set " " \fIKEY=VALUE\fR
+Set a configuration key in \fIconfig.toml\fR (e.g. \fBimage.quality=90\fR).
+.TP
+.BR \-\-config\-get " " \fIKEY\fR
+Read the value of a configuration key from \fIconfig.toml\fR.
+.TP
+.BR \-\-save\-config\-json " " \fIJSON\fR
+Update configuration from a JSON string or \fB\-\fR (stdin) and synchronize menus.
+.TP
+.B \-\-dump\-config\-json
+Output the active configuration as JSON.
+.TP
+.B \-\-install\-dolphin
+Install Dolphin service menu integration.
+.TP
+.B \-\-uninstall\-dolphin
+Remove Dolphin service menu integration.
+.TP
+.B \-\-install\-nemo
+Install Nemo context menu actions.
+.TP
+.B \-\-uninstall\-nemo
+Remove Nemo context menu actions.
 .TP
 .B \-\-install\-all
 Install context menus for Dolphin, Nautilus, Nemo and Thunar.
@@ -104,7 +149,13 @@ Install context menus for Dolphin, Nautilus, Nemo and Thunar.
 Remove all installed context menus.
 .TP
 .B \-\-sync\-menu
-Regenerate the Dolphin service menus from the config.
+Regenerate installed context menus from configuration.
+.TP
+.BR \-\-menu\-dir " " \fIDIR\fR
+Target directory for generated menu files (useful for packaging).
+.TP
+.BR \-\-menu\-exec " " \fICMD\fR
+Binary command written to desktop action \fIExec\fR entries (e.g. \fB/usr/bin/konvert\fR or \fBkonvert\fR).
 .TP
 .BR \-s ", " \-\-settings
 Open the Qt6 settings GUI.

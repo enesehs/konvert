@@ -1,94 +1,37 @@
 //! Harici araç bağımlılıklarının varlık kontrolü.
 
+use std::ffi::OsStr;
 use std::path::PathBuf;
-
-#[allow(dead_code)]
-pub struct Dependency {
-    pub tool: &'static str,
-    pub required: bool,
-    pub purpose: &'static str,
-}
-
-#[allow(dead_code)]
-pub const DEPENDENCIES: &[Dependency] = &[
-    Dependency {
-        tool: "ffmpeg",
-        required: true,
-        purpose: "video/ses dönüştürme",
-    },
-    Dependency {
-        tool: "ffprobe",
-        required: true,
-        purpose: "video süresi/boyut hesabı",
-    },
-    Dependency {
-        tool: "magick",
-        required: false,
-        purpose: "SVG/HEIC/PDF birleştirme (convert de olur)",
-    },
-    Dependency {
-        tool: "gs",
-        required: false,
-        purpose: "PDF sıkıştırma",
-    },
-    Dependency {
-        tool: "pdftoppm",
-        required: false,
-        purpose: "PDF → PNG/JPG",
-    },
-    Dependency {
-        tool: "soffice",
-        required: false,
-        purpose: "DOCX/UDF → PDF",
-    },
-    Dependency {
-        tool: "cjxl",
-        required: false,
-        purpose: "JXL'ye dönüştürme",
-    },
-    Dependency {
-        tool: "djxl",
-        required: false,
-        purpose: "JXL okuma",
-    },
-];
 
 /// PATH içinde çalıştırılabilir bir komut var mı?
 pub fn command_exists(name: &str) -> bool {
     let Some(path_var) = std::env::var_os("PATH") else {
         return false;
     };
-    std::env::split_paths(&path_var).any(|dir| {
+    command_exists_in_paths(name, &path_var)
+}
+
+fn command_exists_in_paths(name: &str, path_var: &OsStr) -> bool {
+    std::env::split_paths(path_var).any(|dir| {
         let candidate: PathBuf = dir.join(name);
-        std::fs::metadata(&candidate)
-            .map(|meta| meta.is_file())
-            .unwrap_or(false)
+        let Ok(meta) = std::fs::metadata(&candidate) else {
+            return false;
+        };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            meta.is_file() && (meta.permissions().mode() & 0o111 != 0)
+        }
+        #[cfg(not(unix))]
+        {
+            meta.is_file()
+        }
     })
 }
 
 /// `magick` yoksa `convert` (ImageMagick 6) da kabul edilir.
 pub fn imagemagick_available() -> bool {
     command_exists("magick") || command_exists("convert")
-}
-
-#[allow(dead_code)]
-pub fn check() -> Vec<(String, bool, bool, String)> {
-    DEPENDENCIES
-        .iter()
-        .map(|dep| {
-            let found = if dep.tool == "magick" {
-                imagemagick_available()
-            } else {
-                command_exists(dep.tool)
-            };
-            (
-                dep.tool.to_string(),
-                found,
-                dep.required,
-                dep.purpose.to_string(),
-            )
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -102,9 +45,25 @@ mod tests {
         assert!(!command_exists("konvert-olmayan-bir-arac"));
     }
 
+    #[cfg(unix)]
     #[test]
-    fn test_check_covers_all_dependencies() {
-        let report = check();
-        assert_eq!(report.len(), DEPENDENCIES.len());
+    fn test_command_exists_requires_executable_bit() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = std::env::temp_dir().join(format!("konvert_deps_exec_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let non_exec = dir.join("not_exec_tool");
+        std::fs::write(&non_exec, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&non_exec, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(!command_exists_in_paths("not_exec_tool", dir.as_os_str()));
+
+        let exec = dir.join("exec_tool");
+        std::fs::write(&exec, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&exec, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(command_exists_in_paths("exec_tool", dir.as_os_str()));
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

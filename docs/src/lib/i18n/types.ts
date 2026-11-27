@@ -17,6 +17,13 @@ export interface Translations {
     openMenu: string;
     mobileMenu: string;
     skipLink: string;
+    mainNavAria: string;
+    langSelectionAria: string;
+    langLabel: string;
+    switchToLight: string;
+    switchToDark: string;
+    starProject: string;
+    supportProject: string;
   };
   hero: {
     seoH1: string;
@@ -57,6 +64,13 @@ export interface Translations {
     localDisk: string;
     hint: string;
     interactiveHint: string;
+    itemCountSummary: string;
+    processingLabel: string;
+    doneSummaryTemplate: string;
+    footerIdle: string;
+    footerConvertingTemplate: string;
+    footerDoneTemplate: string;
+    resetShort: string;
   };
   comparison: {
     badge: string;
@@ -97,6 +111,7 @@ export interface Translations {
       desc: string;
       tag: string;
     }>;
+    specs: [string, string, string];
   };
   formats: {
     badge: string;
@@ -123,6 +138,7 @@ export interface Translations {
       desc: string;
     }>;
     defaultRayon: string;
+    perPage: string;
     params: Record<string, string>;
   };
   install: {
@@ -158,6 +174,10 @@ export interface Translations {
     sourceContribTitle: string;
     licenseTag: string;
     sourceContribDesc: string;
+    copyCommandAria: string;
+    copyIntegrationAria: string;
+    copiedShort: string;
+    copyShort: string;
   };
   faq: {
     badge: string;

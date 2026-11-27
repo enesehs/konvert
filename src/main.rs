@@ -17,7 +17,10 @@ use konvert::gui::launch_settings_gui;
 use konvert::i18n::{self, t};
 use konvert::logger;
 use konvert::notification::Notifier;
-use konvert::process::{pid_file_path, process_is_konvert, terminate_process, write_pid_lock};
+use konvert::process::{
+    list_active_konvert_pids, pause_file_path_for, pause_process, resume_process,
+    terminate_process, write_pid_lock,
+};
 use konvert::update::check_for_updates;
 
 fn main() -> Result<()> {
@@ -31,7 +34,22 @@ fn main() -> Result<()> {
     }
 
     logger::init(cli.verbose);
-    let config = Config::load();
+    let is_readonly_invocation = cli.cancel
+        || cli.pause
+        || cli.resume
+        || cli.doctor
+        || cli.check_deps
+        || cli.settings
+        || cli.dump_config_json
+        || cli.config_get.is_some()
+        || cli.list_profiles
+        || cli.check_update
+        || cli.dry_run;
+    let config = if is_readonly_invocation {
+        Config::load_readonly()
+    } else {
+        Config::load()
+    };
     let chosen_lang = cli.lang.as_deref().or(config.general.language.as_deref());
     i18n::init(chosen_lang);
 
@@ -40,38 +58,103 @@ fn main() -> Result<()> {
     converter::set_force_overwrite(cli.force);
     converter::set_create_backup(cli.backup);
 
-    if cli.cancel {
-        let Some(path) = pid_file_path() else {
+    if cli.pause {
+        let active = list_active_konvert_pids();
+        if active.is_empty() {
             println!("No active conversion process found.");
-            return Ok(());
-        };
-        let Some(pid) = fs::read_to_string(&path)
-            .ok()
-            .and_then(|content| content.trim().parse::<i32>().ok())
-        else {
-            let _ = fs::remove_file(&path);
-            println!("No active conversion process found.");
-            return Ok(());
-        };
-
-        // Bayat/ilgisiz PID kaydını temizle, yabancı sürece dokunma.
-        if !process_is_konvert(pid) {
-            let _ = fs::remove_file(&path);
-            println!(
-                "No active Konvert process found (stale lock for PID {} cleaned).",
-                pid
-            );
             return Ok(());
         }
 
-        if terminate_process(pid) {
-            converter::cleanup_recorded_temps();
-            let _ = fs::remove_file(&path);
-            println!("Active Konvert process cancelled (PID: {}).", pid);
+        let mut paused_pids = Vec::new();
+        for (pid, _) in active {
+            if pause_process(pid) {
+                if let Some(marker) = pause_file_path_for(pid) {
+                    for _ in 0..10 {
+                        if marker.exists() {
+                            break;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(15));
+                    }
+                }
+                paused_pids.push(pid);
+            }
+        }
+
+        if !paused_pids.is_empty() {
+            let pid_list: Vec<String> = paused_pids.iter().map(ToString::to_string).collect();
+            println!(
+                "Active Konvert process paused (PID: {}).",
+                pid_list.join(", ")
+            );
+        } else {
+            println!("Failed to pause active conversion process.");
+        }
+        return Ok(());
+    }
+
+    if cli.resume {
+        let active = list_active_konvert_pids();
+        if active.is_empty() {
+            println!("No active conversion process found.");
+            return Ok(());
+        }
+
+        let mut resumed_pids = Vec::new();
+        for (pid, _) in active {
+            if resume_process(pid) {
+                if let Some(marker) = pause_file_path_for(pid) {
+                    for _ in 0..10 {
+                        if !marker.exists() {
+                            break;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(15));
+                    }
+                }
+                resumed_pids.push(pid);
+            }
+        }
+
+        if !resumed_pids.is_empty() {
+            let pid_list: Vec<String> = resumed_pids.iter().map(ToString::to_string).collect();
+            println!(
+                "Active Konvert process resumed (PID: {}).",
+                pid_list.join(", ")
+            );
+        } else {
+            println!("Failed to resume active conversion process.");
+        }
+        return Ok(());
+    }
+
+    if cli.cancel {
+        let active = list_active_konvert_pids();
+        if active.is_empty() {
+            println!("No active conversion process found.");
+            return Ok(());
+        }
+
+        let mut cancelled_pids = Vec::new();
+        for (pid, lock_path) in active {
+            let terminated = terminate_process(pid);
+            let _ = fs::remove_file(&lock_path);
+            if let Some(pause_path) = pause_file_path_for(pid) {
+                let _ = fs::remove_file(pause_path);
+            }
+            if terminated {
+                cancelled_pids.push(pid);
+            }
+        }
+        converter::cleanup_recorded_temps();
+
+        if !cancelled_pids.is_empty() {
+            let pid_list: Vec<String> = cancelled_pids.iter().map(ToString::to_string).collect();
+            println!(
+                "Active Konvert process cancelled (PID: {}).",
+                pid_list.join(", ")
+            );
             notifier.success("Konvert", "Conversion process cancelled.");
         } else {
-            let _ = fs::remove_file(&path);
-            println!("Conversion process already finished (PID: {}).", pid);
+            println!("Conversion process already finished.");
         }
         return Ok(());
     }
@@ -86,10 +169,13 @@ fn main() -> Result<()> {
     }
 
     if cli.settings {
-        if let Err(e) = launch_settings_gui() {
-            eprintln!("Failed to launch settings app: {:#}", e);
-            std::process::exit(1);
-        }
+        launch_settings_gui()
+            .map_err(|e| anyhow::anyhow!("Failed to launch settings app: {:#}", e))?;
+        return Ok(());
+    }
+
+    if cli.dump_config_json {
+        println!("{}", serde_json::to_string(&config)?);
         return Ok(());
     }
 
@@ -98,8 +184,7 @@ fn main() -> Result<()> {
             println!("{}", val);
             return Ok(());
         } else {
-            eprintln!("Unknown config key: {}", key);
-            std::process::exit(1);
+            bail!("Unknown config key: {}", key);
         }
     }
 
@@ -116,7 +201,7 @@ fn main() -> Result<()> {
         println!("Configuration updated: {} = {}", key, val);
         if key == "context_menu.enabled_actions" {
             let menu_exec = cli.menu_exec.as_deref();
-            let _ = desktop::dolphin::install_dolphin_service_with_options(
+            let _ = desktop::detector::sync_installed_menus(
                 &cfg.context_menu.enabled_actions,
                 menu_exec,
                 cli.menu_dir,
@@ -140,7 +225,7 @@ fn main() -> Result<()> {
         cfg.save()?;
 
         let menu_exec = cli.menu_exec.as_deref();
-        let _ = desktop::dolphin::install_dolphin_service_with_options(
+        let _ = desktop::detector::sync_installed_menus(
             &cfg.context_menu.enabled_actions,
             menu_exec,
             cli.menu_dir,
@@ -182,7 +267,6 @@ fn main() -> Result<()> {
     }
 
     if let Some(name) = cli.save_profile {
-        let mut cfg = config.clone();
         let profile = config::ProfileConfig {
             quality: cli.quality,
             crf: cli.crf,
@@ -191,9 +275,11 @@ fn main() -> Result<()> {
             dpi: cli.dpi,
             lossless: if cli.lossless { Some(true) } else { None },
         };
-        cfg.profiles.insert(name.clone(), profile);
+        let validated_name = config::validate_custom_profile(&name, &profile)?;
+        let mut cfg = config.clone();
+        cfg.profiles.insert(validated_name.clone(), profile);
         cfg.save()?;
-        println!("Profile '{}' saved to config.", name);
+        println!("Profile '{}' saved to config.", validated_name);
         return Ok(());
     }
 
@@ -207,16 +293,14 @@ fn main() -> Result<()> {
                 .unwrap_or(false);
 
         if has_display {
-            if let Err(e) = launch_settings_gui() {
-                eprintln!("Failed to launch settings app: {:#}", e);
-                std::process::exit(1);
-            }
+            launch_settings_gui()
+                .map_err(|e| anyhow::anyhow!("Failed to launch settings app: {:#}", e))?;
             return Ok(());
         }
 
-        eprintln!("Error: No files specified for conversion.");
-        eprintln!("Run 'konvert --help' for usage instructions or 'konvert -s' to open settings.");
-        std::process::exit(1);
+        bail!(
+            "No files specified for conversion. Run 'konvert --help' for usage instructions or 'konvert -s' to open settings."
+        );
     }
 
     let custom_output_dir = cli
@@ -232,8 +316,7 @@ fn main() -> Result<()> {
             cli.files.clone()
         };
         if files.is_empty() {
-            eprintln!("Error: No input files found to merge into PDF.");
-            std::process::exit(1);
+            bail!("No input files found to merge into PDF.");
         }
 
         return run_merge_pdf(&files, custom_output_dir.as_deref(), cli.dry_run, &notifier);
@@ -253,8 +336,7 @@ fn main() -> Result<()> {
         match &cli.target {
             Some(t) => t.trim_start_matches('.').to_lowercase(),
             None => {
-                eprintln!("Error: Please specify a target format (--target / -t <format>)");
-                std::process::exit(1);
+                bail!("Please specify a target format (--target / -t <format>)");
             }
         }
     };
@@ -270,8 +352,7 @@ fn main() -> Result<()> {
     };
 
     if files.is_empty() {
-        eprintln!("Error: No input files found to convert.");
-        std::process::exit(1);
+        bail!("No input files found to convert.");
     }
 
     let total_count = files.len();
@@ -329,11 +410,11 @@ fn main() -> Result<()> {
             {
                 opts.dpi = Some(d);
             }
-            if let Some(l) = p.lossless
-                && l
+            if !cli.lossless
+                && let Some(l) = p.lossless
             {
-                opts.image_lossless = true;
-                opts.video_lossless = true;
+                opts.image_lossless = l;
+                opts.video_lossless = l;
             }
         } else {
             eprintln!(
@@ -363,7 +444,7 @@ fn main() -> Result<()> {
     } else if target == "discord_8mb" {
         "Discord (8 MB)".to_string()
     } else if target == "email_25mb" {
-        "E-Posta (25 MB)".to_string()
+        t("action_email_25mb").to_string()
     } else if target == "web_opt" {
         t("action_web_opt").to_string()
     } else if target.starts_with("resize_") {

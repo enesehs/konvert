@@ -134,7 +134,7 @@ export function ConvertDemo() {
             <span className="font-semibold text-foreground">{t.demo.pathFolder}</span>
           </div>
           <div className="ml-auto hidden items-center gap-2 text-muted-foreground sm:flex" aria-hidden="true">
-            <span className="text-[10px] text-muted-foreground/70">6 öğe (2 seçildi)</span>
+            <span className="text-[10px] text-muted-foreground/70">{t.demo.itemCountSummary}</span>
             <span className="h-3 w-px bg-border" />
             <LayoutGrid className="h-3.5 w-3.5 opacity-40" />
             <List className="h-3.5 w-3.5 text-brand" />
@@ -210,7 +210,7 @@ export function ConvertDemo() {
                         {result.sizes[i] || "0,8 MB"}
                       </span>
                     ) : converting ? (
-                      <span className="text-muted-foreground">işleniyor...</span>
+                      <span className="text-muted-foreground">{t.demo.processingLabel}</span>
                     ) : (
                       <span className="text-muted-foreground">{file.size}</span>
                     )}
@@ -271,7 +271,9 @@ export function ConvertDemo() {
                     {t.demo.notificationSuccess} ({result.time})
                   </p>
                   <p className="mt-1 text-[11px] leading-snug text-slate-300">
-                    2 dosya başarıyla {target} formatına dönüştürüldü ({result.total}).
+                    {t.demo.doneSummaryTemplate
+                      .replace("{target}", target)
+                      .replace("{total}", result.total)}
                   </p>
                   <button
                     type="button"
@@ -288,9 +290,11 @@ export function ConvertDemo() {
         </div>
         <div className="flex h-8 items-center justify-between gap-2 border-t border-border bg-muted/40 px-3.5 font-mono text-[10.5px] text-muted-foreground">
           <span className="truncate">
-            {phase === "idle" && "Hazır — Menüden format seçerek canlı dönüşümü test edin"}
-            {phase === "converting" && `Rust Rayon iş parçacığı dönüştürüyor: ${target}...`}
-            {phase === "done" && `Tamamlandı: %${result.saved} disk tasarrufu sağlandı.`}
+            {phase === "idle" && t.demo.footerIdle}
+            {phase === "converting" &&
+              t.demo.footerConvertingTemplate.replace("{target}", target)}
+            {phase === "done" &&
+              t.demo.footerDoneTemplate.replace("{saved}", String(result.saved))}
           </span>
           {phase === "done" && (
             <button
@@ -298,7 +302,7 @@ export function ConvertDemo() {
               onClick={reset}
               className="font-semibold text-brand-strong hover:underline"
             >
-              [ Sıfırla ]
+              [ {t.demo.resetShort} ]
             </button>
           )}
         </div>

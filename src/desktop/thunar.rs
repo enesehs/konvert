@@ -26,30 +26,48 @@ fn xml_escape(input: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
-fn generate_thunar_actions(exec: &str) -> String {
-    use crate::desktop::dolphin::{QUICK_ACTION_IDS, find_action};
+fn quote_exec_for_shell(exec: &str) -> String {
+    if !exec.is_empty()
+        && exec
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '-' | '_' | '.' | '+' | ':'))
+    {
+        exec.to_string()
+    } else {
+        format!("'{}'", exec.replace('\'', "'\\''"))
+    }
+}
 
+fn generate_thunar_actions(exec: &str, enabled_action_ids: &[String]) -> String {
+    use crate::desktop::dolphin::ALL_ACTIONS;
+
+    let escaped_exec = xml_escape(&quote_exec_for_shell(exec));
     let mut out = String::new();
-    for id in QUICK_ACTION_IDS {
-        let Some(action) = find_action(id) else {
+    for action in ALL_ACTIONS {
+        if !enabled_action_ids.iter().any(|id| id == action.id) {
             continue;
-        };
-        let file_type = match action.category {
-            "photos" => "    <image-files/>\n",
-            "videos" => "    <video-files/>\n",
-            "music" => "    <audio-files/>\n    <video-files/>\n",
-            _ => "",
+        }
+        let (patterns, file_type) = match action.category {
+            "photos" => ("*", "    <image-files/>\n"),
+            "videos" => ("*", "    <video-files/>\n"),
+            "music" => ("*", "    <audio-files/>\n    <video-files/>\n"),
+            "pdf" => ("*.pdf;*.PDF", "    <other-files/>\n"),
+            "udf" => ("*.udf;*.UDF", "    <other-files/>\n"),
+            "word" => ("*.docx;*.DOCX;*.doc;*.DOC", "    <other-files/>\n"),
+            _ => ("*", "    <other-files/>\n"),
         };
         let name = xml_escape(action.name_en);
         out.push_str(&format!(
-            "  <action>\n    <icon>{icon}</icon>\n    <name>{name}</name>\n    <submenu>Konvert</submenu>\n    <unique-id>konvert-{id}</unique-id>\n    <command>{exec} {args}</command>\n    <description>Konvert: {name}</description>\n    <patterns>*</patterns>\n{file_type}  </action>\n",
+            "  <action>\n    <icon>{icon}</icon>\n    <name>{name}</name>\n    <submenu>Konvert</submenu>\n    <unique-id>konvert-{id}</unique-id>\n    <command>{exec} {args}</command>\n    <description>Konvert: {name}</description>\n    <patterns>{patterns}</patterns>\n{file_type}  </action>\n",
             icon = action.icon,
             name = name,
             id = action.id,
-            exec = exec,
+            exec = escaped_exec,
             args = action.cmd_args,
+            patterns = patterns,
             file_type = file_type,
         ));
     }
@@ -108,7 +126,17 @@ fn strip_konvert_actions(content: &str) -> String {
 }
 
 fn atomic_write(path: &Path, content: &str) -> Result<()> {
-    let tmp = path.with_extension("xml.tmp");
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    static TMP_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    if path.exists() {
+        let bak = path.with_extension("xml.bak");
+        fs::copy(path, &bak)
+            .with_context(|| format!("Yedek dosyası oluşturulamadı: {}", bak.display()))?;
+    }
+
+    let seq = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp = path.with_extension(format!("xml.{}.{}.tmp", std::process::id(), seq));
     fs::write(&tmp, content)
         .with_context(|| format!("Geçici dosya yazılamadı: {}", tmp.display()))?;
     fs::rename(&tmp, path).with_context(|| format!("Dosya güncellenemedi: {}", path.display()))?;
@@ -116,6 +144,14 @@ fn atomic_write(path: &Path, content: &str) -> Result<()> {
 }
 
 pub fn install_thunar_actions(custom_exec: Option<&str>) -> Result<PathBuf> {
+    let cfg = crate::config::Config::load();
+    install_thunar_actions_with_actions(&cfg.context_menu.enabled_actions, custom_exec)
+}
+
+pub fn install_thunar_actions_with_actions(
+    enabled_action_ids: &[String],
+    custom_exec: Option<&str>,
+) -> Result<PathBuf> {
     let path = get_thunar_uca_path()?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -128,7 +164,7 @@ pub fn install_thunar_actions(custom_exec: Option<&str>) -> Result<PathBuf> {
             .unwrap_or_else(|_| "konvert".to_string()),
     };
 
-    let actions_snippet = generate_thunar_actions(&exec);
+    let actions_snippet = generate_thunar_actions(&exec, enabled_action_ids);
 
     if path.exists() {
         let content = fs::read_to_string(&path)?;
@@ -256,5 +292,39 @@ mod tests {
     fn test_find_action_start_ignores_actions_root() {
         assert_eq!(find_action_start("<actions>\n<action>"), Some(10));
         assert_eq!(find_action_start("<actions></actions>"), None);
+    }
+
+    #[test]
+    fn test_generate_thunar_actions_quotes_exec_and_matches_doc_categories() {
+        let ids = vec![
+            "compress_doc".to_string(),
+            "udf_to_pdf".to_string(),
+            "docx_to_pdf".to_string(),
+        ];
+        let xml = generate_thunar_actions("/opt/My Apps/konvert", &ids);
+        assert!(xml.contains("&apos;/opt/My Apps/konvert&apos;"));
+        assert!(xml.contains("<patterns>*.pdf;*.PDF</patterns>\n    <other-files/>"));
+        assert!(xml.contains("<patterns>*.udf;*.UDF</patterns>\n    <other-files/>"));
+        assert!(xml.contains("<patterns>*.docx;*.DOCX;*.doc;*.DOC</patterns>\n    <other-files/>"));
+    }
+
+    #[test]
+    fn test_atomic_write_creates_backup_of_existing_file() {
+        let dir =
+            std::env::temp_dir().join(format!("konvert_test_thunar_bak_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("uca.xml");
+        fs::write(&target, FIXTURE).unwrap();
+
+        let cleaned = strip_konvert_actions(FIXTURE);
+        atomic_write(&target, &cleaned).unwrap();
+
+        let bak = dir.join("uca.xml.bak");
+        assert!(bak.exists(), "existing uca.xml must be backed up");
+        assert_eq!(fs::read_to_string(&bak).unwrap(), FIXTURE);
+        assert_eq!(fs::read_to_string(&target).unwrap(), cleaned);
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }

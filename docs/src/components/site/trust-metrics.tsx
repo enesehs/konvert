@@ -9,11 +9,7 @@ export function TrustMetrics() {
   const { t } = useI18n();
 
   const cardIcons = [Cpu, ShieldCheck, Code2];
-  const technicalSpecs = [
-    "POSIX EXEC · DAEMON YOK · 0 SYSTEMD SERVICE",
-    "SIFIR AĞ İSTEĞİ · SIFIR TELEMETRİ · AIR-GAP UYUMLU",
-    "GPL-3.0-or-later · BAĞIMSIZ DENETLENEBİLİR DERLEME",
-  ];
+  const technicalSpecs = t.trustMetrics.specs;
 
   return (
     <Section id="metrikler" className="relative border-b border-border bg-transparent">

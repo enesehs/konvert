@@ -22,7 +22,7 @@ pub fn install_desktop_entry(exec_path: Option<&str>) -> Result<PathBuf> {
 
     let exec = match exec_path {
         Some(e) => e.to_string(),
-        None => "sh -c \"PATH=\\\"$HOME/.local/bin:$PATH\\\" exec konvert -s\"".to_string(),
+        None => "sh -c \"PATH=\\\"\\\\$HOME/.local/bin:\\\\$PATH\\\" exec konvert -s\"".to_string(),
     };
 
     let content = format!(
@@ -38,10 +38,11 @@ Comment[ru]=Настройки конвертации и обработки фа
 Comment[zh_CN]=文件转换和处理设置
 Comment[ja]=ファイル変換および処理の設定
 Exec={exec}
-Icon=preferences-system-symbolic
+Icon=konvert
+StartupWMClass=konvert-settings
 Terminal=false
 Type=Application
-Categories=Utility;Settings;
+Categories=Utility;
 Keywords=convert;donusturucu;settings;ayar;konvertieren;conversion;
 "#,
         exec = exec
@@ -56,4 +57,14 @@ Keywords=convert;donusturucu;settings;ayar;konvertieren;conversion;
     }
 
     Ok(path)
+}
+
+pub fn uninstall_desktop_entry() -> Result<bool> {
+    let path = get_desktop_entry_path()?;
+    if path.exists() {
+        fs::remove_file(&path)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }

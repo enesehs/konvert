@@ -41,6 +41,11 @@ jobs:
           cd docs
           pnpm install --frozen-lockfile
 
+      - name: Lint static site
+        run: |
+          cd docs
+          pnpm run lint
+
       - name: Build static site
         env:
           OUTPUT_EXPORT: "true"

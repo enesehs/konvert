@@ -7,7 +7,7 @@ use crate::converter::{self, ConvertOptions};
 use crate::desktop;
 use crate::history::{self, HistoryEntry, add_history_entry, format_bytes};
 use crate::i18n::t;
-use crate::notification::Notifier;
+use crate::notification::{JobProgressUpdate, Notifier};
 use crate::process::{remove_pid_lock, write_pid_lock};
 
 pub fn calculate_savings_str(orig: u64, out: u64) -> String {
@@ -42,6 +42,28 @@ pub fn calculate_savings_pct(orig: u64, out: u64) -> f64 {
     }
 }
 
+pub fn format_action_headline(target: &str, target_display: &str) -> String {
+    match target {
+        "compress" => t("notify_status_compressing").to_string(),
+        "discord_8mb" | "email_25mb" => {
+            format!("{}: {}", t("notify_status_compressing"), target_display)
+        }
+        s if s.starts_with("target_") => {
+            format!("{}: {}", t("notify_status_compressing"), target_display)
+        }
+        "web_opt" => t("notify_status_optimizing").to_string(),
+        s if s.starts_with("resize_") => format!(
+            "{}: {}",
+            t("notify_status_resizing"),
+            s.trim_start_matches("resize_")
+        ),
+        "strip-metadata" => t("notify_status_stripping").to_string(),
+        "frames" | "images" => format!("{}: {}", t("notify_status_extracting"), target_display),
+        "merge-pdf" => t("notify_status_merging").to_string(),
+        _ => format!("{}: {}", t("notify_status_converting"), target_display),
+    }
+}
+
 /// Masaüstü entegrasyonu (Dolphin, Nemo, Nautilus, Thunar) ve bağlam menüsü kurulum komutlarını işler.
 pub fn handle_desktop_integrations(
     cli: &Cli,
@@ -50,18 +72,21 @@ pub fn handle_desktop_integrations(
 ) -> Result<bool> {
     if cli.sync_menu {
         let menu_exec = cli.menu_exec.as_deref();
-        let path = desktop::dolphin::install_dolphin_service_with_options(
+        let synced = desktop::detector::sync_installed_menus(
             &config.context_menu.enabled_actions,
             menu_exec,
             cli.menu_dir.clone(),
         )
         .map_err(|e| anyhow::anyhow!("Failed to sync context menu: {:#}", e))?;
-        println!("Context menu synchronized with config: {}", path.display());
+        for path in &synced {
+            println!("Context menu synchronized with config: {}", path.display());
+        }
         return Ok(true);
     }
 
     if cli.install_all {
-        let report = desktop::detector::install_all();
+        let report =
+            desktop::detector::install_all_with_config(&config.context_menu.enabled_actions);
         for item in &report.affected {
             println!("Installed: {}", item);
         }
@@ -214,10 +239,16 @@ pub fn run_merge_pdf(
         .iter()
         .map(|f| f.metadata().map(|m| m.len()).unwrap_or(0))
         .sum();
-    let progress_title = "Konvert: Merging PDF...".to_string();
-    let stable_body = format!("Scanning {} images...", files.len());
-    let mut progress_handle =
-        notifier.start_progress(&progress_title, &stable_body, 15, Some("15%"));
+    let headline = t("notify_status_merging");
+    let source_label = format!("{} ({})", files.len(), format_bytes(orig_bytes));
+    let mut progress_handle = notifier.start_job(&JobProgressUpdate {
+        headline,
+        source_value: &source_label,
+        target_value: "PDF",
+        percent: 15,
+        detail_text: Some("15%"),
+        batch_progress: Some((0, files.len() as u64)),
+    });
 
     let (tx, rx) = std::sync::mpsc::channel();
     let merge_files = files.to_vec();
@@ -229,12 +260,51 @@ pub fn run_merge_pdf(
 
     let start_time = std::time::Instant::now();
     let mut progress_val = 15;
+    let mut was_paused = false;
 
     let merge_res = loop {
         match rx.recv_timeout(std::time::Duration::from_millis(300)) {
             Ok(res) => break res,
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                let elapsed_secs = start_time.elapsed().as_secs();
+                let is_paused = crate::process::is_job_paused();
+                if is_paused {
+                    if !was_paused {
+                        was_paused = true;
+                        let paused_text = format!("{}% ({})", progress_val, t("notify_paused"));
+                        notifier.update_job(
+                            &mut progress_handle,
+                            &JobProgressUpdate {
+                                headline,
+                                source_value: &source_label,
+                                target_value: "PDF",
+                                percent: progress_val,
+                                detail_text: Some(&paused_text),
+                                batch_progress: Some((0, files.len() as u64)),
+                            },
+                        );
+                    }
+                    continue;
+                }
+                if was_paused {
+                    was_paused = false;
+                    let prog_text = format!("{}%", progress_val);
+                    notifier.update_job(
+                        &mut progress_handle,
+                        &JobProgressUpdate {
+                            headline,
+                            source_value: &source_label,
+                            target_value: "PDF",
+                            percent: progress_val,
+                            detail_text: Some(&prog_text),
+                            batch_progress: Some((0, files.len() as u64)),
+                        },
+                    );
+                }
+
+                let elapsed_secs = start_time
+                    .elapsed()
+                    .saturating_sub(crate::process::job_paused_duration())
+                    .as_secs();
                 let target_pct = if elapsed_secs <= 5 {
                     15 + (elapsed_secs as i32 * 6)
                 } else if elapsed_secs <= 15 {
@@ -249,12 +319,16 @@ pub fn run_merge_pdf(
                 if target_pct > progress_val {
                     progress_val = target_pct;
                     let prog_text = format!("{}%", progress_val);
-                    notifier.update_progress(
+                    notifier.update_job(
                         &mut progress_handle,
-                        &progress_title,
-                        &stable_body,
-                        progress_val,
-                        Some(&prog_text),
+                        &JobProgressUpdate {
+                            headline,
+                            source_value: &source_label,
+                            target_value: "PDF",
+                            percent: progress_val,
+                            detail_text: Some(&prog_text),
+                            batch_progress: Some((0, files.len() as u64)),
+                        },
                     );
                 }
             }
@@ -284,11 +358,10 @@ pub fn run_merge_pdf(
             println!("{}", msg);
             notifier.finish_progress(
                 &mut progress_handle,
-                "PDF Merge Completed",
+                t("notify_done_single"),
                 &format!(
-                    "{}\n{} images ({} -> {})",
+                    "{}\n{} -> {}",
                     out_name,
-                    files.len(),
                     format_bytes(orig_bytes),
                     format_bytes(out_bytes)
                 ),
@@ -306,11 +379,29 @@ pub fn run_merge_pdf(
             });
             Ok(())
         }
+        Err(err) if crate::process::is_cancelled_error(&err) => {
+            remove_pid_lock();
+            let cancel_msg = t("err_job_cancelled");
+            eprintln!("{}", cancel_msg);
+            notifier.cancel_progress(&mut progress_handle, t("notify_cancelled"), &source_label);
+
+            let _ = add_history_entry(HistoryEntry {
+                timestamp: history::current_timestamp(),
+                target: "merge-pdf".into(),
+                file_count: files.len(),
+                original_size_bytes: orig_bytes,
+                output_size_bytes: 0,
+                savings_percent: 0.0,
+                status: "Cancelled".into(),
+                output_path: None,
+            });
+            bail!("{}", cancel_msg);
+        }
         Err(err) => {
             remove_pid_lock();
             let msg = format!("Failed to merge PDF:\n{:#}", err);
             eprintln!("{}", msg);
-            notifier.error_progress(&mut progress_handle, "PDF Merge Failed", &msg);
+            notifier.error_progress(&mut progress_handle, t("notify_failed"), &msg);
 
             let _ = add_history_entry(HistoryEntry {
                 timestamp: history::current_timestamp(),
@@ -327,24 +418,106 @@ pub fn run_merge_pdf(
     }
 }
 
+struct PidLockGuard;
+
+impl PidLockGuard {
+    fn acquire() -> Self {
+        write_pid_lock();
+        Self
+    }
+}
+
+impl Drop for PidLockGuard {
+    fn drop(&mut self) {
+        remove_pid_lock();
+    }
+}
+
+struct TempPathGuard(PathBuf);
+
+impl Drop for TempPathGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+fn read_stdin_prefix(reader: &mut impl std::io::Read, max_bytes: usize) -> Result<Vec<u8>> {
+    let mut buf = Vec::with_capacity(max_bytes);
+    let mut chunk = [0u8; 1024];
+    while buf.len() < max_bytes {
+        let to_read = (max_bytes - buf.len()).min(chunk.len());
+        let n = reader
+            .read(&mut chunk[..to_read])
+            .context("Failed to read from stdin")?;
+        if n == 0 {
+            break;
+        }
+        buf.extend_from_slice(&chunk[..n]);
+    }
+    Ok(buf)
+}
+
+fn create_private_stdin_temp(ext: &str) -> Result<(PathBuf, std::fs::File)> {
+    let temp_dir = std::env::temp_dir();
+    let pid = std::process::id();
+    for attempt in 0..16u32 {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let path = temp_dir.join(format!(
+            "konvert_stdin_{}_{}_{}.{}",
+            pid, unique, attempt, ext
+        ));
+        let mut open_opts = std::fs::OpenOptions::new();
+        open_opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            open_opts.mode(0o600);
+        }
+        match open_opts.open(&path) {
+            Ok(file) => return Ok((path, file)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.into()),
+        }
+    }
+    bail!("Failed to create secure temporary file for stdin conversion")
+}
+
 /// Stdin üzerinden gelen baytları hedef formata dönüştürür.
 pub fn run_stdin_conversion(
     opts: &ConvertOptions,
     dry_run: bool,
     output_dir: Option<&Path>,
 ) -> Result<()> {
-    use std::io::Read;
-    let mut input_bytes = Vec::new();
-    std::io::stdin()
-        .lock()
-        .read_to_end(&mut input_bytes)
-        .context("Failed to read from stdin")?;
+    use std::io::{IsTerminal, Write};
 
-    if input_bytes.is_empty() {
+    let mut stdin_lock = std::io::stdin().lock();
+    let prefix = read_stdin_prefix(&mut stdin_lock, 4096)?;
+    if prefix.is_empty() {
         bail!("Error: stdin was empty.");
     }
 
-    let detected = converter::detect_extension_from_bytes(&input_bytes);
+    let detected = converter::detect_extension_from_bytes(&prefix);
+    let piped_stdout = !std::io::stdout().is_terminal() && output_dir.is_none();
+
+    if piped_stdout {
+        let action = converter::TargetAction::parse(&opts.target)?;
+        let produces_dir = matches!(action, converter::TargetAction::Frames)
+            || matches!(
+                action,
+                converter::TargetAction::Convert(ref fmt)
+                    if detected == "pdf" && matches!(fmt.as_str(), "png" | "jpg" | "jpeg")
+            );
+        if produces_dir {
+            bail!(
+                "Target '{}' produces a folder and cannot be streamed to stdout; pass -o <dir> instead",
+                opts.target
+            );
+        }
+    }
+
     if dry_run {
         println!(
             "[Dry Run] Planning stdin conversion: detected format .{} -> target: {}",
@@ -353,40 +526,42 @@ pub fn run_stdin_conversion(
         return Ok(());
     }
 
-    let temp_dir = std::env::temp_dir();
-    let unique = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    let temp_file = temp_dir.join(format!(
-        "konvert_stdin_{}_{}.{}",
-        std::process::id(),
-        unique,
-        detected
-    ));
-    std::fs::write(&temp_file, &input_bytes)?;
+    let _pid_guard = PidLockGuard::acquire();
+    let (temp_file, mut temp_handle) = create_private_stdin_temp(detected)?;
+    let _in_guard = TempPathGuard(temp_file.clone());
 
-    let convert_res = converter::convert_single(&temp_file, opts);
-    let _ = std::fs::remove_file(&temp_file);
+    temp_handle.write_all(&prefix)?;
+    std::io::copy(&mut stdin_lock, &mut temp_handle)
+        .context("Failed to stream stdin to temporary file")?;
+    temp_handle.flush()?;
+    drop(temp_handle);
+    drop(stdin_lock);
 
-    match convert_res {
-        Ok(output_path) => {
-            use std::io::IsTerminal;
-            if !std::io::stdout().is_terminal() && output_dir.is_none() {
-                let out_data = std::fs::read(&output_path)?;
-                let _ = std::fs::remove_file(&output_path);
-                let mut out = std::io::stdout().lock();
-                std::io::Write::write_all(&mut out, &out_data)?;
-                std::io::Write::flush(&mut out)?;
-            } else {
-                println!("Converted stdin -> {}", output_path.display());
-            }
-            Ok(())
+    let mut effective_opts = opts.clone();
+    effective_opts.custom_output_dir = if piped_stdout {
+        None
+    } else {
+        output_dir.map(Path::to_path_buf)
+    };
+
+    let output_path = converter::convert_single(&temp_file, &effective_opts)
+        .map_err(|e| anyhow::anyhow!("Stdin conversion failed: {:#}", e))?;
+
+    if piped_stdout {
+        if output_path.is_dir() {
+            let _ = std::fs::remove_dir_all(&output_path);
+            bail!("Target produced a directory which cannot be streamed to stdout");
         }
-        Err(e) => {
-            bail!("Stdin conversion failed: {:#}", e);
-        }
+        let _out_guard = TempPathGuard(output_path.clone());
+        let mut out_file = std::fs::File::open(&output_path)?;
+        let mut out = std::io::stdout().lock();
+        std::io::copy(&mut out_file, &mut out)?;
+        out.flush()?;
+    } else {
+        println!("Converted stdin -> {}", output_path.display());
     }
+
+    Ok(())
 }
 
 /// Simülasyon (dry-run) kipinde dönüştürme planını ve çakışma durumunu yazdırır.
@@ -400,29 +575,50 @@ pub fn run_dry_run(files: &[PathBuf], opts: &ConvertOptions, force: bool) -> Res
     println!();
 
     let mut collisions = 0;
+    let mut errors = 0;
+    let mut planned_outputs: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
     for (i, file) in files.iter().enumerate() {
+        if file.as_os_str() != "-" && !file.exists() {
+            println!(
+                "  {:2}. {} -> [Hata: Dosya bulunamadı]",
+                i + 1,
+                file.display()
+            );
+            errors += 1;
+            continue;
+        }
         match converter::plan_output_path(file, opts, force) {
-            Ok((predicted, exists)) => {
-                let status = if exists {
+            Ok((predicted, exists_on_disk)) => {
+                let intra_conflict = planned_outputs.contains(&predicted);
+                let resolved = if intra_conflict {
+                    converter::next_free_path(&predicted, |p| {
+                        planned_outputs.contains(p) || (!force && p.exists())
+                    })
+                } else {
+                    predicted.clone()
+                };
+                let collision = exists_on_disk || intra_conflict || resolved != predicted;
+                let status = if exists_on_disk && force && resolved == predicted {
                     collisions += 1;
-                    if force {
-                        "(overwriting existing)"
-                    } else {
-                        "(collision resolved with new name)"
-                    }
+                    "(overwriting existing)"
+                } else if collision {
+                    collisions += 1;
+                    "(collision resolved with new name)"
                 } else {
                     "(new file)"
                 };
+                planned_outputs.insert(resolved.clone());
                 println!(
                     "  {:2}. {} -> {} {}",
                     i + 1,
                     file.display(),
-                    predicted.display(),
+                    resolved.display(),
                     status
                 );
             }
             Err(err) => {
                 println!("  {:2}. {} -> [Hata: {}]", i + 1, file.display(), err);
+                errors += 1;
             }
         }
     }
@@ -432,6 +628,9 @@ pub fn run_dry_run(files: &[PathBuf], opts: &ConvertOptions, force: bool) -> Res
         files.len(),
         collisions
     );
+    if errors > 0 {
+        bail!("Dry run failed with {} error(s).", errors);
+    }
     Ok(())
 }
 
@@ -445,11 +644,21 @@ pub fn run_single_conversion(
 ) -> Result<()> {
     let file_name = file.file_name().and_then(|s| s.to_str()).unwrap_or("dosya");
 
-    let progress_title = "Konvert".to_string();
-    let stable_body = format!("{} -> {}", file_name, target_display);
+    let headline = format_action_headline(&opts.target, target_display);
+    let source_label = if orig_total_bytes > 0 {
+        format!("{} ({})", file_name, format_bytes(orig_total_bytes))
+    } else {
+        file_name.to_string()
+    };
 
-    let mut progress_handle =
-        notifier.start_progress(&progress_title, &stable_body, 10, Some("10%"));
+    let mut progress_handle = notifier.start_job(&JobProgressUpdate {
+        headline: &headline,
+        source_value: &source_label,
+        target_value: target_display,
+        percent: 10,
+        detail_text: Some("10%"),
+        batch_progress: None,
+    });
 
     enum SingleProgressMsg {
         Progress(i32, String),
@@ -473,7 +682,9 @@ pub fn run_single_conversion(
 
     let start_time = std::time::Instant::now();
     let mut progress_val = 10;
+    let mut last_detail = "10%".to_string();
     let mut has_real_progress = false;
+    let mut was_paused = false;
 
     let convert_res = loop {
         match rx.recv_timeout(std::time::Duration::from_millis(250)) {
@@ -481,20 +692,65 @@ pub fn run_single_conversion(
             Ok(SingleProgressMsg::Progress(pct, detail_text)) => {
                 has_real_progress = true;
                 progress_val = pct;
-                notifier.update_progress(
+                last_detail = detail_text.clone();
+                if crate::process::is_job_paused() {
+                    continue;
+                }
+                notifier.update_job(
                     &mut progress_handle,
-                    &progress_title,
-                    &stable_body,
-                    pct,
-                    Some(&detail_text),
+                    &JobProgressUpdate {
+                        headline: &headline,
+                        source_value: &source_label,
+                        target_value: target_display,
+                        percent: pct,
+                        detail_text: Some(&detail_text),
+                        batch_progress: None,
+                    },
                 );
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                let is_paused = crate::process::is_job_paused();
+                if is_paused {
+                    if !was_paused {
+                        was_paused = true;
+                        let paused_text = format!("{} ({})", last_detail, t("notify_paused"));
+                        notifier.update_job(
+                            &mut progress_handle,
+                            &JobProgressUpdate {
+                                headline: &headline,
+                                source_value: &source_label,
+                                target_value: target_display,
+                                percent: progress_val,
+                                detail_text: Some(&paused_text),
+                                batch_progress: None,
+                            },
+                        );
+                    }
+                    continue;
+                }
+                if was_paused {
+                    was_paused = false;
+                    notifier.update_job(
+                        &mut progress_handle,
+                        &JobProgressUpdate {
+                            headline: &headline,
+                            source_value: &source_label,
+                            target_value: target_display,
+                            percent: progress_val,
+                            detail_text: Some(&last_detail),
+                            batch_progress: None,
+                        },
+                    );
+                }
+
                 if has_real_progress {
                     continue;
                 }
 
-                let elapsed_secs = start_time.elapsed().as_secs();
+                let elapsed_secs = start_time
+                    .elapsed()
+                    .saturating_sub(crate::process::job_paused_duration())
+                    .as_secs();
                 let target_pct = if elapsed_secs <= 5 {
                     10 + (elapsed_secs as i32 * 7)
                 } else if elapsed_secs <= 15 {
@@ -509,12 +765,17 @@ pub fn run_single_conversion(
                 if target_pct > progress_val {
                     progress_val = target_pct;
                     let progress_text = format!("{}%", progress_val);
-                    notifier.update_progress(
+                    last_detail = progress_text.clone();
+                    notifier.update_job(
                         &mut progress_handle,
-                        &progress_title,
-                        &stable_body,
-                        progress_val,
-                        Some(&progress_text),
+                        &JobProgressUpdate {
+                            headline: &headline,
+                            source_value: &source_label,
+                            target_value: target_display,
+                            percent: progress_val,
+                            detail_text: Some(&progress_text),
+                            batch_progress: None,
+                        },
                     );
                 }
             }
@@ -536,7 +797,11 @@ pub fn run_single_conversion(
 
             let msg = format!("Converted:\n{}\n{}", output.display(), savings_str);
             println!("{}", msg);
-            notifier.finish_progress(&mut progress_handle, out_name, &savings_str);
+            notifier.finish_progress(
+                &mut progress_handle,
+                t("notify_done_single"),
+                &format!("{}\n{}", out_name, savings_str),
+            );
 
             let savings_pct = calculate_savings_pct(orig_total_bytes, out_bytes);
             let _ = add_history_entry(HistoryEntry {
@@ -550,6 +815,24 @@ pub fn run_single_conversion(
                 output_path: Some(output.to_string_lossy().to_string()),
             });
             Ok(())
+        }
+        Err(err) if crate::process::is_cancelled_error(&err) => {
+            remove_pid_lock();
+            let cancel_msg = t("err_job_cancelled");
+            eprintln!("{}", cancel_msg);
+            notifier.cancel_progress(&mut progress_handle, t("notify_cancelled"), file_name);
+
+            let _ = add_history_entry(HistoryEntry {
+                timestamp: history::current_timestamp(),
+                target: opts.target.clone(),
+                file_count: 1,
+                original_size_bytes: orig_total_bytes,
+                output_size_bytes: 0,
+                savings_percent: 0.0,
+                status: "Cancelled".into(),
+                output_path: None,
+            });
+            bail!("{}", cancel_msg);
         }
         Err(err) => {
             remove_pid_lock();
@@ -581,16 +864,28 @@ pub fn run_batch_conversion(
     notifier: &Notifier,
 ) -> Result<()> {
     let total_count = files.len();
-    let batch_title = t("notify_batch_in_progress");
-    let initial_batch_body = format!("[0/{}] {}", total_count, target_display);
-    let mut progress_handle =
-        notifier.start_progress(batch_title, &initial_batch_body, 0, Some("0%"));
+    let headline = format_action_headline(&opts.target, target_display);
+    let initial_source = format!("[0/{}] ({})", total_count, format_bytes(orig_total_bytes));
+    let mut progress_handle = notifier.start_job(&JobProgressUpdate {
+        headline: &headline,
+        source_value: &initial_source,
+        target_value: target_display,
+        percent: 0,
+        detail_text: Some("0%"),
+        batch_progress: Some((0, total_count as u64)),
+    });
 
     let batch_start = std::time::Instant::now();
+    let mut last_notify_emit = std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(1))
+        .unwrap_or_else(std::time::Instant::now);
     let batch_result =
         converter::convert_batch_with_progress(files, opts, |curr, total, file, percent| {
             let file_name = file.file_name().and_then(|s| s.to_str()).unwrap_or("file");
-            let elapsed = batch_start.elapsed().as_secs_f64();
+            let elapsed = batch_start
+                .elapsed()
+                .saturating_sub(crate::process::job_paused_duration())
+                .as_secs_f64();
             let eta_str = if curr > 0 && curr < total {
                 let avg = elapsed / curr as f64;
                 let rem_secs = (avg * (total - curr) as f64).round() as u64;
@@ -602,16 +897,22 @@ pub fn run_batch_conversion(
             } else {
                 String::new()
             };
-            let summary = format!("[{}/{}]", curr, total);
-            let body = format!("{} -> {}", file_name, target_display);
-            let progress_text = format!("{}%{}", percent, eta_str);
-            notifier.update_progress(
-                &mut progress_handle,
-                &summary,
-                &body,
-                percent,
-                Some(&progress_text),
-            );
+            if curr == 1 || curr == total || last_notify_emit.elapsed().as_millis() >= 150 {
+                let source_val = format!("[{}/{}] {}", curr, total, file_name);
+                let progress_text = format!("{}%{}", percent, eta_str);
+                notifier.update_job(
+                    &mut progress_handle,
+                    &JobProgressUpdate {
+                        headline: &headline,
+                        source_value: &source_val,
+                        target_value: target_display,
+                        percent,
+                        detail_text: Some(&progress_text),
+                        batch_progress: Some((curr as u64, total as u64)),
+                    },
+                );
+                last_notify_emit = std::time::Instant::now();
+            }
             println!(
                 "[{}/{}] {} ({}%{})",
                 curr, total, file_name, percent, eta_str
@@ -647,7 +948,9 @@ pub fn run_batch_conversion(
         original_size_bytes: orig_total_bytes,
         output_size_bytes: out_total_bytes,
         savings_percent: savings_pct,
-        status: if fail_count == 0 {
+        status: if batch_result.cancelled {
+            "Cancelled".into()
+        } else if fail_count == 0 {
             "Success".into()
         } else {
             "Partial".into()
@@ -658,7 +961,14 @@ pub fn run_batch_conversion(
             .map(|p| p.to_string_lossy().to_string()),
     });
 
-    if fail_count == 0 {
+    if batch_result.cancelled {
+        notifier.cancel_progress(
+            &mut progress_handle,
+            t("notify_cancelled"),
+            &format!("{} {}", success_count, t("label_files_converted")),
+        );
+        bail!("{}", t("err_job_cancelled"));
+    } else if fail_count == 0 {
         notifier.finish_progress(
             &mut progress_handle,
             t("notify_done_batch"),
@@ -692,4 +1002,25 @@ pub fn run_batch_conversion(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_action_headline_variants() {
+        let comp = format_action_headline("compress", "Compress");
+        assert!(!comp.is_empty());
+
+        let strip = format_action_headline("strip-metadata", "Strip Metadata");
+        assert!(!strip.is_empty());
+        assert_ne!(strip, comp);
+
+        let webm = format_action_headline("webm", "WEBM");
+        assert!(webm.ends_with(": WEBM"));
+
+        let resize = format_action_headline("resize_1080p", "Resize (1080p)");
+        assert!(resize.ends_with(": 1080p"));
+    }
 }

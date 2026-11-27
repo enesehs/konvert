@@ -30,62 +30,65 @@
 #include <QImageReader>
 #include <QFileDialog>
 #include <QShortcut>
+#include <QPointer>
+#include <QSharedPointer>
+#include <QSignalBlocker>
+#include <QThreadPool>
+#include <QMetaObject>
+#include <cmath>
 
 #ifndef KONVERT_APP_VERSION
 #define KONVERT_APP_VERSION "v0.1-beta"
 #endif
 
-static QString findKonvertBinary() {
-    QString program = "konvert";
-    const QFileInfo sibling(QDir(QCoreApplication::applicationDirPath()).filePath("konvert"));
-    if (sibling.exists() && sibling.isExecutable()) {
-        return sibling.absoluteFilePath();
-    }
-    const QFileInfo cargoSibling(QDir(QCoreApplication::applicationDirPath()).filePath("../../target/release/konvert"));
-    if (cargoSibling.exists() && cargoSibling.isExecutable()) {
-        return cargoSibling.canonicalFilePath();
-    }
-    const QFileInfo cargoDebugSibling(QDir(QCoreApplication::applicationDirPath()).filePath("../../target/debug/konvert"));
-    if (cargoDebugSibling.exists() && cargoDebugSibling.isExecutable()) {
-        return cargoDebugSibling.canonicalFilePath();
-    }
-    return program;
+static QString getCacheBaseDir() {
+    return QDir(QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation)).filePath("konvert");
 }
 
-static QString getPidFilePath() {
-    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::GenericCacheLocation);
-    return QDir(cacheDir).filePath("konvert/running.pid");
-}
-
-static qint64 getActiveKonvertPid() {
-    QString pidPath = getPidFilePath();
-    QFile file(pidPath);
-    if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return 0;
-    }
-    QTextStream in(&file);
-    QString pidStr = in.readLine().trimmed();
-    bool ok = false;
-    qint64 pid = pidStr.toLongLong(&ok);
-    if (!ok || pid <= 0) {
-        return 0;
-    }
-
+static bool pidIsActiveKonvert(qint64 pid) {
+    if (pid <= 0) return false;
     QFile commFile(QString("/proc/%1/comm").arg(pid));
     if (commFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QString comm = QTextStream(&commFile).readLine().trimmed();
         if (comm == "konvert") {
-            return pid;
+            return true;
         }
     }
     QFileInfo exeInfo(QString("/proc/%1/exe").arg(pid));
     if (exeInfo.exists()) {
-        QString symlink = exeInfo.symLinkTarget();
-        if (symlink.contains("konvert") && !symlink.contains("konvert-settings")) {
-            return pid;
+        QString target = exeInfo.symLinkTarget();
+        return QFileInfo(target).fileName() == "konvert";
+    }
+    return false;
+}
+
+static qint64 parsePidFile(const QString &pidPath) {
+    QFile file(pidPath);
+    if (!file.exists() || !file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return 0;
+    }
+    bool ok = false;
+    qint64 pid = QTextStream(&file).readLine().trimmed().toLongLong(&ok);
+    return (ok && pidIsActiveKonvert(pid)) ? pid : 0;
+}
+
+static qint64 getActiveKonvertPid() {
+    const QString base = getCacheBaseDir();
+    QDir pidsDir(QDir(base).filePath("pids"));
+    if (pidsDir.exists()) {
+        const QStringList entries = pidsDir.entryList({"*.pid"}, QDir::Files);
+        for (const QString &name : entries) {
+            qint64 pid = parsePidFile(pidsDir.filePath(name));
+            if (pid > 0) return pid;
         }
     }
-    return 0;
+    return parsePidFile(QDir(base).filePath("running.pid"));
+}
+
+static bool isPidPaused(qint64 pid) {
+    if (pid <= 0) return false;
+    const QString base = getCacheBaseDir();
+    return QFileInfo::exists(QDir(QDir(base).filePath("pids")).filePath(QString("%1.paused").arg(pid)));
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -99,9 +102,18 @@ MainWindow::MainWindow(QWidget *parent)
     m_saveTimer->setInterval(400);
     connect(m_saveTimer, &QTimer::timeout, this, &MainWindow::saveSettingsNow);
 
+    m_reloadGuardTimer = new QTimer(this);
+    m_reloadGuardTimer->setSingleShot(true);
+    m_reloadGuardTimer->setInterval(300);
+    connect(m_reloadGuardTimer, &QTimer::timeout, this, [this]() {
+        m_isSavingConfig = false;
+    });
+
     m_processMonitorTimer = new QTimer(this);
     m_processMonitorTimer->setInterval(2000);
-    connect(m_processMonitorTimer, &QTimer::timeout, this, &MainWindow::updateProcessMonitor);
+    connect(m_processMonitorTimer, &QTimer::timeout, this, [this]() {
+        updateProcessMonitor(false);
+    });
     m_processMonitorTimer->start();
 
     setupConfigWatcher();
@@ -121,7 +133,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *refreshShortcut = new QShortcut(QKeySequence::Refresh, this);
     connect(refreshShortcut, &QShortcut::activated, this, [this]() {
         loadHistoryData();
-        updateProcessMonitor();
+        updateProcessMonitor(true);
     });
 
     setWindowTitle("Konvert");
@@ -137,11 +149,26 @@ static QString trKey(const QString &key, const QString &lang) {
     return AppTranslator::tr(key, lang);
 }
 
+static void selectComboLanguage(QComboBox *combo, const QString &langCode) {
+    if (!combo) return;
+    int idx = combo->findData(langCode);
+    if (idx < 0) {
+        if (langCode.isEmpty() || langCode == "auto") {
+            idx = 0;
+        } else {
+            combo->addItem(langCode, langCode);
+            idx = combo->count() - 1;
+        }
+    }
+    combo->setCurrentIndex(idx);
+}
+
 QWidget* MainWindow::createCard(const QString &title, QWidget *contentWidget) {
     auto *frame = new QFrame(this);
+    frame->setObjectName("konvertCard");
     frame->setFrameShape(QFrame::StyledPanel);
     frame->setStyleSheet(
-        "QFrame { "
+        "QFrame#konvertCard { "
         "  border: 1px solid palette(midlight); "
         "  border-radius: 8px; "
         "  background-color: palette(alternate-base); "
@@ -154,8 +181,8 @@ QWidget* MainWindow::createCard(const QString &title, QWidget *contentWidget) {
     layout->setContentsMargins(16, 14, 16, 14);
 
     if (!title.isEmpty()) {
-        auto *lblTitle = new QLabel(QString("<b>%1</b>").arg(title), frame);
-        lblTitle->setStyleSheet("font-size: 13px; border: none; background: transparent;");
+        auto *lblTitle = new QLabel(QString("<b>%1</b>").arg(title.toHtmlEscaped()), frame);
+        lblTitle->setStyleSheet("font-size: 1.0em; border: none; background: transparent;");
         layout->addWidget(lblTitle);
 
         auto *sep = new QFrame(frame);
@@ -164,7 +191,6 @@ QWidget* MainWindow::createCard(const QString &title, QWidget *contentWidget) {
         layout->addWidget(sep);
     }
 
-    contentWidget->setStyleSheet("border: none; background: transparent;");
     layout->addWidget(contentWidget);
 
     return frame;
@@ -206,7 +232,7 @@ QCheckBox* MainWindow::createActionCheckBox(
     }
     cb->setProperty("actionId", id);
     cb->setChecked(m_config.enabledActions.contains(id));
-    cb->setStyleSheet("QCheckBox { font-size: 13px; padding: 4px 0; }");
+    cb->setStyleSheet("QCheckBox { font-size: 1.0em; padding: 4px 0; }");
 
     connect(cb, &QCheckBox::toggled, this, &MainWindow::onActionCheckChanged);
     m_actionCheckBoxes.append(cb);
@@ -214,8 +240,12 @@ QCheckBox* MainWindow::createActionCheckBox(
 }
 
 void MainWindow::setupUi() {
-    auto *oldCentral = centralWidget();
-    if (oldCentral) {
+    m_actionCheckBoxes.clear();
+    m_videoLosslessWarnLabel = nullptr;
+    m_depsStatusEdit = nullptr;
+    m_lastMonitoredPid = -2;
+    if (auto *oldCentral = takeCentralWidget()) {
+        oldCentral->hide();
         oldCentral->deleteLater();
     }
 
@@ -229,15 +259,15 @@ void MainWindow::setupUi() {
     const QString lang = currentLanguage();
     m_rootTabWidget->addTab(createConvertTab(), QIcon::fromTheme("document-edit-symbolic"), trKey("tab_convert", lang));
     const int historyTabIndex = m_rootTabWidget->addTab(createHistoryTab(), QIcon::fromTheme("view-history-symbolic"), trKey("tab_history", lang));
-    const int settingsTabIndex = m_rootTabWidget->addTab(createSettingsTab(), QIcon::fromTheme("configure-symbolic", QIcon::fromTheme("preferences-system-symbolic")), trKey("tab_settings", lang));
+    m_settingsTabIndex = m_rootTabWidget->addTab(createSettingsTab(), QIcon::fromTheme("configure-symbolic", QIcon::fromTheme("preferences-system-symbolic")), trKey("tab_settings", lang));
     m_rootTabWidget->addTab(createAboutTab(), QIcon::fromTheme("help-about-symbolic"), trKey("tab_about", lang));
 
-    // CLI'den yapılan dönüşümler sekme açılınca görünsün.
-    connect(m_rootTabWidget, &QTabWidget::currentChanged, this, [this, historyTabIndex, settingsTabIndex](int index) {
+    // CLI'den yapılan dönüşümler sekme açılınca tembel olarak yüklensin.
+    connect(m_rootTabWidget, &QTabWidget::currentChanged, this, [this, historyTabIndex](int index) {
         if (index == historyTabIndex) {
             loadHistoryData();
-        } else if (index == settingsTabIndex) {
-            updateProcessMonitor();
+        } else if (index == m_settingsTabIndex) {
+            updateProcessMonitor(true);
         }
     });
 
@@ -282,144 +312,144 @@ QWidget* MainWindow::createPhotosTab() {
 
     actionsGrid->addWidget(createActionCheckBox(
         "compress_photo",
-        lang == "tr" ? "Görseli Sıkıştır" : "Compress Image",
-        lang == "tr" ? "Görseli insan gözünün fark edemeyeceği maksimum görsel kalite ve en küçük dosya boyutu dengesiyle WebP formatında sıkıştırır." : "Compresses image to WebP with optimal balance of maximum visual quality and minimum file size.",
+        AppTranslator::trActionLabel("compress_photo", lang),
+        AppTranslator::trActionDesc("compress_photo", lang),
         "konvert-compress",
         actionsWidget
     ), 0, 0, 1, 2);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_webp",
-        lang == "tr" ? "WebP'ye Dönüştür" : "Convert to WebP",
-        lang == "tr" ? "Modern WebP formatına dönüştürür. JPEG ve PNG'ye kıyasla yüksek oranda boyut tasarrufu sağlar." : "Converts to modern WebP format, providing significant size reduction compared to JPEG and PNG.",
+        AppTranslator::trActionLabel("to_webp", lang),
+        AppTranslator::trActionDesc("to_webp", lang),
         "konvert-image",
         actionsWidget
     ), 1, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_png",
-        lang == "tr" ? "PNG'ye Dönüştür" : "Convert to PNG",
-        lang == "tr" ? "Kayıpsız ve şeffaflık (alpha) kanalını destekleyen standart PNG formatına dönüştürür." : "Converts to lossless standard PNG with transparency support.",
+        AppTranslator::trActionLabel("to_png", lang),
+        AppTranslator::trActionDesc("to_png", lang),
         "konvert-image",
         actionsWidget
     ), 1, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_jpg",
-        lang == "tr" ? "JPG'ye Dönüştür" : "Convert to JPG",
-        lang == "tr" ? "Evrensel uyumluluğa sahip standart JPEG formatına dönüştürür." : "Converts to universal standard JPEG image.",
+        AppTranslator::trActionLabel("to_jpg", lang),
+        AppTranslator::trActionDesc("to_jpg", lang),
         "konvert-image",
         actionsWidget
     ), 2, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_svg",
-        lang == "tr" ? "SVG Olarak Vektörleştir" : "Trace to SVG (Vectorize)",
-        lang == "tr" ? "Görseli potrace ile izleyerek ölçeklenebilir vektör (SVG) grafiğine dönüştürür." : "Traces raster image to scalable vector graphic (SVG) format using potrace.",
+        AppTranslator::trActionLabel("to_svg", lang),
+        AppTranslator::trActionDesc("to_svg", lang),
         "konvert-image",
         actionsWidget
     ), 2, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_ico",
-        lang == "tr" ? "ICO'ya Dönüştür" : "Convert to ICO",
-        lang == "tr" ? "Web sitesi favicon veya uygulama simgesi olarak kullanılan ICO formatına dönüştürür." : "Converts to standard Windows and favicon ICO format.",
+        AppTranslator::trActionLabel("to_ico", lang),
+        AppTranslator::trActionDesc("to_ico", lang),
         "konvert-image",
         actionsWidget
     ), 3, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_heic",
-        lang == "tr" ? "HEIC'e Dönüştür" : "Convert to HEIC",
-        lang == "tr" ? "Apple ve modern cihazlarda kullanılan yüksek verimli HEIC formatına dönüştürür." : "Converts to high-efficiency HEIC format.",
+        AppTranslator::trActionLabel("to_heic", lang),
+        AppTranslator::trActionDesc("to_heic", lang),
         "konvert-image",
         actionsWidget
     ), 3, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_bmp",
-        lang == "tr" ? "BMP'ye Dönüştür" : "Convert to BMP",
-        lang == "tr" ? "Sıkıştırmasız standart Windows Bitmap formatına dönüştürür." : "Converts to uncompressed standard Windows Bitmap format.",
+        AppTranslator::trActionLabel("to_bmp", lang),
+        AppTranslator::trActionDesc("to_bmp", lang),
         "konvert-image",
         actionsWidget
     ), 4, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_avif",
-        lang == "tr" ? "AVIF'e Dönüştür" : "Convert to AVIF",
-        lang == "tr" ? "AV1 video kodlayıcı tabanlı, yüksek sıkıştırma verimliliği sunan yeni nesil görsel formatı." : "Next-generation image format based on AV1, providing superior compression.",
+        AppTranslator::trActionLabel("to_avif", lang),
+        AppTranslator::trActionDesc("to_avif", lang),
         "konvert-image",
         actionsWidget
     ), 4, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_jxl",
-        lang == "tr" ? "JXL'e Dönüştür" : "Convert to JXL",
-        lang == "tr" ? "Yeni nesil JPEG XL formatına dönüştürür. Geniş renk gamutu ve üstün sıkıştırma oranı sunar." : "Converts to next-generation JPEG XL format with wide color gamut and high compression.",
+        AppTranslator::trActionLabel("to_jxl", lang),
+        AppTranslator::trActionDesc("to_jxl", lang),
         "konvert-image",
         actionsWidget
     ), 5, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_jxl_lossless",
-        lang == "tr" ? "Kayıpsız JXL'e Dönüştür" : "Convert to JXL (Lossless)",
-        lang == "tr" ? "Piksel kaybı olmaksızın matematiksel olarak tam kayıpsız JPEG XL sıkıştırması uygular." : "Mathematically lossless JPEG XL compression without pixel loss.",
+        AppTranslator::trActionLabel("to_jxl_lossless", lang),
+        AppTranslator::trActionDesc("to_jxl_lossless", lang),
         "konvert-image",
         actionsWidget
     ), 5, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "merge_to_pdf",
-        lang == "tr" ? "Tek PDF Olarak Birleştir" : "Merge to Single PDF",
-        lang == "tr" ? "Seçilen tüm görselleri tek bir PDF belgesi içerisinde sayfalar halinde birleştirir." : "Merges all selected images into a single multi-page PDF document.",
+        AppTranslator::trActionLabel("merge_to_pdf", lang),
+        AppTranslator::trActionDesc("merge_to_pdf", lang),
         "konvert-layers",
         actionsWidget
     ), 6, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "strip_metadata",
-        lang == "tr" ? "EXIF ve Metadata Temizle" : "Strip Metadata & EXIF",
-        lang == "tr" ? "Görseldeki GPS konumu, çekim tarihi, kamera modeli ve etiketleri temizleyerek gizliliği korur." : "Cleans GPS coordinates, camera model, shooting date, and personal tags for privacy.",
+        AppTranslator::trActionLabel("strip_metadata", lang),
+        AppTranslator::trActionDesc("strip_metadata", lang),
         "konvert-shield",
         actionsWidget
     ), 6, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "resize_50",
-        lang == "tr" ? "Görseli %50 Küçült" : "Resize by 50%",
-        lang == "tr" ? "Görselin genişlik ve yükseklik çözünürlüğünü yarıya indirerek dosya boyutunu büyük oranda azaltır." : "Reduces image dimensions by half (50%) to shrink file size.",
+        AppTranslator::trActionLabel("resize_50", lang),
+        AppTranslator::trActionDesc("resize_50", lang),
         "konvert-scaling",
         actionsWidget
     ), 7, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "resize_1080p",
-        lang == "tr" ? "Full HD'ye Ölçekle" : "Resize to Full HD",
-        lang == "tr" ? "Görselin en-boy oranını koruyarak 1920x1080 Full HD sınırlarına sığacak şekilde ölçekler." : "Scales image proportionally to fit within 1920x1080 Full HD bounds.",
+        AppTranslator::trActionLabel("resize_1080p", lang),
+        AppTranslator::trActionDesc("resize_1080p", lang),
         "konvert-monitor",
         actionsWidget
     ), 7, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "web_opt",
-        lang == "tr" ? "Web İçin Optimize Et (WebP)" : "Optimize for Web (WebP)",
-        lang == "tr" ? "WebP formatında %82 kalite ve sıfır EXIF ile web için ideal boyuta getirir." : "Converts to WebP with 82% quality and stripped EXIF for fast web delivery.",
+        AppTranslator::trActionLabel("web_opt", lang),
+        AppTranslator::trActionDesc("web_opt", lang),
         "konvert-globe",
         actionsWidget
     ), 8, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "discord_8mb_photo",
-        lang == "tr" ? "Discord İçin Sıkıştır (8 MB)" : "Compress for Discord (8 MB)",
-        lang == "tr" ? "Görseli 8 MB sınırına sığacak şekilde optimize eder." : "Optimizes image to guarantee size under 8 MB.",
+        AppTranslator::trActionLabel("discord_8mb_photo", lang),
+        AppTranslator::trActionDesc("discord_8mb_photo", lang),
         "konvert-mail",
         actionsWidget
     ), 8, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "email_25mb_photo",
-        lang == "tr" ? "E-Posta İçin Sıkıştır (25 MB)" : "Compress for Email (25 MB)",
-        lang == "tr" ? "Görseli 25 MB e-posta ek sınırına uyacak şekilde optimize eder." : "Optimizes image to fit standard 25 MB email attachment limits.",
+        AppTranslator::trActionLabel("email_25mb_photo", lang),
+        AppTranslator::trActionDesc("email_25mb_photo", lang),
         "konvert-mail",
         actionsWidget
     ), 9, 0, 1, 2);
@@ -433,7 +463,7 @@ QWidget* MainWindow::createPhotosTab() {
 
     auto *sliderRow = new QHBoxLayout();
     auto *sliderLabel = new QLabel(trKey("lbl_photo_quality", lang), qualityWidget);
-    sliderLabel->setToolTip(lang == "tr" ? "Hedef görsel kalitesi (1-100). 85 önerilir." : "Target image quality percentage (1-100). 85 is recommended.");
+    sliderLabel->setToolTip(trKey("tip_photo_quality", lang));
     sliderRow->addWidget(sliderLabel);
 
     m_photoQualitySlider = new QSlider(Qt::Horizontal, qualityWidget);
@@ -456,10 +486,16 @@ QWidget* MainWindow::createPhotosTab() {
     qualityLayout->addLayout(sliderRow);
 
     m_photoLosslessCheck = new QCheckBox(trKey("lbl_lossless_photo", lang), qualityWidget);
-    m_photoLosslessCheck->setToolTip(lang == "tr" ? "WebP, PNG ve JXL dönüşümlerinde tam kayıpsız modu zorlar." : "Forces mathematically lossless mode in WebP, PNG, and JXL conversions.");
+    m_photoLosslessCheck->setToolTip(trKey("tip_lossless_photo", lang));
     m_photoLosslessCheck->setChecked(m_config.imageLossless);
+    if (m_photoQualitySlider) {
+        m_photoQualitySlider->setEnabled(!m_config.imageLossless);
+    }
     connect(m_photoLosslessCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_config.imageLossless = checked;
+        if (m_photoQualitySlider) {
+            m_photoQualitySlider->setEnabled(!checked);
+        }
         saveSettings();
     });
     qualityLayout->addWidget(m_photoLosslessCheck);
@@ -489,83 +525,91 @@ QWidget* MainWindow::createVideosTab() {
 
     actionsGrid->addWidget(createActionCheckBox(
         "compress_video",
-        lang == "tr" ? "Videoyu Sıkıştır" : "Compress Video",
-        lang == "tr" ? "Videoyu H.264 CRF 28 ve slow kodlama önayarı ile görsel kalitesini koruyarak %80'e varan oranda sıkıştırır." : "Compresses video with H.264 CRF 28 and slow preset preserving visual quality.",
+        AppTranslator::trActionLabel("compress_video", lang),
+        AppTranslator::trActionDesc("compress_video", lang),
         "konvert-compress",
         actionsWidget
     ), 0, 0, 1, 2);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_mp4",
-        lang == "tr" ? "MP4'e Dönüştür" : "Convert to MP4",
-        lang == "tr" ? "Evrensel cihaz ve tarayıcı uyumluluğu için standart H.264/AAC MP4 formatına dönüştürür." : "Converts to standard H.264/AAC MP4 for universal device and browser compatibility.",
+        AppTranslator::trActionLabel("to_mp4", lang),
+        AppTranslator::trActionDesc("to_mp4", lang),
         "konvert-video",
         actionsWidget
     ), 1, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_mkv",
-        lang == "tr" ? "MKV'ye Dönüştür" : "Convert to MKV",
-        lang == "tr" ? "Çoklu ses ve altyazı izlerini destekleyen esnek Matroska video kapsayıcısına dönüştürür." : "Converts to versatile Matroska video container supporting multiple audio and subtitle streams.",
+        AppTranslator::trActionLabel("to_mkv", lang),
+        AppTranslator::trActionDesc("to_mkv", lang),
         "konvert-video",
         actionsWidget
     ), 1, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_webm",
-        lang == "tr" ? "WebM'ye Dönüştür" : "Convert to WebM",
-        lang == "tr" ? "Web ve HTML5 uyumlu açık kaynaklı VP9 video formatına dönüştürür." : "Converts to open-source VP9 WebM format for web and HTML5 streaming.",
+        AppTranslator::trActionLabel("to_webm", lang),
+        AppTranslator::trActionDesc("to_webm", lang),
         "konvert-video",
         actionsWidget
     ), 2, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_av1",
-        lang == "tr" ? "AV1'e Dönüştür" : "Convert to AV1",
-        lang == "tr" ? "Modern açık AV1 formatına dönüştürür. Donanım hızlandırma veya SVT-AV1 ile yüksek sıkıştırma verimliliği sağlar." : "Converts to modern open AV1 video format with high compression efficiency via hardware acceleration or SVT-AV1.",
+        AppTranslator::trActionLabel("to_av1", lang),
+        AppTranslator::trActionDesc("to_av1", lang),
         "konvert-video",
         actionsWidget
     ), 2, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "to_gif",
-        lang == "tr" ? "GIF'e Dönüştür" : "Convert to GIF",
-        lang == "tr" ? "İki geçişli renk paleti analiziyle videonun ilk 15 saniyesini yüksek kaliteli animasyonlu GIF'e dönüştürür." : "Converts the first 15 seconds of video to a high-quality animated GIF using two-pass palette optimization.",
+        AppTranslator::trActionLabel("to_gif", lang),
+        AppTranslator::trActionDesc("to_gif", lang),
         "konvert-video",
         actionsWidget
     ), 3, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "extract_audio",
-        lang == "tr" ? "Videodan Sesi Ayıkla" : "Extract Audio",
-        lang == "tr" ? "Videonun ses izini doğrudan ayrı bir MP3 ses dosyası olarak dışa aktarır." : "Demuxes and extracts the audio stream directly into an MP3 file.",
+        AppTranslator::trActionLabel("extract_audio", lang),
+        AppTranslator::trActionDesc("extract_audio", lang),
         "konvert-audio",
         actionsWidget
     ), 3, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
         "discord_8mb_video",
-        lang == "tr" ? "Discord İçin Sıkıştır (8 MB)" : "Compress for Discord (8 MB)",
-        lang == "tr" ? "Videonun süresine göre bit hızını otomatik ayarlayarak 8 MB boyutuna sığdırır." : "Automatically computes video bitrate according to length to fit within 8 MB.",
+        AppTranslator::trActionLabel("discord_8mb_video", lang),
+        AppTranslator::trActionDesc("discord_8mb_video", lang),
         "konvert-mail",
         actionsWidget
     ), 4, 0);
 
     actionsGrid->addWidget(createActionCheckBox(
         "email_25mb_video",
-        lang == "tr" ? "E-Posta İçin Sıkıştır (25 MB)" : "Compress for Email (25 MB)",
-        lang == "tr" ? "Videonun süresine göre bit hızını otomatik ayarlayarak 25 MB e-posta ek sınırına sığdırır." : "Automatically calculates bitrate to fit within 25 MB email attachment limit.",
+        AppTranslator::trActionLabel("email_25mb_video", lang),
+        AppTranslator::trActionDesc("email_25mb_video", lang),
         "konvert-mail",
         actionsWidget
     ), 4, 1);
 
     actionsGrid->addWidget(createActionCheckBox(
+        "strip_metadata_video",
+        AppTranslator::trActionLabel("strip_metadata_video", lang),
+        AppTranslator::trActionDesc("strip_metadata_video", lang),
+        "konvert-shield",
+        actionsWidget
+    ), 5, 0);
+
+    actionsGrid->addWidget(createActionCheckBox(
         "extract_frames",
-        lang == "tr" ? "Kareleri Klasöre Aktar" : "Export Frames to Folder",
-        lang == "tr" ? "Videonun her video karesini PNG resimleri olarak yeni bir klasöre döker." : "Exports all video frames as individual PNG images to a dedicated folder.",
+        AppTranslator::trActionLabel("extract_frames", lang),
+        AppTranslator::trActionDesc("extract_frames", lang),
         "konvert-folder",
         actionsWidget
-    ), 5, 0, 1, 2);
+    ), 5, 1);
 
     layout->addWidget(createCard(trKey("card_actions", lang), actionsWidget));
 
@@ -576,7 +620,7 @@ QWidget* MainWindow::createVideosTab() {
 
     auto *crfRow = new QHBoxLayout();
     auto *crfLabel = new QLabel(trKey("lbl_video_crf", lang), compWidget);
-    crfLabel->setToolTip(lang == "tr" ? "Sabit Oran Faktörü (0-51): 0 kayıpsız, 18-23 dengeli yüksek kalite, 28+ yüksek sıkıştırma." : "Constant Rate Factor (0-51): 0 is lossless, 18-23 is balanced high quality, 28+ is high compression.");
+    crfLabel->setToolTip(trKey("tip_video_crf", lang));
     crfRow->addWidget(crfLabel);
 
     m_videoCrfSlider = new QSlider(Qt::Horizontal, compWidget);
@@ -599,7 +643,7 @@ QWidget* MainWindow::createVideosTab() {
 
     auto *presetRow = new QHBoxLayout();
     auto *presetLabel = new QLabel(trKey("lbl_video_preset", lang), compWidget);
-    presetLabel->setToolTip(lang == "tr" ? "Kodlayıcı hız önayarı: 'slow' veya 'medium' en iyi sıkıştırma/süre dengesini sunar." : "Encoder speed preset: 'slow' or 'medium' offers the best compression-to-time ratio.");
+    presetLabel->setToolTip(trKey("tip_video_preset", lang));
     presetRow->addWidget(presetLabel);
 
     m_videoPresetCombo = new QComboBox(compWidget);
@@ -618,7 +662,7 @@ QWidget* MainWindow::createVideosTab() {
 
     auto *hwaccelRow = new QHBoxLayout();
     auto *hwaccelLabel = new QLabel(trKey("lbl_video_hwaccel", lang), compWidget);
-    hwaccelLabel->setToolTip(lang == "tr" ? "GPU donanım hızlandırma kodlayıcısı (NVIDIA NVENC veya Intel/AMD VA-API). Desteklenmeyen sistemlerde otomatik olarak CPU'ya geri döner." : "GPU hardware acceleration encoder (NVIDIA NVENC or Intel/AMD VA-API). Automatically falls back to CPU if unsupported.");
+    hwaccelLabel->setToolTip(trKey("tip_video_hwaccel", lang));
     hwaccelRow->addWidget(hwaccelLabel);
 
     m_videoHwaccelCombo = new QComboBox(compWidget);
@@ -644,13 +688,31 @@ QWidget* MainWindow::createVideosTab() {
     compLayout->addLayout(hwaccelRow);
 
     m_videoLosslessCheck = new QCheckBox(trKey("lbl_video_lossless", lang), compWidget);
-    m_videoLosslessCheck->setToolTip(lang == "tr" ? "CRF 0 ile x264 RGB kayıpsız kodlama yapar." : "Encodes using x264 RGB with CRF 0 without lossy compression artifacts.");
+    m_videoLosslessCheck->setToolTip(trKey("tip_video_lossless", lang));
     m_videoLosslessCheck->setChecked(m_config.videoLossless);
+    if (m_videoCrfSlider) {
+        m_videoCrfSlider->setEnabled(!m_config.videoLossless);
+    }
+    m_videoLosslessWarnLabel = new QLabel(
+        trKey("warn_video_lossless", lang),
+        compWidget
+    );
+    m_videoLosslessWarnLabel->setWordWrap(true);
+    m_videoLosslessWarnLabel->setStyleSheet("color: #d97706; font-size: 0.88em;");
+    m_videoLosslessWarnLabel->setVisible(m_config.videoLossless);
+
     connect(m_videoLosslessCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_config.videoLossless = checked;
+        if (m_videoCrfSlider) {
+            m_videoCrfSlider->setEnabled(!checked);
+        }
+        if (m_videoLosslessWarnLabel) {
+            m_videoLosslessWarnLabel->setVisible(checked);
+        }
         saveSettings();
     });
     compLayout->addWidget(m_videoLosslessCheck);
+    compLayout->addWidget(m_videoLosslessWarnLabel);
 
     layout->addWidget(createCard(trKey("card_video_comp", lang), compWidget));
     layout->addStretch();
@@ -677,22 +739,22 @@ QWidget* MainWindow::createMusicTab() {
 
     actionsLayout->addWidget(createActionCheckBox(
         "to_mp3",
-        lang == "tr" ? "MP3'e Dönüştür" : "Convert to MP3",
-        lang == "tr" ? "En yaygın evrensel ses formatı olan MP3'e dönüştürür." : "Converts to universal standard MP3 audio.",
+        AppTranslator::trActionLabel("to_mp3", lang),
+        AppTranslator::trActionDesc("to_mp3", lang),
         "konvert-audio",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "to_wav",
-        lang == "tr" ? "WAV'a Dönüştür" : "Convert to WAV",
-        lang == "tr" ? "Stüdyo kalitesinde, tam kayıpsız ve sıkıştırmasız PCM WAV ses dosyası üretir." : "Converts to uncompressed studio-quality PCM WAV audio.",
+        AppTranslator::trActionLabel("to_wav", lang),
+        AppTranslator::trActionDesc("to_wav", lang),
         "konvert-audio",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "audio_to_video",
-        lang == "tr" ? "Videoya Dönüştür" : "Convert to Video",
-        lang == "tr" ? "Ses dosyası için arka planda KDE mavisi ses dalga formu üreterek paylaşılabilir bir MP4 videosu oluşturur." : "Generates an aesthetic KDE-blue waveform visualization video in MP4 format from audio.",
+        AppTranslator::trActionLabel("audio_to_video", lang),
+        AppTranslator::trActionDesc("audio_to_video", lang),
         "konvert-video",
         actionsWidget
     ));
@@ -706,7 +768,7 @@ QWidget* MainWindow::createMusicTab() {
 
     auto *bitrateRow = new QHBoxLayout();
     auto *bitrateLabel = new QLabel(trKey("lbl_audio_bitrate", lang), audioWidget);
-    bitrateLabel->setToolTip(lang == "tr" ? "MP3 ve AAC kodlama için hedef ses bit hızı. 320k şeffaf stüdyo kalitesi sunar." : "Target audio bitrate for MP3 and AAC encoding. 320k provides transparent CD quality.");
+    bitrateLabel->setToolTip(trKey("tip_audio_bitrate", lang));
     bitrateRow->addWidget(bitrateLabel);
 
     m_audioBitrateCombo = new QComboBox(audioWidget);
@@ -750,43 +812,43 @@ QWidget* MainWindow::createDocumentsTab() {
 
     actionsLayout->addWidget(createActionCheckBox(
         "compress_doc",
-        lang == "tr" ? "PDF Sıkıştır" : "Compress PDF",
-        lang == "tr" ? "PDF belgesinin içerisindeki yüksek çözünürlüklü görselleri ve veri akışlarını sıkıştırarak dosya boyutunu düşürür." : "Compresses high-resolution embedded images and streams in PDF files to minimize file size.",
+        AppTranslator::trActionLabel("compress_doc", lang),
+        AppTranslator::trActionDesc("compress_doc", lang),
         "konvert-compress",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "udf_to_pdf",
-        lang == "tr" ? "UDF'i PDF'e Dönüştür" : "Convert UDF to PDF",
-        lang == "tr" ? "Ulusal Yargı Ağı Bilişim Sistemi (.udf) belgelerini doğrudan görüntülenebilir PDF belgesine dönüştürür." : "Converts Turkish National Judicial Network (.udf) legal documents directly into standard PDF.",
+        AppTranslator::trActionLabel("udf_to_pdf", lang),
+        AppTranslator::trActionDesc("udf_to_pdf", lang),
         "konvert-document",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "udf_to_txt",
-        lang == "tr" ? "UDF'i Metne Dönüştür" : "Convert UDF to Text",
-        lang == "tr" ? "UYAP .udf belgesinin içindeki saf metin içeriğini ayrıştırarak .txt dosyası olarak kaydeder." : "Extracts clean text content from .udf documents into a standard text file.",
+        AppTranslator::trActionLabel("udf_to_txt", lang),
+        AppTranslator::trActionDesc("udf_to_txt", lang),
         "konvert-document",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "pdf_to_images",
-        lang == "tr" ? "PDF Sayfalarını PNG'ye Çıkar" : "Extract PDF Pages to PNG",
-        lang == "tr" ? "PDF belgesinin her bir sayfasını yüksek çözünürlüklü PNG resimleri olarak ayrı ayrı klasöre aktarır." : "Renders all pages of a PDF document into high-resolution PNG image files.",
+        AppTranslator::trActionLabel("pdf_to_images", lang),
+        AppTranslator::trActionDesc("pdf_to_images", lang),
         "konvert-image",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "docx_to_pdf",
-        lang == "tr" ? "DOCX'i PDF'e Dönüştür" : "Convert DOCX to PDF",
-        lang == "tr" ? "Microsoft Word (.docx) belgelerini LibreOffice motoruyla PDF belgesine dönüştürür." : "Converts Microsoft Word (.docx) documents to PDF using LibreOffice.",
+        AppTranslator::trActionLabel("docx_to_pdf", lang),
+        AppTranslator::trActionDesc("docx_to_pdf", lang),
         "konvert-document",
         actionsWidget
     ));
     actionsLayout->addWidget(createActionCheckBox(
         "docx_to_txt",
-        lang == "tr" ? "DOCX'i Metne Dönüştür" : "Convert DOCX to Text",
-        lang == "tr" ? "DOCX belgesinin metin içeriğini ayrıştırarak .txt dosyası olarak kaydeder." : "Extracts text content from .docx documents into a standard text file.",
+        AppTranslator::trActionLabel("docx_to_txt", lang),
+        AppTranslator::trActionDesc("docx_to_txt", lang),
         "konvert-document",
         actionsWidget
     ));
@@ -800,7 +862,7 @@ QWidget* MainWindow::createDocumentsTab() {
 
     auto *dpiRow = new QHBoxLayout();
     auto *dpiLabel = new QLabel(trKey("lbl_pdf_dpi", lang), docWidget);
-    dpiLabel->setToolTip(lang == "tr" ? "PDF sayfaları görsele aktarılırken kullanılacak DPI çözünürlüğü. 300 DPI standart baskı kalitesidir." : "DPI resolution when rendering PDF pages to images. 300 DPI is standard print quality.");
+    dpiLabel->setToolTip(trKey("tip_pdf_dpi", lang));
     dpiRow->addWidget(dpiLabel);
 
     m_pdfDpiSpin = new QSpinBox(docWidget);
@@ -834,8 +896,8 @@ QWidget* MainWindow::createHistoryTab() {
     summaryLayout->setContentsMargins(0, 0, 0, 0);
 
     auto *statsLayout = new QVBoxLayout();
-    m_totalOperationsLabel = new QLabel(lang == "tr" ? "<b>Toplam İşlem:</b> 0" : "<b>Total Conversions:</b> 0", summaryWidget);
-    m_totalSavingsLabel = new QLabel(lang == "tr" ? "<b>Toplam Tasarruf:</b> 0 MB" : "<b>Total Saved:</b> 0 MB", summaryWidget);
+    m_totalOperationsLabel = new QLabel(trKey("lbl_total_operations_init", lang), summaryWidget);
+    m_totalSavingsLabel = new QLabel(trKey("lbl_total_savings_init", lang), summaryWidget);
     statsLayout->addWidget(m_totalOperationsLabel);
     statsLayout->addWidget(m_totalSavingsLabel);
     summaryLayout->addLayout(statsLayout);
@@ -852,16 +914,20 @@ QWidget* MainWindow::createHistoryTab() {
     connect(btnClear, &QPushButton::clicked, this, &MainWindow::clearHistoryData);
     summaryLayout->addWidget(btnClear);
 
-    layout->addWidget(createCard(lang == "tr" ? "Dönüştürme İstatistikleri" : "Conversion Statistics", summaryWidget));
+    layout->addWidget(createCard(trKey("card_history_stats", lang), summaryWidget));
 
     // History Table
     m_historyTable = new QTableWidget(container);
     m_historyTable->setColumnCount(7);
-    if (lang == "tr") {
-        m_historyTable->setHorizontalHeaderLabels({"Tarih / Saat", "İşlem", "Dosya", "Orijinal", "Çıktı", "Tasarruf", "Durum"});
-    } else {
-        m_historyTable->setHorizontalHeaderLabels({"Date / Time", "Action", "Files", "Original", "Output", "Savings", "Status"});
-    }
+    m_historyTable->setHorizontalHeaderLabels({
+        trKey("hdr_date_time", lang),
+        trKey("hdr_action", lang),
+        trKey("hdr_files", lang),
+        trKey("hdr_original", lang),
+        trKey("hdr_output", lang),
+        trKey("hdr_savings", lang),
+        trKey("hdr_status", lang)
+    });
     m_historyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     m_historyTable->horizontalHeader()->setStretchLastSection(true);
     m_historyTable->setAlternatingRowColors(true);
@@ -886,19 +952,19 @@ QWidget* MainWindow::createHistoryTab() {
 
     auto *infoLayout = new QVBoxLayout();
     infoLayout->setSpacing(4);
-    m_previewTitleLabel = new QLabel(lang == "tr" ? "Önizleme için tablodan bir satır seçin." : "Select a row from the table to preview file.", m_previewPanel);
+    m_previewTitleLabel = new QLabel(trKey("lbl_preview_select", lang), m_previewPanel);
     m_previewTitleLabel->setWordWrap(true);
     infoLayout->addWidget(m_previewTitleLabel);
 
     m_previewPathLabel = new QLabel("", m_previewPanel);
-    m_previewPathLabel->setStyleSheet("color: palette(mid); font-size: 11px;");
+    m_previewPathLabel->setStyleSheet("color: palette(placeholder-text); font-size: 0.88em;");
     m_previewPathLabel->setWordWrap(true);
     infoLayout->addWidget(m_previewPathLabel);
 
     auto *btnRow = new QHBoxLayout();
     btnRow->setSpacing(8);
 
-    m_previewOpenBtn = new QPushButton(lang == "tr" ? "Dosyayı Aç" : "Open File", m_previewPanel);
+    m_previewOpenBtn = new QPushButton(trKey("btn_open_file", lang), m_previewPanel);
     m_previewOpenBtn->setIcon(QIcon::fromTheme("document-open-symbolic"));
     m_previewOpenBtn->setEnabled(false);
     connect(m_previewOpenBtn, &QPushButton::clicked, this, [this]() {
@@ -908,7 +974,7 @@ QWidget* MainWindow::createHistoryTab() {
     });
     btnRow->addWidget(m_previewOpenBtn);
 
-    m_previewDolphinBtn = new QPushButton(lang == "tr" ? "Dolphin'de Göster" : "Show in File Manager", m_previewPanel);
+    m_previewDolphinBtn = new QPushButton(trKey("btn_show_in_fm", lang), m_previewPanel);
     m_previewDolphinBtn->setIcon(QIcon::fromTheme("system-file-manager-symbolic"));
     m_previewDolphinBtn->setEnabled(false);
     connect(m_previewDolphinBtn, &QPushButton::clicked, this, [this]() {
@@ -926,11 +992,9 @@ QWidget* MainWindow::createHistoryTab() {
 
     previewLayout->addLayout(infoLayout, 1);
 
-    layout->addWidget(createCard(lang == "tr" ? "Dosya Önizleme ve Konum" : "File Preview & Location", m_previewPanel));
+    layout->addWidget(createCard(trKey("card_history_preview", lang), m_previewPanel));
 
     connect(m_historyTable, &QTableWidget::itemSelectionChanged, this, &MainWindow::onHistorySelectionChanged);
-
-    loadHistoryData();
 
     return container;
 }
@@ -945,8 +1009,8 @@ void MainWindow::loadHistoryData() {
     QFile file(historyFile);
     if (!file.open(QIODevice::ReadOnly)) {
         m_historyTable->setRowCount(0);
-        if (m_totalOperationsLabel) m_totalOperationsLabel->setText(lang == "tr" ? "<b>Toplam İşlem:</b> 0" : "<b>Total Conversions:</b> 0");
-        if (m_totalSavingsLabel) m_totalSavingsLabel->setText(lang == "tr" ? "<b>Toplam Tasarruf:</b> 0 MB" : "<b>Total Saved:</b> 0 MB");
+        if (m_totalOperationsLabel) m_totalOperationsLabel->setText(trKey("lbl_total_operations_init", lang));
+        if (m_totalSavingsLabel) m_totalSavingsLabel->setText(trKey("lbl_total_savings_init", lang));
         return;
     }
 
@@ -957,6 +1021,7 @@ void MainWindow::loadHistoryData() {
     if (!doc.isArray()) return;
 
     QJsonArray array = doc.array();
+    m_historyTable->setUpdatesEnabled(false);
     m_historyTable->setRowCount(array.size());
 
     qint64 totalSavedBytes = 0;
@@ -966,10 +1031,11 @@ void MainWindow::loadHistoryData() {
         const double KB = 1024.0;
         const double MB = KB * 1024.0;
         const double GB = MB * 1024.0;
-        double b = static_cast<double>(bytes);
-        if (b >= GB) return QString::number(b / GB, 'f', 1) + " GB";
-        if (b >= MB) return QString::number(b / MB, 'f', 1) + " MB";
-        if (b >= KB) return QString::number(b / KB, 'f', 1) + " KB";
+        const QString sign = bytes < 0 ? "-" : "";
+        double b = std::abs(static_cast<double>(bytes));
+        if (b >= GB) return sign + QString::number(b / GB, 'f', 1) + " GB";
+        if (b >= MB) return sign + QString::number(b / MB, 'f', 1) + " MB";
+        if (b >= KB) return sign + QString::number(b / KB, 'f', 1) + " KB";
         return QString::number(bytes) + " B";
     };
 
@@ -982,10 +1048,20 @@ void MainWindow::loadHistoryData() {
         qint64 outSize = static_cast<qint64>(obj["output_size_bytes"].toDouble());
         double savingsPct = obj["savings_percent"].toDouble();
         QString status = obj["status"].toString();
+        const QString normalizedStatus = status.trimmed().toLower();
+        const bool isCancelled = (normalizedStatus == "cancelled"
+            || normalizedStatus == "canceled"
+            || normalizedStatus == "iptal"
+            || normalizedStatus == "iptal edildi");
+        const bool isFailed = (normalizedStatus == "failed"
+            || normalizedStatus == "hata"
+            || normalizedStatus == "başarısız");
 
         totalFiles += fileCount;
-        // Büyüyen dönüşümler toplamdan düşülür (imzalı delta).
-        totalSavedBytes += (origSize - outSize);
+        // Başarısız veya iptal edilen işlemler tasarruf toplamına katılmaz; büyüyen dönüşümler düşülür (imzalı delta).
+        if (!isFailed && !isCancelled) {
+            totalSavedBytes += (origSize - outSize);
+        }
 
         QString outPath = obj["output_path"].toString();
         auto *timeItem = new QTableWidgetItem(timestamp);
@@ -1005,31 +1081,23 @@ void MainWindow::loadHistoryData() {
         m_historyTable->setItem(i, 5, savingsItem);
 
         auto *statusItem = new QTableWidgetItem(status);
-        const QString normalizedStatus = status.trimmed().toLower();
         if (normalizedStatus == "success" || normalizedStatus == "completed"
             || normalizedStatus == "tamamlandı" || normalizedStatus == "başarılı") {
             statusItem->setForeground(QColor(46, 170, 70));
-        } else if (normalizedStatus == "partial" || normalizedStatus == "kısmi") {
+        } else if (normalizedStatus == "partial" || normalizedStatus == "kısmi" || isCancelled) {
             statusItem->setForeground(QColor(210, 150, 40));
         } else {
             statusItem->setForeground(QColor(220, 80, 70));
         }
         m_historyTable->setItem(i, 6, statusItem);
     }
+    m_historyTable->setUpdatesEnabled(true);
 
     if (m_totalOperationsLabel) {
-        if (lang == "tr") {
-            m_totalOperationsLabel->setText(QString("<b>Toplam İşlem:</b> %1 (%2 dosya)").arg(array.size()).arg(totalFiles));
-        } else {
-            m_totalOperationsLabel->setText(QString("<b>Total Conversions:</b> %1 (%2 files)").arg(array.size()).arg(totalFiles));
-        }
+        m_totalOperationsLabel->setText(trKey("lbl_total_operations_fmt", lang).arg(array.size()).arg(totalFiles));
     }
     if (m_totalSavingsLabel) {
-        if (lang == "tr") {
-            m_totalSavingsLabel->setText(QString("<b>Toplam Tasarruf:</b> %1").arg(formatBytes(totalSavedBytes)));
-        } else {
-            m_totalSavingsLabel->setText(QString("<b>Total Saved:</b> %1").arg(formatBytes(totalSavedBytes)));
-        }
+        m_totalSavingsLabel->setText(trKey("lbl_total_savings_fmt", lang).arg(formatBytes(totalSavedBytes)));
     }
 
     onHistorySelectionChanged();
@@ -1041,7 +1109,7 @@ void MainWindow::onHistorySelectionChanged() {
     int row = m_historyTable->currentRow();
     if (row < 0 || row >= m_historyTable->rowCount()) {
         m_selectedOutputPath.clear();
-        if (m_previewTitleLabel) m_previewTitleLabel->setText(lang == "tr" ? "Önizleme için tablodan bir satır seçin." : "Select a row from the table to preview file.");
+        if (m_previewTitleLabel) m_previewTitleLabel->setText(trKey("lbl_preview_select", lang));
         if (m_previewPathLabel) m_previewPathLabel->setText("");
         if (m_previewThumbLabel) m_previewThumbLabel->clear();
         if (m_previewOpenBtn) m_previewOpenBtn->setEnabled(false);
@@ -1058,8 +1126,8 @@ void MainWindow::onHistorySelectionChanged() {
         if (m_previewTitleLabel) {
             m_previewTitleLabel->setText(
                 m_selectedOutputPath.isEmpty()
-                    ? (lang == "tr" ? "Bu işlem için dosya yolu kaydedilmemiş." : "No file path recorded for this operation.")
-                    : (lang == "tr" ? "Dosya diskte bulunamadı (taşınmış veya silinmiş olabilir)." : "File not found on disk (may have been moved or deleted).")
+                    ? trKey("lbl_preview_no_path", lang)
+                    : trKey("lbl_preview_missing", lang)
             );
         }
         if (m_previewPathLabel) m_previewPathLabel->setText(m_selectedOutputPath);
@@ -1071,33 +1139,65 @@ void MainWindow::onHistorySelectionChanged() {
 
     QFileInfo fi(m_selectedOutputPath);
     QString ext = fi.suffix().toLower();
+    const QString sizeText = m_historyTable->item(row, 4) ? m_historyTable->item(row, 4)->text() : "";
 
     if (m_previewTitleLabel) {
-        m_previewTitleLabel->setText(QString("<b>%1</b> (%2)").arg(fi.fileName()).arg(m_historyTable->item(row, 4) ? m_historyTable->item(row, 4)->text() : ""));
+        m_previewTitleLabel->setText(
+            QString("<b>%1</b> (%2)").arg(fi.fileName().toHtmlEscaped(), sizeText.toHtmlEscaped())
+        );
     }
     if (m_previewPathLabel) {
         m_previewPathLabel->setText(m_selectedOutputPath);
     }
 
-    // Thumbnail Preview
-    if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webp" || ext == "avif" || ext == "bmp" || ext == "svg") {
-        // Tam boy görseli UI thread'inde çözmek yerine hedef boyutta oku.
-        QImageReader reader(m_selectedOutputPath);
-        reader.setAutoTransform(true);
-        const QSize originalSize = reader.size();
-        if (originalSize.isValid()) {
-            reader.setScaledSize(originalSize.scaled(QSize(72, 72), Qt::KeepAspectRatio));
-        }
-        const QImage thumb = reader.read();
-        if (!thumb.isNull()) {
-            m_previewThumbLabel->setPixmap(QPixmap::fromImage(thumb));
-        } else {
+    const quint64 reqId = ++m_previewRequestId;
+    const qreal dpr = devicePixelRatioF();
+
+    // Küçük resmi UI iş parçacığını bloklamadan arka plan havuzunda DPR ölçekli çöz.
+    if (ext == "png" || ext == "jpg" || ext == "jpeg" || ext == "webp" || ext == "avif"
+        || ext == "bmp" || ext == "svg" || ext == "gif" || ext == "ico"
+        || ext == "tiff" || ext == "tif")
+    {
+        if (m_previewThumbLabel) {
             QFileIconProvider prov;
-            m_previewThumbLabel->setPixmap(prov.icon(fi).pixmap(52, 52));
+            QPixmap placeholder = prov.icon(fi).pixmap(QSize(52, 52), dpr);
+            placeholder.setDevicePixelRatio(dpr);
+            m_previewThumbLabel->setPixmap(placeholder);
         }
-    } else {
+
+        const QString thumbPath = m_selectedOutputPath;
+        const QSize targetPx(qRound(72.0 * dpr), qRound(72.0 * dpr));
+        QPointer<MainWindow> self(this);
+        QThreadPool::globalInstance()->start([self, reqId, thumbPath, targetPx, dpr]() {
+            QImageReader reader(thumbPath);
+            reader.setAutoTransform(true);
+            const QSize originalSize = reader.size();
+            if (originalSize.isValid()) {
+                reader.setScaledSize(originalSize.scaled(targetPx, Qt::KeepAspectRatio));
+            }
+            const QImage thumb = reader.read();
+            if (!self) return;
+            QMetaObject::invokeMethod(self, [self, reqId, thumbPath, thumb, dpr]() {
+                if (!self || self->m_previewRequestId != reqId || !self->m_previewThumbLabel) {
+                    return;
+                }
+                if (!thumb.isNull()) {
+                    QPixmap pix = QPixmap::fromImage(thumb);
+                    pix.setDevicePixelRatio(dpr);
+                    self->m_previewThumbLabel->setPixmap(pix);
+                } else {
+                    QFileIconProvider prov;
+                    QPixmap fallback = prov.icon(QFileInfo(thumbPath)).pixmap(QSize(52, 52), dpr);
+                    fallback.setDevicePixelRatio(dpr);
+                    self->m_previewThumbLabel->setPixmap(fallback);
+                }
+            }, Qt::QueuedConnection);
+        });
+    } else if (m_previewThumbLabel) {
         QFileIconProvider prov;
-        m_previewThumbLabel->setPixmap(prov.icon(fi).pixmap(52, 52));
+        QPixmap fallback = prov.icon(fi).pixmap(QSize(52, 52), dpr);
+        fallback.setDevicePixelRatio(dpr);
+        m_previewThumbLabel->setPixmap(fallback);
     }
 
     if (m_previewOpenBtn) m_previewOpenBtn->setEnabled(true);
@@ -1108,9 +1208,8 @@ void MainWindow::clearHistoryData() {
     const QString lang = currentLanguage();
     const auto answer = QMessageBox::question(
         this,
-        lang == "tr" ? "Geçmişi temizle" : "Clear history",
-        lang == "tr" ? "Tüm dönüşüm geçmişi silinecek. Emin misiniz?"
-                     : "All conversion history will be deleted. Continue?",
+        trKey("dlg_clear_history_title", lang),
+        trKey("dlg_clear_history_body", lang),
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::No);
     if (answer != QMessageBox::Yes) {
@@ -1122,8 +1221,8 @@ void MainWindow::clearHistoryData() {
     if (QFile::exists(historyFile) && !QFile::remove(historyFile)) {
         QMessageBox::warning(
             this,
-            lang == "tr" ? "Hata" : "Error",
-            lang == "tr" ? "Geçmiş dosyası silinemedi." : "Could not delete the history file.");
+            trKey("dlg_error_title", lang),
+            trKey("dlg_clear_history_err", lang));
         return;
     }
     loadHistoryData();
@@ -1149,9 +1248,11 @@ QWidget* MainWindow::createAboutTab() {
     headerLayout->setSpacing(6);
 
     auto *iconLabel = new QLabel(headerWidget);
-    QPixmap logoPix(":/logo.svg");
+    const qreal dpr = devicePixelRatioF();
+    QPixmap logoPix = QIcon(":/logo.svg").pixmap(QSize(72, 72), dpr);
     if (!logoPix.isNull()) {
-        iconLabel->setPixmap(logoPix.scaled(72, 72, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        logoPix.setDevicePixelRatio(dpr);
+        iconLabel->setPixmap(logoPix);
     }
     iconLabel->setAlignment(Qt::AlignCenter);
     headerLayout->addWidget(iconLabel);
@@ -1159,10 +1260,10 @@ QWidget* MainWindow::createAboutTab() {
     auto *titleLabel = new QLabel(
         QString(
             "<div style='text-align: center;'>"
-            "<span style='font-size: 22px; font-weight: bold;'>Konvert</span> "
-            "<span style='font-size: 13px; opacity: 0.7;'>%1</span><br>"
-            "<span style='font-size: 12px;'>%2</span></div>"
-        ).arg(KONVERT_APP_VERSION, lang == "tr" ? "Linux ve KDE Plasma için yerel dosya dönüştürücü" : "Native file converter for Linux and KDE Plasma"),
+            "<span style='font-size: 1.55em; font-weight: bold;'>Konvert</span> "
+            "<span style='font-size: 0.95em; opacity: 0.7;'>%1</span><br>"
+            "<span style='font-size: 0.92em;'>%2</span></div>"
+        ).arg(QString(KONVERT_APP_VERSION).toHtmlEscaped(), trKey("about_subtitle", lang).toHtmlEscaped()),
         headerWidget
     );
     titleLabel->setAlignment(Qt::AlignCenter);
@@ -1180,12 +1281,7 @@ QWidget* MainWindow::createAboutTab() {
     infoLayout->setContentsMargins(14, 14, 14, 14);
     infoLayout->setSpacing(12);
 
-    auto *lblDesc = new QLabel(
-        lang == "tr"
-            ? "Konvert; Linux masaüstü ortamları ve KDE Plasma için sıfır telemetri ve tam gizlilik esasıyla geliştirilmiş yerel bir dosya işleme aracıdır. Dosyalarınız cihazınızdan asla ayrılmaz; tüm dönüştürme ve optimizasyon işlemleri yerel donanım kaynaklarıyla gerçekleştirilir."
-            : "Konvert is a fast, offline, and native file conversion utility designed for Linux and KDE Plasma. All processing runs entirely on your local machine with strict zero-telemetry privacy.",
-        infoWidget
-    );
+    auto *lblDesc = new QLabel(trKey("about_description", lang), infoWidget);
     lblDesc->setWordWrap(true);
     infoLayout->addWidget(lblDesc);
 
@@ -1207,12 +1303,12 @@ QWidget* MainWindow::createAboutTab() {
     QString archStr = QSysInfo::buildCpuArchitecture();
     if (archStr.isEmpty()) archStr = "x86_64";
 
-    addSpecRow(0, lang == "tr" ? "Sürüm:" : "Version:", QString("%1 (%2-linux)").arg(KONVERT_APP_VERSION, archStr));
-    addSpecRow(1, lang == "tr" ? "Masaüstü Ortamı:" : "Desktop Environment:", desktopEnv);
-    addSpecRow(2, lang == "tr" ? "Grafik Arayüzü:" : "GUI Framework:", lang == "tr" ? "Qt 6 (KDE Breeze Uyumlu)" : "Qt 6 (KDE Breeze Compliant)");
-    addSpecRow(3, lang == "tr" ? "Çekirdek Motor:" : "Core Engine:", lang == "tr" ? "Rust 2024 & Rayon Çok Çekirdekli Motor" : "Rust 2024 & Rayon Multi-Core Engine");
-    addSpecRow(4, lang == "tr" ? "Web Sitesi:" : "Homepage:", "<a href='https://github.com/enesehs/konvert'>github.com/enesehs/konvert</a>");
-    addSpecRow(5, lang == "tr" ? "Hata Bildirimi:" : "Bug Tracker:", "<a href='https://github.com/enesehs/konvert/issues'>github.com/enesehs/konvert/issues</a>");
+    addSpecRow(0, trKey("about_spec_version", lang), QString("%1 (%2-linux)").arg(KONVERT_APP_VERSION, archStr));
+    addSpecRow(1, trKey("about_spec_desktop", lang), desktopEnv);
+    addSpecRow(2, trKey("about_spec_gui", lang), trKey("about_spec_gui_val", lang));
+    addSpecRow(3, trKey("about_spec_engine", lang), trKey("about_spec_engine_val", lang));
+    addSpecRow(4, trKey("about_spec_homepage", lang), "<a href='https://github.com/enesehs/konvert'>github.com/enesehs/konvert</a>");
+    addSpecRow(5, trKey("about_spec_bugs", lang), "<a href='https://github.com/enesehs/konvert/issues'>github.com/enesehs/konvert/issues</a>");
 
     infoLayout->addLayout(specGrid);
     infoLayout->addStretch();
@@ -1229,12 +1325,12 @@ QWidget* MainWindow::createAboutTab() {
     authorBox->setStyleSheet("QFrame { border: 1px solid palette(midlight); border-radius: 6px; background-color: palette(base); padding: 10px; }");
     auto *authorBoxLayout = new QVBoxLayout(authorBox);
     authorBoxLayout->setSpacing(4);
-    auto *lblAuthTitle = new QLabel(QString("<b>%1</b>").arg(lang == "tr" ? "Geliştirici" : "Author"), authorBox);
+    auto *lblAuthTitle = new QLabel(QString("<b>%1</b>").arg(trKey("about_author_title", lang)), authorBox);
     auto *lblAuthDetail = new QLabel(
         QString(
             "<b>enesehs</b> &lt;<a href='https://enesehs.dev'>https://enesehs.dev</a>&gt;<br>"
-            "<span style='font-size: 12px; opacity: 0.8;'>%1</span>"
-        ).arg(lang == "tr" ? "Çekirdek mimari, Rust dönüştürme motoru ve Qt6 arayüz tasarımı." : "Core architecture, Rust conversion engine, and Qt6 GUI design."),
+            "<span style='font-size: 0.92em; opacity: 0.8;'>%1</span>"
+        ).arg(trKey("about_author_desc", lang)),
         authorBox
     );
     lblAuthDetail->setOpenExternalLinks(true);
@@ -1263,14 +1359,14 @@ QWidget* MainWindow::createAboutTab() {
         compGrid->addWidget(lblD, row, 1);
     };
 
-    addCompRow(0, "Rust & Rayon", lang == "tr" ? "Paralel çok çekirdekli sistem motoru ve güvenli bellek yönetimi." : "Multi-threaded parallel systems engine and memory safety.");
-    addCompRow(1, "Qt 6 Widgets", lang == "tr" ? "KDE Breeze ile kusursuz uyumlu yerel grafik kullanıcı arayüzü." : "Native KDE Breeze compliant graphical user interface.");
-    addCompRow(2, "zbus & D-Bus", lang == "tr" ? "KDE Plasma 6 JobView (kuiserver) yerel ilerleme ve bildirim entegrasyonu." : "Native KDE Plasma 6 JobView (kuiserver) progress and notification integration.");
-    addCompRow(3, "FFmpeg", lang == "tr" ? "Gelişmiş video ve ses kodlama altyapısı, dalga formu üretimi." : "High performance video & audio transcoding framework.");
-    addCompRow(4, "Potrace & Oxipng", lang == "tr" ? "Vektörleştirme (bitmap'ten SVG'ye) ve kayıpsız PNG optimizasyonu." : "Vector tracing (bitmap to SVG) and lossless PNG optimization.");
-    addCompRow(5, "libjxl (JPEG XL)", lang == "tr" ? "Yeni nesil yüksek verimli görsel sıkıştırma ve kod çözücü." : "Next-gen high efficiency image coding and compression.");
-    addCompRow(6, "Poppler & Ghostscript", lang == "tr" ? "PDF sayfa ayrıştırma, metin çıkarma ve belge sıkıştırma." : "PDF page rasterization, text extraction, and document compression.");
-    addCompRow(7, "ImageMagick", lang == "tr" ? "Görsel format dönüşümleri, PDF birleştirme ve metadata temizleme." : "Image manipulation, PDF merging, and metadata stripping.");
+    addCompRow(0, "Rust & Rayon", trKey("about_comp_rust", lang));
+    addCompRow(1, "Qt 6 Widgets", trKey("about_comp_qt", lang));
+    addCompRow(2, "zbus & D-Bus", trKey("about_comp_zbus", lang));
+    addCompRow(3, "FFmpeg", trKey("about_comp_ffmpeg", lang));
+    addCompRow(4, "Potrace & Oxipng", trKey("about_comp_potrace", lang));
+    addCompRow(5, "libjxl (JPEG XL)", trKey("about_comp_jxl", lang));
+    addCompRow(6, "Poppler & Ghostscript", trKey("about_comp_pdf", lang));
+    addCompRow(7, "ImageMagick", trKey("about_comp_im", lang));
 
     compLayout->addLayout(compGrid);
     compLayout->addStretch();
@@ -1289,7 +1385,7 @@ QWidget* MainWindow::createAboutTab() {
     licBrowser->setReadOnly(true);
     licBrowser->setOpenExternalLinks(true);
     licBrowser->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-    licBrowser->setStyleSheet("QTextBrowser { border: 1px solid palette(midlight); border-radius: 6px; padding: 10px; background-color: palette(base); font-size: 11px; }");
+    licBrowser->setStyleSheet("QTextBrowser { border: 1px solid palette(midlight); border-radius: 6px; padding: 10px; background-color: palette(base); font-size: 0.88em; }");
     licBrowser->setPlainText(
         "GNU GENERAL PUBLIC LICENSE\n"
         "Version 3, 29 June 2007\n\n"
@@ -1315,21 +1411,58 @@ QWidget* MainWindow::createAboutTab() {
     return scroll;
 }
 
-void MainWindow::updateProcessMonitor() {
+void MainWindow::updateProcessMonitor(bool force) {
     if (!m_processStatusLabel || !m_cancelProcessBtn) return;
+    if (!force && (!isVisible() || (m_rootTabWidget && m_rootTabWidget->currentIndex() != m_settingsTabIndex))) {
+        return;
+    }
+
     const QString lang = currentLanguage();
     qint64 pid = getActiveKonvertPid();
+    const bool paused = pid > 0 && isPidPaused(pid);
+
+    if (!force && pid == m_lastMonitoredPid && paused == m_lastMonitoredPaused && lang == m_lastMonitoredLang) {
+        return;
+    }
+    m_lastMonitoredPid = pid;
+    m_lastMonitoredPaused = paused;
+    m_lastMonitoredLang = lang;
+
     if (pid > 0) {
-        m_processStatusLabel->setText(
-            QString("<span style='color: #27ae60; font-weight: bold;'>●</span> %1")
-                .arg(trKey("lbl_process_running", lang).arg(pid))
-        );
+        m_activeProcessPaused = paused;
+        if (paused) {
+            m_processStatusLabel->setText(
+                QString("<span style='color: #f39c12; font-weight: bold;'>||</span> %1")
+                    .arg(trKey("lbl_process_paused", lang).arg(pid))
+            );
+            if (m_pauseResumeProcessBtn) {
+                m_pauseResumeProcessBtn->setIcon(QIcon::fromTheme("media-playback-start-symbolic"));
+                m_pauseResumeProcessBtn->setText(trKey("btn_resume_process", lang));
+                m_pauseResumeProcessBtn->setEnabled(true);
+            }
+        } else {
+            m_processStatusLabel->setText(
+                QString("<span style='color: #27ae60; font-weight: bold;'>●</span> %1")
+                    .arg(trKey("lbl_process_running", lang).arg(pid))
+            );
+            if (m_pauseResumeProcessBtn) {
+                m_pauseResumeProcessBtn->setIcon(QIcon::fromTheme("media-playback-pause-symbolic"));
+                m_pauseResumeProcessBtn->setText(trKey("btn_pause_process", lang));
+                m_pauseResumeProcessBtn->setEnabled(true);
+            }
+        }
         m_cancelProcessBtn->setEnabled(true);
     } else {
+        m_activeProcessPaused = false;
         m_processStatusLabel->setText(
             QString("<span style='color: #7f8c8d;'>○</span> %1")
                 .arg(trKey("lbl_process_idle", lang))
         );
+        if (m_pauseResumeProcessBtn) {
+            m_pauseResumeProcessBtn->setIcon(QIcon::fromTheme("media-playback-pause-symbolic"));
+            m_pauseResumeProcessBtn->setText(trKey("btn_pause_process", lang));
+            m_pauseResumeProcessBtn->setEnabled(false);
+        }
         m_cancelProcessBtn->setEnabled(false);
     }
 }
@@ -1358,21 +1491,18 @@ QWidget* MainWindow::createSettingsTab() {
 
     m_langCombo = new QComboBox(genWidget);
     lblLang->setBuddy(m_langCombo);
-    m_langCombo->addItem(lang == "tr" ? "Otomatik Algıla (Sistem Dili)" : "Auto Detect (System)", "auto");
+    m_langCombo->addItem(trKey("lang_auto", lang), "auto");
     m_langCombo->addItem("Türkçe", "tr");
     m_langCombo->addItem("English", "en");
     m_langCombo->addItem("Deutsch", "de");
     m_langCombo->addItem("Français", "fr");
     m_langCombo->addItem("Español", "es");
+    m_langCombo->addItem("Italiano", "it");
+    m_langCombo->addItem("Русский", "ru");
+    m_langCombo->addItem("中文", "zh");
+    m_langCombo->addItem("日本語", "ja");
 
-    int curIdx = 0;
-    for (int i = 0; i < m_langCombo->count(); ++i) {
-        if (m_langCombo->itemData(i).toString() == m_config.language) {
-            curIdx = i;
-            break;
-        }
-    }
-    m_langCombo->setCurrentIndex(curIdx);
+    selectComboLanguage(m_langCombo, m_config.language);
     connect(m_langCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onLanguageChanged);
 
     langRow->addWidget(m_langCombo);
@@ -1381,7 +1511,7 @@ QWidget* MainWindow::createSettingsTab() {
 
     // Notification checkbox
     m_notifyCheck = new QCheckBox(trKey("lbl_notifications", lang), genWidget);
-    m_notifyCheck->setToolTip(lang == "tr" ? "Dönüştürme esnasında yerel ilerleme çubuğu ve D-Bus bildirimlerini gösterir." : "Displays real-time D-Bus notification with progress bar during conversion.");
+    m_notifyCheck->setToolTip(trKey("tip_notifications", lang));
     m_notifyCheck->setChecked(m_config.notificationEnabled);
     connect(m_notifyCheck, &QCheckBox::toggled, this, [this](bool checked) {
         m_config.notificationEnabled = checked;
@@ -1399,8 +1529,7 @@ QWidget* MainWindow::createSettingsTab() {
     m_outputDirEdit->setReadOnly(true);
     m_outputDirEdit->setPlaceholderText(trKey("lbl_output_dir_default", lang));
     m_outputDirEdit->setText(m_config.outputDirectory);
-    m_outputDirEdit->setToolTip(lang == "tr" ? "Dönüştürülen tüm dosyaların kaydedileceği varsayılan klasör. Boş bırakıldığında girdi dosyasıyla aynı klasöre kaydedilir."
-                                            : "Default directory where converted files will be saved. If left empty, files are saved in the same folder as the input file.");
+    m_outputDirEdit->setToolTip(trKey("tip_output_dir", lang));
     outDirRow->addWidget(m_outputDirEdit);
 
     auto *browseBtn = new QPushButton(QIcon::fromTheme("document-open-symbolic"), trKey("btn_browse", lang), genWidget);
@@ -1435,27 +1564,44 @@ QWidget* MainWindow::createSettingsTab() {
 
     auto *statusRow = new QHBoxLayout();
     m_processStatusLabel = new QLabel(monitorWidget);
-    m_processStatusLabel->setStyleSheet("font-size: 13px;");
+    m_processStatusLabel->setStyleSheet("font-size: 1.0em;");
     statusRow->addWidget(m_processStatusLabel);
     statusRow->addStretch();
+
+    m_pauseResumeProcessBtn = new QPushButton(
+        QIcon::fromTheme("media-playback-pause-symbolic"),
+        trKey("btn_pause_process", lang),
+        monitorWidget
+    );
+    m_pauseResumeProcessBtn->setEnabled(false);
+    connect(m_pauseResumeProcessBtn, &QPushButton::clicked, this, [this]() {
+        const QString lang = currentLanguage();
+        const QString flag = m_activeProcessPaused ? "--resume" : "--pause";
+        const QString titleKey = m_activeProcessPaused ? "btn_resume_process" : "btn_pause_process";
+        runKonvertCommandAsync(m_pauseResumeProcessBtn, {flag}, [this, lang, titleKey](bool ok, const QString &out) {
+            if (!ok && !out.isEmpty()) {
+                QMessageBox::warning(this, trKey(titleKey, lang), out);
+            }
+            updateProcessMonitor(true);
+        });
+    });
+    statusRow->addWidget(m_pauseResumeProcessBtn);
 
     m_cancelProcessBtn = new QPushButton(QIcon::fromTheme("process-stop-symbolic"), trKey("btn_cancel_process", lang), monitorWidget);
     m_cancelProcessBtn->setEnabled(false);
     connect(m_cancelProcessBtn, &QPushButton::clicked, this, [this]() {
         const QString lang = currentLanguage();
-        QProcess proc;
-        proc.start(findKonvertBinary(), {"--cancel"});
-        if (proc.waitForFinished(3000)) {
-            QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-            if (out.isEmpty()) {
-                out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
-            }
+        runKonvertCommandAsync(m_cancelProcessBtn, {"--cancel"}, [this, lang](bool ok, const QString &out) {
             if (!out.isEmpty()) {
-                QMessageBox::information(this, trKey("btn_cancel_process", lang), out);
+                if (ok) {
+                    QMessageBox::information(this, trKey("btn_cancel_process", lang), out);
+                } else {
+                    QMessageBox::warning(this, trKey("btn_cancel_process", lang), out);
+                }
             }
-        }
-        updateProcessMonitor();
-        loadHistoryData();
+            updateProcessMonitor(true);
+            loadHistoryData();
+        });
     });
     statusRow->addWidget(m_cancelProcessBtn);
     monitorLayout->addLayout(statusRow);
@@ -1467,95 +1613,79 @@ QWidget* MainWindow::createSettingsTab() {
     deskLayout->setContentsMargins(4, 4, 4, 4);
     deskLayout->setSpacing(10);
 
-    auto *deskDesc = new QLabel(
-        lang == "tr" ? "KDE Dolphin, GNOME Nautilus, Cinnamon Nemo ve XFCE Thunar dosya yöneticisi entegrasyonlarını kurabilir veya kaldırabilirsiniz."
-                     : "Install or remove context menu integrations for KDE Dolphin, GNOME Nautilus, Cinnamon Nemo, and XFCE Thunar.",
-        deskWidget
-    );
+    auto *deskDesc = new QLabel(trKey("msg_desk_desc", lang), deskWidget);
     deskDesc->setWordWrap(true);
     deskLayout->addWidget(deskDesc);
 
     auto *btnRow = new QHBoxLayout();
     auto *installBtn = new QPushButton(QIcon::fromTheme("system-software-install-symbolic"), trKey("btn_install_integration", lang), deskWidget);
-    connect(installBtn, &QPushButton::clicked, this, [this]() {
+    connect(installBtn, &QPushButton::clicked, this, [this, installBtn]() {
         const QString lang = currentLanguage();
-        QProcess proc;
-        proc.start(findKonvertBinary(), {"--install-all"});
-        if (proc.waitForFinished(5000)) {
-            QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-            if (out.isEmpty()) {
-                out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+        runKonvertCommandAsync(installBtn, {"--install-all"}, [this, lang](bool ok, const QString &out) {
+            if (ok) {
+                QString msg = out.isEmpty() ? trKey("msg_install_ok", lang) : out;
+                QMessageBox::information(this, trKey("btn_install_integration", lang), msg);
+            } else {
+                QString msg = out.isEmpty() ? trKey("msg_install_fail", lang) : out;
+                QMessageBox::warning(this, trKey("btn_install_integration", lang), msg);
             }
-            if (out.isEmpty()) {
-                out = lang == "tr" ? "Entegrasyonlar başarıyla kuruldu." : "Integrations installed successfully.";
-            }
-            QMessageBox::information(this, trKey("btn_install_integration", lang), out);
-        } else {
-            QMessageBox::warning(this, trKey("btn_install_integration", lang),
-                lang == "tr" ? "İşlem zaman aşımına uğradı veya başlatılamadı." : "Operation timed out or failed to start.");
-        }
+        });
     });
     btnRow->addWidget(installBtn);
 
     auto *uninstallBtn = new QPushButton(QIcon::fromTheme("edit-delete-symbolic"), trKey("btn_uninstall_integration", lang), deskWidget);
-    connect(uninstallBtn, &QPushButton::clicked, this, [this]() {
+    connect(uninstallBtn, &QPushButton::clicked, this, [this, uninstallBtn]() {
         const QString lang = currentLanguage();
         auto reply = QMessageBox::question(
             this,
             trKey("btn_uninstall_integration", lang),
-            lang == "tr" ? "Konvert sağ tık menüsü eylemlerini tüm dosya yöneticilerinden kaldırmak istediğinize emin misiniz?"
-                         : "Are you sure you want to remove Konvert context menu actions from all file managers?",
+            trKey("msg_uninstall_confirm", lang),
             QMessageBox::Yes | QMessageBox::No
         );
         if (reply == QMessageBox::Yes) {
-            QProcess proc;
-            proc.start(findKonvertBinary(), {"--uninstall-all"});
-            if (proc.waitForFinished(5000)) {
-                QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-                if (out.isEmpty()) {
-                    out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+            runKonvertCommandAsync(uninstallBtn, {"--uninstall-all"}, [this, lang](bool ok, const QString &out) {
+                if (ok) {
+                    QString msg = out.isEmpty() ? trKey("msg_uninstall_ok", lang) : out;
+                    QMessageBox::information(this, trKey("btn_uninstall_integration", lang), msg);
+                } else {
+                    QString msg = out.isEmpty() ? trKey("msg_uninstall_fail", lang) : out;
+                    QMessageBox::warning(this, trKey("btn_uninstall_integration", lang), msg);
                 }
-                if (out.isEmpty()) {
-                    out = lang == "tr" ? "Entegrasyonlar kaldırıldı." : "Integrations uninstalled.";
-                }
-                QMessageBox::information(this, trKey("btn_uninstall_integration", lang), out);
-            }
+            });
         }
     });
     btnRow->addWidget(uninstallBtn);
 
     auto *checkDepsBtn = new QPushButton(QIcon::fromTheme("system-run-symbolic"), trKey("btn_check_deps", lang), deskWidget);
-    connect(checkDepsBtn, &QPushButton::clicked, this, [this]() {
-        const QString lang = currentLanguage();
-        QProcess proc;
-        proc.start(findKonvertBinary(), {"--doctor"});
-        if (proc.waitForFinished(5000)) {
-            QString out = QString::fromUtf8(proc.readAllStandardOutput()).trimmed();
-            if (out.isEmpty()) {
-                out = QString::fromUtf8(proc.readAllStandardError()).trimmed();
+    connect(checkDepsBtn, &QPushButton::clicked, this, [this, checkDepsBtn, lang]() {
+        runKonvertCommandAsync(checkDepsBtn, {"--doctor"}, [this, lang](bool, const QString &out) {
+            QString text = out.isEmpty() ? trKey("msg_doctor_fail", lang) : out;
+            if (m_depsStatusEdit) {
+                m_depsStatusEdit->setPlainText(text);
+                m_depsStatusEdit->setVisible(true);
             }
-            if (m_depsStatusLabel) {
-                m_depsStatusLabel->setText(QString("<pre style='margin:0; font-size:11px;'>%1</pre>").arg(out.toHtmlEscaped()));
-                m_depsStatusLabel->setVisible(true);
-            }
-        }
+        });
     });
     btnRow->addWidget(checkDepsBtn);
     btnRow->addStretch();
     deskLayout->addLayout(btnRow);
 
-    m_depsStatusLabel = new QLabel(deskWidget);
-    m_depsStatusLabel->setTextFormat(Qt::RichText);
-    m_depsStatusLabel->setStyleSheet("background: palette(base); border: 1px solid palette(midlight); border-radius: 4px; padding: 8px;");
-    m_depsStatusLabel->setVisible(false);
-    deskLayout->addWidget(m_depsStatusLabel);
+    m_depsStatusEdit = new QPlainTextEdit(deskWidget);
+    m_depsStatusEdit->setReadOnly(true);
+    m_depsStatusEdit->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
+    m_depsStatusEdit->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+    m_depsStatusEdit->setMinimumHeight(180);
+    m_depsStatusEdit->setMaximumHeight(320);
+    m_depsStatusEdit->setStyleSheet("QPlainTextEdit { background: palette(base); border: 1px solid palette(midlight); border-radius: 4px; padding: 8px; }");
+    m_depsStatusEdit->setVisible(false);
+    deskLayout->addWidget(m_depsStatusEdit);
 
     layout->addWidget(createCard(trKey("card_desktop_integration", lang), deskWidget));
 
     layout->addStretch();
     scroll->setWidget(container);
 
-    updateProcessMonitor();
+    updateProcessMonitor(true);
     return scroll;
 }
 
@@ -1602,10 +1732,15 @@ void MainWindow::onLanguageChanged(int index) {
     if (!m_langCombo) return;
     QString langCode = m_langCombo->itemData(index).toString();
     if (m_config.language != langCode) {
+        const int prevTab = m_rootTabWidget ? m_rootTabWidget->currentIndex() : 0;
         m_config.language = langCode;
         saveSettings();
-        m_actionCheckBoxes.clear();
-        setupUi();
+        QTimer::singleShot(0, this, [this, prevTab]() {
+            setupUi();
+            if (m_rootTabWidget && prevTab >= 0 && prevTab < m_rootTabWidget->count()) {
+                m_rootTabWidget->setCurrentIndex(prevTab);
+            }
+        });
     }
 }
 
@@ -1617,55 +1752,158 @@ void MainWindow::saveSettings() {
     }
 }
 
+void MainWindow::runKonvertCommandAsync(
+    QPushButton *btn,
+    const QStringList &args,
+    std::function<void(bool, const QString &)> onDone
+) {
+    QPointer<QPushButton> btnPtr(btn);
+    if (btnPtr) {
+        btnPtr->setEnabled(false);
+    }
+
+    auto *proc = new QProcess(this);
+    auto completed = QSharedPointer<bool>::create(false);
+
+    connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+        this, [this, proc, btnPtr, completed, cb = onDone](int exitCode, QProcess::ExitStatus exitStatus) {
+            if (*completed) return;
+            *completed = true;
+            if (btnPtr) {
+                btnPtr->setEnabled(true);
+            }
+            QString out = QString::fromUtf8(proc->readAllStandardOutput()).trimmed();
+            const QString err = QString::fromUtf8(proc->readAllStandardError()).trimmed();
+            if (out.isEmpty()) {
+                out = err;
+            } else if (!err.isEmpty() && (exitStatus != QProcess::NormalExit || exitCode != 0)) {
+                out += "\n" + err;
+            }
+            const bool ok = (exitStatus == QProcess::NormalExit && exitCode == 0);
+            proc->deleteLater();
+            if (cb) cb(ok, out);
+        });
+
+    connect(proc, &QProcess::errorOccurred,
+        this, [this, proc, btnPtr, completed, cb = onDone](QProcess::ProcessError) {
+            if (*completed) return;
+            *completed = true;
+            if (btnPtr) {
+                btnPtr->setEnabled(true);
+            }
+            const QString errMsg = proc->errorString();
+            proc->deleteLater();
+            if (cb) cb(false, errMsg);
+        });
+
+    proc->start(ConfigManager::findKonvertBinary(), args);
+}
+
 void MainWindow::saveSettingsNow() {
     m_isSavingConfig = true;
-    if (!m_config.save()) {
-        const QString lang = currentLanguage();
-        QMessageBox::warning(
-            this,
-            lang == "tr" ? "Ayarlar kaydedilemedi" : "Could not save settings",
-            lang == "tr" ? "Ayar dosyası yazılamadı. Disk izinlerini kontrol edin."
-                         : "The settings file could not be written. Check file permissions.");
+    if (m_reloadGuardTimer) {
+        m_reloadGuardTimer->stop();
     }
-    if (m_configWatcher) {
-        m_configWatcher->addPath(ConfigManager::getConfigPath());
-    }
-    QTimer::singleShot(250, this, [this]() {
-        m_isSavingConfig = false;
+    m_config.saveAsync(this, [this](bool ok) {
+        if (!ok) {
+            const QString lang = currentLanguage();
+            QMessageBox::warning(
+                this,
+                trKey("msg_save_err_title", lang),
+                trKey("msg_save_err_body", lang));
+        }
+        const QString configPath = ConfigManager::getConfigPath();
+        if (m_configWatcher && QFile::exists(configPath) && !m_configWatcher->files().contains(configPath)) {
+            m_configWatcher->addPath(configPath);
+        }
+        if (m_reloadGuardTimer) {
+            m_reloadGuardTimer->start();
+        } else {
+            m_isSavingConfig = false;
+        }
     });
 }
 
-void MainWindow::setupConfigWatcher() {
-    QString configPath = ConfigManager::getConfigPath();
-    if (!QFile::exists(configPath)) {
-        return;
+void MainWindow::flushSettingsSync() {
+    m_isSavingConfig = true;
+    if (m_reloadGuardTimer) {
+        m_reloadGuardTimer->stop();
     }
+    m_config.save();
+    m_isSavingConfig = false;
+}
+
+void MainWindow::setupConfigWatcher() {
+    const QString configPath = ConfigManager::getConfigPath();
+    const QString configDir = QFileInfo(configPath).absolutePath();
+    QDir().mkpath(configDir);
+
     if (!m_configWatcher) {
         m_configWatcher = new QFileSystemWatcher(this);
     }
-    m_configWatcher->addPath(configPath);
-    connect(m_configWatcher, &QFileSystemWatcher::fileChanged, this, [this](const QString &path) {
-        if (m_configWatcher && QFile::exists(path)) {
-            m_configWatcher->addPath(path);
+    if (!m_configWatcher->directories().contains(configDir)) {
+        m_configWatcher->addPath(configDir);
+    }
+    if (QFile::exists(configPath) && !m_configWatcher->files().contains(configPath)) {
+        m_configWatcher->addPath(configPath);
+    }
+
+    auto handleFsEvent = [this, configPath]() {
+        if (m_configWatcher && QFile::exists(configPath) && !m_configWatcher->files().contains(configPath)) {
+            m_configWatcher->addPath(configPath);
         }
-        if (m_isSavingConfig) {
+        if (m_isSavingConfig || (m_saveTimer && m_saveTimer->isActive())) {
             return;
         }
         reloadConfigToUi();
+    };
+
+    connect(m_configWatcher, &QFileSystemWatcher::fileChanged, this, [handleFsEvent](const QString &) {
+        handleFsEvent();
+    });
+    connect(m_configWatcher, &QFileSystemWatcher::directoryChanged, this, [handleFsEvent](const QString &) {
+        handleFsEvent();
     });
 }
 
 void MainWindow::reloadConfigToUi() {
     m_config.load();
-    if (m_photoQualitySlider) m_photoQualitySlider->setValue(m_config.imageQuality);
-    if (m_photoLosslessCheck) m_photoLosslessCheck->setChecked(m_config.imageLossless);
-    if (m_videoCrfSlider) m_videoCrfSlider->setValue(m_config.videoCrf);
+
+    if (m_photoQualitySlider) {
+        const QSignalBlocker blocker(m_photoQualitySlider);
+        m_photoQualitySlider->setValue(m_config.imageQuality);
+        m_photoQualitySlider->setEnabled(!m_config.imageLossless);
+    }
+    if (m_photoQualityLabel) {
+        m_photoQualityLabel->setText(QString("%1%").arg(m_config.imageQuality));
+    }
+    if (m_photoLosslessCheck) {
+        const QSignalBlocker blocker(m_photoLosslessCheck);
+        m_photoLosslessCheck->setChecked(m_config.imageLossless);
+    }
+
+    if (m_videoCrfSlider) {
+        const QSignalBlocker blocker(m_videoCrfSlider);
+        m_videoCrfSlider->setValue(m_config.videoCrf);
+        m_videoCrfSlider->setEnabled(!m_config.videoLossless);
+    }
+    if (m_videoCrfLabel) {
+        m_videoCrfLabel->setText(QString::number(m_config.videoCrf));
+    }
     if (m_videoPresetCombo) {
+        const QSignalBlocker blocker(m_videoPresetCombo);
         int idx = m_videoPresetCombo->findText(m_config.videoPreset);
         if (idx >= 0) m_videoPresetCombo->setCurrentIndex(idx);
     }
-    if (m_videoLosslessCheck) m_videoLosslessCheck->setChecked(m_config.videoLossless);
+    if (m_videoLosslessCheck) {
+        const QSignalBlocker blocker(m_videoLosslessCheck);
+        m_videoLosslessCheck->setChecked(m_config.videoLossless);
+    }
+    if (m_videoLosslessWarnLabel) {
+        m_videoLosslessWarnLabel->setVisible(m_config.videoLossless);
+    }
     if (m_videoHwaccelCombo) {
+        const QSignalBlocker blocker(m_videoHwaccelCombo);
         for (int i = 0; i < m_videoHwaccelCombo->count(); ++i) {
             if (m_videoHwaccelCombo->itemData(i).toString() == m_config.videoHwaccel) {
                 m_videoHwaccelCombo->setCurrentIndex(i);
@@ -1673,20 +1911,34 @@ void MainWindow::reloadConfigToUi() {
             }
         }
     }
+
     if (m_audioBitrateCombo) {
+        const QSignalBlocker blocker(m_audioBitrateCombo);
         int idx = m_audioBitrateCombo->findText(m_config.audioBitrate);
         if (idx >= 0) m_audioBitrateCombo->setCurrentIndex(idx);
     }
-    if (m_pdfDpiSpin) m_pdfDpiSpin->setValue(m_config.pdfDpi);
-    if (m_notifyCheck) m_notifyCheck->setChecked(m_config.notificationEnabled);
-    if (m_outputDirEdit) m_outputDirEdit->setText(m_config.outputDirectory);
+    if (m_pdfDpiSpin) {
+        const QSignalBlocker blocker(m_pdfDpiSpin);
+        m_pdfDpiSpin->setValue(m_config.pdfDpi);
+    }
+    if (m_notifyCheck) {
+        const QSignalBlocker blocker(m_notifyCheck);
+        m_notifyCheck->setChecked(m_config.notificationEnabled);
+    }
+    if (m_outputDirEdit) {
+        const QSignalBlocker blocker(m_outputDirEdit);
+        m_outputDirEdit->setText(m_config.outputDirectory);
+    }
+    if (m_langCombo) {
+        const QSignalBlocker blocker(m_langCombo);
+        selectComboLanguage(m_langCombo, m_config.language);
+    }
 
     for (auto *cb : m_actionCheckBoxes) {
         if (cb) {
+            const QSignalBlocker blocker(cb);
             QString id = cb->property("actionId").toString();
-            cb->blockSignals(true);
             cb->setChecked(m_config.enabledActions.contains(id));
-            cb->blockSignals(false);
         }
     }
 }
@@ -1694,7 +1946,7 @@ void MainWindow::reloadConfigToUi() {
 void MainWindow::closeEvent(QCloseEvent *event) {
     if (m_saveTimer && m_saveTimer->isActive()) {
         m_saveTimer->stop();
-        saveSettingsNow();
+        flushSettingsSync();
     }
     QMainWindow::closeEvent(event);
 }

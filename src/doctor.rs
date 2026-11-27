@@ -20,6 +20,7 @@ pub struct DoctorReport {
     pub os: String,
     pub desktop: String,
     pub config_path: Option<String>,
+    pub hwaccel: String,
     pub tools: Vec<ToolCheck>,
     pub all_required_installed: bool,
     pub missing_required: Vec<&'static str>,
@@ -88,7 +89,7 @@ pub const DIAGNOSTIC_TOOLS: &[(&str, &str, bool, &str, &str, &str, &str)] = &[
         "Görselleri JPEG XL (.jxl) formatına dönüştürme",
         "libjxl",
         "libjxl-tools",
-        "libjxl",
+        "libjxl-utils",
     ),
     (
         "JPEG XL Decoder",
@@ -97,7 +98,7 @@ pub const DIAGNOSTIC_TOOLS: &[(&str, &str, bool, &str, &str, &str, &str)] = &[
         "JPEG XL (.jxl) dosyalarını açma ve işleme",
         "libjxl",
         "libjxl-tools",
-        "libjxl",
+        "libjxl-utils",
     ),
     (
         "Oxipng",
@@ -105,7 +106,7 @@ pub const DIAGNOSTIC_TOOLS: &[(&str, &str, bool, &str, &str, &str, &str)] = &[
         false,
         "Kayıpsız PNG optimizasyonu ve sıkıştırma",
         "oxipng",
-        "oxipng",
+        "",
         "oxipng",
     ),
     (
@@ -138,6 +139,9 @@ fn query_tool_version(cmd: &str) -> Option<String> {
     };
 
     let output = out?;
+    if !output.status.success() {
+        return None;
+    }
     let raw = if !output.stdout.is_empty() {
         String::from_utf8_lossy(&output.stdout).to_string()
     } else {
@@ -154,7 +158,7 @@ fn query_tool_version(cmd: &str) -> Option<String> {
 
 pub fn diagnose() -> DoctorReport {
     let desktop = std::env::var("XDG_CURRENT_DESKTOP")
-        .unwrap_or_else(|_| "Bilinmeyen Masaüstü Ortamı".to_string());
+        .unwrap_or_else(|_| crate::i18n::t("doctor_unknown_desktop").to_string());
     let os = std::fs::read_to_string("/etc/os-release")
         .ok()
         .and_then(|content| {
@@ -208,11 +212,14 @@ pub fn diagnose() -> DoctorReport {
     }
 
     let all_required_installed = missing_required.is_empty();
+    let ffmpeg_installed = tools.iter().any(|t| t.command == "ffmpeg" && t.installed);
+    let hwaccel = detect_hwaccel_summary(ffmpeg_installed);
 
     DoctorReport {
         os,
         desktop,
         config_path,
+        hwaccel,
         tools,
         all_required_installed,
         missing_required,
@@ -220,18 +227,66 @@ pub fn diagnose() -> DoctorReport {
     }
 }
 
+fn detect_hwaccel_summary(ffmpeg_installed: bool) -> String {
+    if !ffmpeg_installed {
+        return crate::i18n::t("doctor_hwaccel_no_ffmpeg").to_string();
+    }
+    let mut caps = Vec::new();
+    if crate::converter::video::probe_nvenc() {
+        if crate::converter::video::probe_av1_nvenc() {
+            caps.push("NVENC (H.264/HEVC, AV1)".to_string());
+        } else {
+            caps.push("NVENC (H.264/HEVC)".to_string());
+        }
+    }
+    if crate::converter::video::probe_vaapi() {
+        let dev = crate::converter::video::probe_vaapi_device()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "VA-API".to_string());
+        let mut codecs = vec!["H.264/HEVC"];
+        if crate::converter::video::probe_vp9_vaapi() {
+            codecs.push("VP9");
+        }
+        if crate::converter::video::probe_av1_vaapi() {
+            codecs.push("AV1");
+        }
+        caps.push(format!("VA-API ({}: {})", dev, codecs.join("/")));
+    }
+    if caps.is_empty() {
+        crate::i18n::t("doctor_hwaccel_cpu").to_string()
+    } else {
+        caps.join(" | ")
+    }
+}
+
+fn collect_unique_packages<'a>(pkgs: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
+    let mut unique = Vec::new();
+    for pkg in pkgs {
+        if !pkg.is_empty() && !unique.contains(&pkg) {
+            unique.push(pkg);
+        }
+    }
+    unique
+}
+
 pub fn print_doctor_report(report: &DoctorReport) {
-    println!("=== Konvert Sistem Teşhisi (--doctor) ===");
-    println!("İşletim Sistemi:    {}", report.os);
-    println!("Masaüstü Ortamı:    {}", report.desktop);
+    use crate::i18n::t;
+
+    println!("{}", t("doctor_header"));
+    println!("{} {}", t("doctor_os"), report.os);
+    println!("{} {}", t("doctor_desktop"), report.desktop);
+    println!("{} {}", t("doctor_hwaccel"), report.hwaccel);
     if let Some(cfg) = &report.config_path {
-        println!("Ayar Dosyası:       {}", cfg);
+        println!("{} {}", t("doctor_config"), cfg);
     }
     println!();
 
     println!(
-        "{:<20} {:<12} {:<10} AÇIKLAMA / SÜRÜM",
-        "BİLEŞEN", "DURUM", "TÜR"
+        "{:<20} {:<12} {:<10} {}",
+        t("doctor_col_component"),
+        t("doctor_col_status"),
+        t("doctor_col_type"),
+        t("doctor_col_detail")
     );
     println!("{:-<20} {:-<12} {:-<10} {:-<40}", "", "", "", "");
 
@@ -245,9 +300,9 @@ pub fn print_doctor_report(report: &DoctorReport) {
         };
 
         let role_str = if tool.required {
-            "Zorunlu"
+            t("status_required")
         } else {
-            "İsteğe Bağlı"
+            t("status_optional")
         };
 
         let detail_str = if let Some(v) = &tool.version {
@@ -265,30 +320,34 @@ pub fn print_doctor_report(report: &DoctorReport) {
     println!();
 
     if report.all_required_installed && report.missing_optional.is_empty() {
-        println!(
-            "[TAMAM] Tüm çekirdek ve isteğe bağlı araçlar kurulu. Konvert tüm özellikleriyle hazır."
-        );
+        println!("{}", t("doctor_all_ok"));
     } else if report.all_required_installed {
-        println!("[UYARI] Temel dönüşümler çalışabilir, ancak bazı isteğe bağlı bileşenler eksik.");
+        println!("{}", t("doctor_missing_optional"));
     } else {
-        println!("[HATA] Zorunlu bağımlılıklar eksik! Video ve ses dönüşümleri çalışmayacaktır.");
+        println!("{}", t("doctor_missing_required"));
     }
 
     let all_missing: Vec<&ToolCheck> = report.tools.iter().filter(|t| !t.installed).collect();
     if !all_missing.is_empty() {
         println!();
-        println!("Eksik paketleri kurmak için komutlar:");
+        println!("{}", t("doctor_install_hint"));
 
-        let arch_pkgs: Vec<&str> = all_missing.iter().map(|t| t.arch_pkg).collect();
-        let deb_pkgs: Vec<&str> = all_missing.iter().map(|t| t.deb_pkg).collect();
-        let fedora_pkgs: Vec<&str> = all_missing.iter().map(|t| t.fedora_pkg).collect();
+        let arch_pkgs = collect_unique_packages(all_missing.iter().map(|t| t.arch_pkg));
+        let deb_pkgs = collect_unique_packages(all_missing.iter().map(|t| t.deb_pkg));
+        let fedora_pkgs = collect_unique_packages(all_missing.iter().map(|t| t.fedora_pkg));
 
-        println!("  * Arch Linux:    sudo pacman -S {}", arch_pkgs.join(" "));
-        println!("  * Debian/Ubuntu: sudo apt install {}", deb_pkgs.join(" "));
-        println!(
-            "  * Fedora:        sudo dnf install {}",
-            fedora_pkgs.join(" ")
-        );
+        if !arch_pkgs.is_empty() {
+            println!("  * Arch Linux:    sudo pacman -S {}", arch_pkgs.join(" "));
+        }
+        if !deb_pkgs.is_empty() {
+            println!("  * Debian/Ubuntu: sudo apt install {}", deb_pkgs.join(" "));
+        }
+        if !fedora_pkgs.is_empty() {
+            println!(
+                "  * Fedora:        sudo dnf install {}",
+                fedora_pkgs.join(" ")
+            );
+        }
     }
 }
 
@@ -301,10 +360,17 @@ mod tests {
         let report = diagnose();
         assert!(!report.tools.is_empty());
         assert_eq!(report.tools.len(), DIAGNOSTIC_TOOLS.len());
+        assert!(!report.hwaccel.is_empty());
     }
 
     #[test]
     fn test_query_tool_version_nonexistent() {
         assert!(query_tool_version("non_existent_tool_12345").is_none());
+    }
+
+    #[test]
+    fn test_collect_unique_packages_dedups_and_skips_empty() {
+        let res = collect_unique_packages(["ffmpeg", "ffmpeg", "", "libjxl", "libjxl", ""]);
+        assert_eq!(res, vec!["ffmpeg", "libjxl"]);
     }
 }

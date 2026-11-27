@@ -2,12 +2,12 @@
 
 #include <QMainWindow>
 #include <QTabWidget>
-#include <QListWidget>
 #include <QSlider>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QSpinBox>
 #include <QLabel>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QTableWidget>
@@ -49,9 +49,11 @@ private:
 
     void loadHistoryData();
     void clearHistoryData();
-    void updateProcessMonitor();
+    void updateProcessMonitor(bool force = false);
     void setupConfigWatcher();
     void reloadConfigToUi();
+    void flushSettingsSync();
+    void runKonvertCommandAsync(QPushButton *btn, const QStringList &args, std::function<void(bool, const QString &)> onDone);
 
     QWidget* createCard(const QString &title, QWidget *contentWidget);
     QCheckBox* createActionCheckBox(const QString &id, const QString &label, const QString &tooltip, const QString &iconName, QWidget *parent);
@@ -70,6 +72,7 @@ private:
     QComboBox *m_videoPresetCombo = nullptr;
     QComboBox *m_videoHwaccelCombo = nullptr;
     QCheckBox *m_videoLosslessCheck = nullptr;
+    QLabel *m_videoLosslessWarnLabel = nullptr;
 
     // Music
     QComboBox *m_audioBitrateCombo = nullptr;
@@ -94,11 +97,19 @@ private:
     QComboBox *m_langCombo = nullptr;
     QLineEdit *m_outputDirEdit = nullptr;
     QLabel *m_processStatusLabel = nullptr;
+    QPushButton *m_pauseResumeProcessBtn = nullptr;
     QPushButton *m_cancelProcessBtn = nullptr;
-    QLabel *m_depsStatusLabel = nullptr;
+    bool m_activeProcessPaused = false;
+    QPlainTextEdit *m_depsStatusEdit = nullptr;
+    int m_settingsTabIndex = -1;
+    qint64 m_lastMonitoredPid = -2;
+    bool m_lastMonitoredPaused = false;
+    QString m_lastMonitoredLang;
+    quint64 m_previewRequestId = 0;
     QTimer *m_processMonitorTimer = nullptr;
     QTabWidget *m_rootTabWidget = nullptr;
     QTimer *m_saveTimer = nullptr;
+    QTimer *m_reloadGuardTimer = nullptr;
     QFileSystemWatcher *m_configWatcher = nullptr;
     bool m_isSavingConfig = false;
 };

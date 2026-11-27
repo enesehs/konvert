@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 import { useI18n, LOCALES } from "@/lib/i18n";
 
 function LanguageToggle() {
-  const { locale, setLocale } = useI18n();
+  const { t, locale, setLocale } = useI18n();
   return (
     <div
       role="group"
-      aria-label="Dil seçimi / Language selection"
+      aria-label={t.nav.langSelectionAria}
       className="flex h-7 items-center border border-border bg-card p-0.5 font-mono text-[11px]"
     >
       {LOCALES.map((l) => (
@@ -37,6 +37,7 @@ function LanguageToggle() {
 }
 
 function ThemeToggle() {
+  const { t } = useI18n();
   const { resolvedTheme, setTheme } = useTheme();
   const mounted = React.useSyncExternalStore(
     () => () => {},
@@ -50,8 +51,8 @@ function ThemeToggle() {
       suppressHydrationWarning
       aria-label={
         mounted && resolvedTheme === "dark"
-          ? "Aydınlık temaya geç"
-          : "Karanlık temaya geç"
+          ? t.nav.switchToLight
+          : t.nav.switchToDark
       }
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
       className="inline-flex h-7 w-7 items-center justify-center border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -70,11 +71,12 @@ function ThemeToggle() {
 }
 
 function useKonvertVersion() {
-  const [version, setVersion] = React.useState("v0.4.0");
+  const [version, setVersion] = React.useState("v0.5.0");
 
   React.useEffect(() => {
     let active = true;
-    fetch("https://raw.githubusercontent.com/enesehs/konvert/refs/heads/main/VERSION")
+    const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+    fetch(`${basePath}/VERSION`)
       .then((res) => {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();
@@ -141,7 +143,7 @@ export function SiteHeader() {
           </span>
         </a>
 
-        <nav aria-label="Ana menü" className="hidden items-center gap-1 lg:flex">
+        <nav aria-label={t.nav.mainNavAria} className="hidden items-center gap-1 lg:flex">
           {navItems.map((item) => (
             <a
               key={item.href}
@@ -162,22 +164,22 @@ export function SiteHeader() {
             href="https://github.com/enesehs/konvert"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Star on GitHub"
+            aria-label={t.nav.starProject}
             className="hidden h-7 items-center gap-1.5 border border-border bg-card px-2.5 font-mono text-[11.5px] font-medium text-foreground transition-colors hover:bg-muted sm:inline-flex"
           >
             <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500/20" aria-hidden="true" />
-            <span>Star project</span>
+            <span>{t.nav.starProject}</span>
           </a>
 
           <a
             href="https://github.com/sponsors/enesehs"
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Support on GitHub Sponsors"
+            aria-label={t.nav.supportProject}
             className="hidden h-7 items-center gap-1.5 border border-border bg-card px-2.5 font-mono text-[11.5px] font-medium text-foreground transition-colors hover:bg-muted sm:inline-flex"
           >
             <Heart className="h-3.5 w-3.5 text-pink-500 fill-pink-500/20" aria-hidden="true" />
-            <span>Support project</span>
+            <span>{t.nav.supportProject}</span>
           </a>
 
           <ThemeToggle />
@@ -211,7 +213,7 @@ export function SiteHeader() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Languages className="h-4 w-4 text-brand" aria-hidden="true" />
-                    <span className="font-mono text-[11px]">DİL</span>
+                    <span className="font-mono text-[11px]">{t.nav.langLabel}</span>
                   </div>
                   <div className="flex gap-1 font-mono text-[11px]">
                     {LOCALES.map((l) => (
@@ -254,7 +256,7 @@ export function SiteHeader() {
                     className="flex h-9 items-center justify-center gap-2 border border-border bg-card px-4 font-mono text-[12.5px] text-foreground"
                   >
                     <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500/20" aria-hidden="true" />
-                    <span>Star project</span>
+                    <span>{t.nav.starProject}</span>
                   </a>
 
                   <a
@@ -265,7 +267,7 @@ export function SiteHeader() {
                     className="flex h-9 items-center justify-center gap-2 border border-border bg-card px-4 font-mono text-[12.5px] text-foreground"
                   >
                     <Heart className="h-3.5 w-3.5 text-pink-500 fill-pink-500/20" aria-hidden="true" />
-                    <span>Support project</span>
+                    <span>{t.nav.supportProject}</span>
                   </a>
                 </div>
               </nav>

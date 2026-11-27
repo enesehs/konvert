@@ -4,13 +4,17 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(
     name = "konvert",
-    author = "enesehs <enesehs@protonmail.com>",
+    author = "enesehs (https://enesehs.dev)",
     version,
     about = "Fast, lightweight, native right-click file converter and optimizer for Linux and KDE Plasma"
 )]
 pub struct Cli {
     /// Target format (e.g. webp, png, jpg, avif, jxl, mp4, gif, mp3, txt, pdf)
-    #[arg(short = 't', long = "target")]
+    #[arg(
+        short = 't',
+        long = "target",
+        conflicts_with_all = ["resize", "target_size", "strip_metadata", "extract_frames", "merge_pdf"]
+    )]
     pub target: Option<String>,
 
     /// Files to convert (single or batch)
@@ -46,11 +50,17 @@ pub struct Cli {
     pub jobs: Option<usize>,
 
     /// Merge multiple images into a single PDF document
-    #[arg(long = "merge-pdf")]
+    #[arg(
+        long = "merge-pdf",
+        conflicts_with_all = ["target", "resize", "target_size", "strip_metadata", "extract_frames"]
+    )]
     pub merge_pdf: bool,
 
     /// Smart compression to target file size (e.g. 8MB, 25MB)
-    #[arg(long = "target-size")]
+    #[arg(
+        long = "target-size",
+        conflicts_with_all = ["target", "resize", "strip_metadata", "extract_frames", "merge_pdf"]
+    )]
     pub target_size: Option<String>,
 
     /// Conversion profile preset (web, balanced, archive, lossless, or custom)
@@ -70,11 +80,17 @@ pub struct Cli {
     pub check_update: bool,
 
     /// Strip EXIF, GPS, and privacy metadata
-    #[arg(long = "strip-metadata")]
+    #[arg(
+        long = "strip-metadata",
+        conflicts_with_all = ["target", "resize", "target_size", "extract_frames", "merge_pdf"]
+    )]
     pub strip_metadata: bool,
 
     /// Resize images (e.g. 50%, 1080p, 720p)
-    #[arg(long = "resize")]
+    #[arg(
+        long = "resize",
+        conflicts_with_all = ["target", "target_size", "strip_metadata", "extract_frames", "merge_pdf"]
+    )]
     pub resize: Option<String>,
 
     /// Video CRF value (0: Lossless, 18-28: Balanced, 35+: High compression)
@@ -104,7 +120,10 @@ pub struct Cli {
     pub dpi: Option<u32>,
 
     /// Extract video frames to folder as PNG images
-    #[arg(long = "extract-frames")]
+    #[arg(
+        long = "extract-frames",
+        conflicts_with_all = ["target", "resize", "target_size", "strip_metadata", "merge_pdf"]
+    )]
     pub extract_frames: bool,
 
     /// GIF length in seconds (0 = entire video; default: 15)
@@ -131,8 +150,16 @@ pub struct Cli {
     #[arg(short = 'v', long = "verbose")]
     pub verbose: bool,
 
+    /// Pause running background conversion process
+    #[arg(long = "pause", conflicts_with_all = ["resume", "cancel"])]
+    pub pause: bool,
+
+    /// Resume paused background conversion process
+    #[arg(long = "resume", conflicts_with_all = ["pause", "cancel"])]
+    pub resume: bool,
+
     /// Cancel running background conversion process
-    #[arg(long = "cancel")]
+    #[arg(long = "cancel", conflicts_with_all = ["pause", "resume"])]
     pub cancel: bool,
 
     /// Generate shell auto-completion script (bash, zsh, fish)
@@ -166,6 +193,10 @@ pub struct Cli {
     /// Save configuration payload from JSON string or stdin ('-') and sync menus
     #[arg(long = "save-config-json", value_name = "JSON")]
     pub save_config_json: Option<String>,
+
+    /// Dump active configuration as JSON (Single Source of Truth for GUI)
+    #[arg(long = "dump-config-json")]
+    pub dump_config_json: bool,
 
     /// Re-synchronize right-click context menu according to config
     #[arg(long = "sync-menu")]
@@ -204,21 +235,25 @@ pub struct Cli {
     pub uninstall_all: bool,
 }
 
-/// `128k`, `192k`, `1.5m` gibi ses bit hızlarını doğrular.
+/// `128k`, `192k`, `1.5m` gibi ses bit hızlarını doğrular (`k` veya `m` soneki zorunludur).
 fn parse_bitrate(value: &str) -> Result<String, String> {
     let trimmed = value.trim().to_lowercase();
     if trimmed.is_empty() {
         return Err("bit hızı boş olamaz".to_string());
     }
-    let number_part = trimmed
-        .strip_suffix('k')
-        .or_else(|| trimmed.strip_suffix('m'))
-        .unwrap_or(&trimmed);
-    match number_part.parse::<f64>() {
-        Ok(n) if n.is_finite() && n > 0.0 && n <= 1024.0 => Ok(trimmed),
-        _ => Err(format!(
-            "geçersiz bit hızı: {value} (örnek: 128k, 192k, 320k)"
-        )),
+    let valid = if let Some(k_str) = trimmed.strip_suffix('k') {
+        matches!(k_str.parse::<f64>(), Ok(n) if n.is_finite() && n > 0.0 && n <= 1024.0)
+    } else if let Some(m_str) = trimmed.strip_suffix('m') {
+        matches!(m_str.parse::<f64>(), Ok(n) if n.is_finite() && n > 0.0 && n <= 10.0)
+    } else {
+        false
+    };
+    if valid {
+        Ok(trimmed)
+    } else {
+        Err(format!(
+            "geçersiz bit hızı: {value} ('k' veya 'm' soneki gerekli, örnek: 128k, 192k, 1.5m)"
+        ))
     }
 }
 
@@ -235,5 +270,62 @@ fn parse_gif_duration(value: &str) -> Result<f64, String> {
     match value.trim().parse::<f64>() {
         Ok(seconds) if seconds.is_finite() && (0.0..=36000.0).contains(&seconds) => Ok(seconds),
         _ => Err(format!("geçersiz GIF süresi: {value} (0-36000 saniye)")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_bitrate_requires_suffix_and_bounds() {
+        assert_eq!(parse_bitrate("128k").as_deref(), Ok("128k"));
+        assert_eq!(parse_bitrate("320K").as_deref(), Ok("320k"));
+        assert_eq!(parse_bitrate("1.5m").as_deref(), Ok("1.5m"));
+
+        assert!(parse_bitrate("192").is_err());
+        assert!(parse_bitrate("0k").is_err());
+        assert!(parse_bitrate("-5k").is_err());
+        assert!(parse_bitrate("20m").is_err());
+        assert!(parse_bitrate("nan").is_err());
+    }
+
+    #[test]
+    fn test_cli_conflicting_action_flags_rejected() {
+        assert!(
+            Cli::try_parse_from(["konvert", "-t", "webp", "--resize", "50%", "a.png"]).is_err()
+        );
+        assert!(Cli::try_parse_from(["konvert", "-t", "pdf", "--merge-pdf", "a.png"]).is_err());
+        assert!(
+            Cli::try_parse_from(["konvert", "--strip-metadata", "--extract-frames", "a.mp4"])
+                .is_err()
+        );
+        assert!(Cli::try_parse_from(["konvert", "-t", "webp", "a.png"]).is_ok());
+    }
+
+    #[test]
+    fn test_cli_pause_resume_cancel_conflicts() {
+        assert!(Cli::try_parse_from(["konvert", "--pause"]).is_ok());
+        assert!(Cli::try_parse_from(["konvert", "--resume"]).is_ok());
+        assert!(Cli::try_parse_from(["konvert", "--cancel"]).is_ok());
+        assert!(Cli::try_parse_from(["konvert", "--pause", "--resume"]).is_err());
+        assert!(Cli::try_parse_from(["konvert", "--pause", "--cancel"]).is_err());
+        assert!(Cli::try_parse_from(["konvert", "--resume", "--cancel"]).is_err());
+    }
+
+    #[test]
+    fn test_parse_jobs_and_gif_duration() {
+        assert_eq!(parse_jobs("1"), Ok(1));
+        assert_eq!(parse_jobs("64"), Ok(64));
+        assert!(parse_jobs("0").is_err());
+        assert!(parse_jobs("65").is_err());
+        assert!(parse_jobs("abc").is_err());
+
+        assert_eq!(parse_gif_duration("0"), Ok(0.0));
+        assert_eq!(parse_gif_duration("15.5"), Ok(15.5));
+        assert!(parse_gif_duration("-1").is_err());
+        assert!(parse_gif_duration("NaN").is_err());
+        assert!(parse_gif_duration("inf").is_err());
+        assert!(parse_gif_duration("40000").is_err());
     }
 }

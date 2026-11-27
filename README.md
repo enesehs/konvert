@@ -12,7 +12,7 @@
 
   [![Website](https://img.shields.io/badge/Website-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.4.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/badge/Release-v0.5.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
   [![License](https://img.shields.io/badge/License-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>
@@ -67,7 +67,7 @@ konvert -s
 
 Tired of uploading private files to online converter sites, switching to browser tabs, or waiting for bloated Electron apps?
 
-* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Zero Telemetry & 100% Privacy:** Every single byte stays on your local hardware; zero network requests or background telemetry.
+* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Zero Telemetry & 100% Privacy:** Every single byte stays on your local hardware; conversions run 100% offline with zero telemetry (network access occurs only if you explicitly run `--check-update`).
 * <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Native Right-Click Menus:** Instant right-click integration for **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar**, and **GNOME Nautilus**.
 * <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 & Rayon Parallelism:** Multi-threaded parallel batch execution with zero GC pauses and ~25 MB peak memory footprint.
 * <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Mathematical Target Sizing:** Compress videos and images to strict limits (Discord 8 MB, Email 25 MB) with automated ladder search.
@@ -80,24 +80,24 @@ Tired of uploading private files to online converter sites, switching to browser
 
 ## Benchmarks
 
-Tested on AMD Ryzen 7 (8 cores / 16 threads).
+Measured on AMD Ryzen 7 7800X3D (8 cores / 16 threads) with [`scripts/benchmark.py`](scripts/benchmark.py).
 
-### Batch Processing & Speedup (19.4 MB 4K PNG)
+### Batch Processing & Speedup (12.7 MB 4K `3840x2160` PNG)
 
-| Operation | Mode | Output Size | Disk Saved | Bare Subprocess (Single) | Konvert (Single) | Konvert (Rayon `-j 8` ×50) |
+| Operation | Mode | Output Size | Disk Saved | Bare Tool (Single) | Konvert (Single) | Konvert (Rayon `-j 8` ×50) |
 |---|---|---|---|---|---|---|
-| **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-92.2%** | 515 ms (`cjxl`) | 517 ms | **3.8s** (~6.8× vs serial `cjxl`) |
-| **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-90.2%** | 840 ms (`magick`) | 843 ms | **5.4s** (~7.8× vs serial `magick`) |
-| **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-78.8%** | 225 ms (`magick`) | 228 ms | **1.6s** (~7.0× vs serial `magick`) |
-| **Unix Pipe (`-`)** | Stdin -> Stdout | Stream | — | — | **37 ms** latency | — |
+| **JPEG XL (`.jxl`)** | `--lossless` | 12.4 MB | **-2.4%** | 1.02 s (`cjxl`) | 1.02 s | **43.89 s** (~1.2× vs serial `cjxl`) |
+| **WebP (`.webp`)** | `-q 85` | 849.2 KB | **-93.5%** | 604 ms (`magick`) | 600 ms | **4.62 s** (~6.5× vs serial `magick`) |
+| **JPEG (`.jpg`)** | `-q 90` | 2.2 MB | **-82.3%** | 194 ms (`magick`) | **187 ms** (`image-rs`) | **1.52 s** (~6.2× vs serial) |
+| **Unix Pipe (`-`)** | Stdin -> Stdout (1080p) | Stream | — | — | **152 ms** latency | — |
 
-*Performance Model Breakdown: For single-file conversion, Konvert delegates directly to native underlying tools (`cjxl`, `magick`, `ffmpeg`) with minimal wrapper latency (~2–3 ms POSIX exec overhead). The primary performance advantage emerges in batch processing: instead of executing heavy shell scripts serially (e.g., 50 files taking ~26s in JXL or ~42s in WebP), Konvert dispatches jobs across a Rayon multi-threaded work-stealing pool (`-j 8`), delivering up to 7–8× total batch throughput speedup without spawning shell interpreters.*
+*Performance Model Breakdown: For JPEG output, Konvert uses Rust's native `image-rs` (`JpegEncoder`) directly in-memory without spawning external processes; for WebP/JXL/video/documents it invokes native tools (`magick`, `cjxl`, `ffmpeg`) directly with zero shell wrapper overhead. In batch mode, Konvert schedules work across a Rayon work-stealing thread pool (`-j 8`), yielding ~6.2–6.5× batch throughput speedups on single-threaded encoders (`magick`, `image-rs`). (`cjxl` already parallelizes internally, so multi-instance speedup depends on core headroom.)*
 
 *Zero Electron/JVM runtime overhead. Base resident memory (RSS): ~24–28 MB (Rust core process). Note: Peak memory usage during 4K video transcoding or heavy PDF processing is governed by FFmpeg and Ghostscript subprocesses.*
 
 ### Quality & Fidelity Assessment (PSNR, SSIM & SNR)
 
-Evaluated with high-fidelity reference media via `benchmark_quality.py`:
+Evaluated against 1080p reference media:
 
 #### Image Quality (1080p Reference Frame)
 
@@ -120,7 +120,7 @@ Evaluated with high-fidelity reference media via `benchmark_quality.py`:
 | **DOCX -> TXT** | `source_doc.docx` | 682 B | — | **100% Word & Character Recall** |
 | **UDF (UYAP) -> TXT** | `source_court.udf` | 519 B | — | **100% Word & Character Recall** |
 
-*Reproduce measurements locally anytime with `python3 ~/konvert-test/benchmark_quality.py`.*
+*Reproduce throughput measurements locally anytime with `python3 scripts/benchmark.py`.*
 
 ---
 
@@ -169,9 +169,9 @@ Evaluated with high-fidelity reference media via `benchmark_quality.py`:
 | <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Preset Profiles** | Built-in presets (`web`, `balanced`, `archive`, `lossless`) plus custom profile creation (`--save-profile <name>`) saved in `config.toml`. |
 | <img src="assets/icons/konvert-terminal.svg" width="16" height="16" align="absmiddle" /> **Unix Pipeline (`-`)** | Direct stdin/stdout streaming with automatic magic-byte format identification for shell pipelines. |
 | <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Atomic Data Safety** | All file writes use temporary `.part` files with atomic commits, collision avoidance (`_2`, `_3`), and optional `.bak` backups (`--backup`). |
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Next-Gen Image Formats** | Native support for JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF, and raster-to-SVG embedding via ImageMagick (vector tracing with Potrace on roadmap). |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Next-Gen Image Formats** | Native support for JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF, GIF, and raster-to-SVG contour tracing via `potrace` (with automatic bitmap embed fallback). |
 | <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Document & PDF Tools** | Direct UDF (UYAP) and DOCX to PDF/TXT conversions with structural table and header extraction, plus multi-image PDF merge. |
-| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Multi-Language (i18n)** | UI and CLI interface localized in 9 languages (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA; core engine errors undergoing full i18n migration) and 5 in Qt6 Settings GUI. |
+| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Multi-Language (i18n)** | CLI, `--doctor`, and core engine errors localized in 9 languages (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA); Qt6 Settings GUI localized in 5 languages with a 9-language selector. |
 
 ---
 
@@ -274,12 +274,16 @@ konvert -t extract-audio video.mp4             # Extract audio stream as MP3
 konvert --extract-frames video.mp4             # Extract video frames into folder as PNGs
 konvert -t audio-to-video song.mp3             # Generate waveform MP4 video from audio
 
-# ── Batch Processing & Safety Controls ─────────────────────────────────
+# ── Batch Processing, Diagnostics & Live Job Control ──────────────────
 konvert -t webp -j 4 *.png                    # Parallel batch conversion with 4 CPU threads
+konvert -t mp4 --hwaccel auto video.mkv        # GPU hardware acceleration (VA-API / NVENC)
 konvert -r -t webp ./photos                    # Recursively scan and convert directories
 konvert --dry-run -t webp *.jpg                # Preview output paths and collision plan
 konvert --backup -f -t png photo.jpg           # Overwrite safely with automatic .bak backup
+konvert --doctor                               # Verify toolchains, GPU encoders, and environment
 konvert --check-update                         # Check GitHub releases for software updates
+konvert --pause                                # Pause ongoing background conversion
+konvert --resume                               # Resume paused background conversion
 konvert --cancel                               # Safely cancel ongoing background conversion
 konvert -s                                     # Open Qt6 Settings GUI
 ```
@@ -290,10 +294,10 @@ konvert -s                                     # Open Qt6 Settings GUI
 
 | Category | Input Formats | Target Formats | Engine Capabilities |
 |---|---|---|---|
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Photos** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Auto-Orientation, EXIF Stripping, 50% & 1080p Resizing, Multi-Image PDF Merge, SVG Bitmap Embedding |
-| <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videos** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, Email 25 MB, Custom Target Sizing, Frame Extraction, Audio Extraction, Two-Pass Palette GIF |
-| <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Audio** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Configurable Bitrates (`128k` to `320k`), Waveform Video (MP4) Generation |
-| <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Documents** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Multi-DPI Page Rendering (36-1200 DPI), Ghostscript Optimization, DOCX/UDF Table & Text Extraction |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Photos** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC, HEIF, GIF | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Auto-Orientation, EXIF Stripping, 50% & 1080p Resizing, Multi-Image PDF Merge, Potrace SVG Vector Tracing |
+| <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videos** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV, M4V | MP4, MKV, WebM, AV1, GIF | Discord 8 MB, Email 25 MB, Custom Target Sizing, Lossless Metadata Stripping, Frame & Audio Extraction, Two-Pass GIF |
+| <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Audio** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A, WMA, AIFF | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Configurable Bitrates (`128k` to `320k`), Lossless Metadata Stripping, Waveform Video (MP4) Generation |
+| <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Documents** | UDF (UYAP), DOCX, PDF | PDF, PNG, JPG, TXT, HTML | Multi-DPI Page Rendering (36-1200 DPI), Ghostscript Optimization, DOCX/UDF Table, Text & HTML Extraction |
 
 ---
 
@@ -340,6 +344,6 @@ This project is licensed under the **GNU General Public License v3.0 or later (G
 
 <div align="center">
   <b>Developer:</b> <a href="https://github.com/enesehs">enesehs</a> &bull;
-  <b>Contact:</b> <a href="mailto:enesehs@protonmail.com">enesehs@protonmail.com</a><br>
+  <b>Website:</b> <a href="https://enesehs.dev">https://enesehs.dev</a><br>
   <sub>Crafted with dedication for Linux and the Open Source Community.</sub>
 </div>

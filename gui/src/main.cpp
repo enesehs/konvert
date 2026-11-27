@@ -1,7 +1,9 @@
 #include <QApplication>
 #include <QDir>
+#include <QGuiApplication>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QLockFile>
-#include <QMessageBox>
 #include <QStandardPaths>
 #include "mainwindow.h"
 
@@ -10,16 +12,29 @@ int main(int argc, char *argv[]) {
     app.setApplicationName("Konvert");
     app.setApplicationDisplayName("Konvert");
     app.setOrganizationName("Konvert");
+    QGuiApplication::setDesktopFileName("io.github.enesehs.konvert");
 
-    // Tek örnek: iki GUI aynı config.toml'u ezmesin.
-    const QString lockDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
-    QLockFile lock(QDir(lockDir).filePath("konvert-settings.lock"));
+    // Tek örnek: ikinci açılışta mevcut pencereyi öne getir.
+    QString lockDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (lockDir.isEmpty()) {
+        lockDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    }
+    QDir().mkpath(lockDir);
+
+    const QString lockPath = QDir(lockDir).filePath("konvert-settings.lock");
+    const QString socketName = QDir(lockDir).filePath("konvert-settings.sock");
+
+    QLockFile lock(lockPath);
     lock.setStaleLockTime(0);
     if (!lock.tryLock(100)) {
-        QMessageBox::information(
-            nullptr,
-            "Konvert",
-            "Konvert settings is already running.");
+        QLocalSocket socket;
+        socket.connectToServer(socketName);
+        if (socket.waitForConnected(500)) {
+            socket.write("ACTIVATE\n");
+            socket.flush();
+            socket.waitForBytesWritten(500);
+            socket.disconnectFromServer();
+        }
         return 0;
     }
 
@@ -33,6 +48,22 @@ int main(int argc, char *argv[]) {
         }
     }
 #endif
+
+    QLocalServer::removeServer(socketName);
+    QLocalServer server;
+    if (server.listen(socketName)) {
+        QObject::connect(&server, &QLocalServer::newConnection, &window, [&server, &window]() {
+            while (QLocalSocket *client = server.nextPendingConnection()) {
+                client->readAll();
+                client->close();
+                client->deleteLater();
+            }
+            window.setWindowState((window.windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+            window.show();
+            window.raise();
+            window.activateWindow();
+        });
+    }
 
     window.show();
 

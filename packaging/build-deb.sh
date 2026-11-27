@@ -11,7 +11,7 @@ BUILD_DIR="${ROOT_DIR}/build-deb-tmp"
 if [ -f "${ROOT_DIR}/VERSION" ]; then
     VERSION="$(tr -d 'v' < "${ROOT_DIR}/VERSION" | tr -d ' \n\r')"
 else
-    VERSION="0.4.0"
+    VERSION="0.5.0"
 fi
 PKG_NAME="konvert"
 ARCH="${DEB_ARCH:-$(dpkg --print-architecture 2>/dev/null || echo amd64)}"
@@ -47,10 +47,24 @@ chmod 755 "${BUILD_DIR}/usr/bin/konvert-settings"
 # 2. Desktop, AppStream ve Dolphin ServiceMenu dosyaları
 cp "${ROOT_DIR}/io.github.enesehs.konvert.desktop" "${BUILD_DIR}/usr/share/applications/"
 cp "${ROOT_DIR}/packaging/io.github.enesehs.konvert.metainfo.xml" "${BUILD_DIR}/usr/share/metainfo/"
-cp "${ROOT_DIR}/docs/konvert.1" "${BUILD_DIR}/usr/share/man/man1/konvert.1"
-chmod 644 "${BUILD_DIR}/usr/share/man/man1/konvert.1"
+gzip -9n -c "${ROOT_DIR}/docs/konvert.1" > "${BUILD_DIR}/usr/share/man/man1/konvert.1.gz"
+chmod 644 "${BUILD_DIR}/usr/share/man/man1/konvert.1.gz"
 chmod 644 "${BUILD_DIR}/usr/share/applications/io.github.enesehs.konvert.desktop"
 chmod 644 "${BUILD_DIR}/usr/share/metainfo/io.github.enesehs.konvert.metainfo.xml"
+
+mkdir -p "${BUILD_DIR}/usr/share/doc/konvert"
+cat << 'EOF' > "${BUILD_DIR}/usr/share/doc/konvert/copyright"
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: konvert
+Source: https://github.com/enesehs/konvert
+
+Files: *
+Copyright: 2026 enesehs <enesehs@protonmail.com>
+License: GPL-3.0-or-later
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in `/usr/share/common-licenses/GPL-3'.
+EOF
+chmod 644 "${BUILD_DIR}/usr/share/doc/konvert/copyright"
 
 # Dolphin KIO ServiceMenus
 mkdir -p "${BUILD_DIR}/usr/share/kio/servicemenus"
@@ -97,15 +111,17 @@ for SIZE in 16 24 32 48 64 128 256; do
 done
 
 # 4. DEBIAN/control dosyası
+INSTALLED_SIZE="$(du -sk --exclude=DEBIAN "${BUILD_DIR}" | cut -f1)"
 cat << EOF > "${BUILD_DIR}/DEBIAN/control"
 Package: konvert
 Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
+Installed-Size: ${INSTALLED_SIZE}
 Maintainer: enesehs <enesehs@protonmail.com>
-Depends: libc6, libqt6core6, libqt6gui6, libqt6widgets6, libqt6svg6, ffmpeg, imagemagick
-Recommends: poppler-utils, ghostscript, libreoffice, libjxl-tools
+Depends: libc6, libqt6core6t64 | libqt6core6, libqt6gui6t64 | libqt6gui6, libqt6widgets6t64 | libqt6widgets6, libqt6network6t64 | libqt6network6, libqt6svg6, ffmpeg, imagemagick
+Recommends: poppler-utils, ghostscript, libreoffice, libjxl-tools, potrace
 Homepage: https://github.com/enesehs/konvert
 Description: Fast, lightweight file converter and optimizer for Linux and KDE Plasma
  Konvert is a fast, lightweight, offline, multi-threaded file conversion and optimization
@@ -145,8 +161,8 @@ else
     mkdir -p "${TEMP_AR}"
 
     echo "2.0" > "${TEMP_AR}/debian-binary"
-    (cd "${BUILD_DIR}/DEBIAN" && tar -czf "${TEMP_AR}/control.tar.gz" control postinst)
-    (cd "${BUILD_DIR}" && tar --exclude='./DEBIAN' -czf "${TEMP_AR}/data.tar.gz" .)
+    (cd "${BUILD_DIR}/DEBIAN" && tar --owner=0 --group=0 -czf "${TEMP_AR}/control.tar.gz" control postinst)
+    (cd "${BUILD_DIR}" && tar --owner=0 --group=0 --exclude='./DEBIAN' -czf "${TEMP_AR}/data.tar.gz" .)
 
     (cd "${TEMP_AR}" && ar rcs "${OUTPUT_DEB}" debian-binary control.tar.gz data.tar.gz)
     rm -rf "${TEMP_AR}"

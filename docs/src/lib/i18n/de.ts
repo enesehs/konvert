@@ -30,6 +30,13 @@ export const de: Translations = {
     openMenu: "Menü öffnen",
     mobileMenu: "Mobiles Menü",
     skipLink: "Zum Inhalt springen",
+    mainNavAria: "Hauptnavigation",
+    langSelectionAria: "Sprachauswahl",
+    langLabel: "SPRACHE",
+    switchToLight: "Zum hellen Design wechseln",
+    switchToDark: "Zum dunklen Design wechseln",
+    starProject: "Auf GitHub markieren",
+    supportProject: "Projekt unterstützen",
   },
   hero: {
     seoH1: "Nativer Rechtsklick-Dateikonverter für Linux",
@@ -76,6 +83,13 @@ export const de: Translations = {
     localDisk: "Lokales Laufwerk",
     hint: "Wählen Sie ein Zielformat aus dem Menü unten, um den Live-Test zu starten:",
     interactiveHint: "INTERAKTIVE DEMO: ZUM TESTEN KLICKEN",
+    itemCountSummary: "6 Elemente (2 ausgewählt)",
+    processingLabel: "wird verarbeitet...",
+    doneSummaryTemplate: "2 Dateien in {target} konvertiert ({total}).",
+    footerIdle: "Bereit — Format im Menü wählen, um die Konvertierung zu testen",
+    footerConvertingTemplate: "Rust-Rayon-Worker konvertiert: {target}...",
+    footerDoneTemplate: "Abgeschlossen: {saved}% Speicherplatz gespart.",
+    resetShort: "Zurücksetzen",
   },
   comparison: {
     badge: "SCHLUSS MIT FFMPEG-FLAGS & WERBE-WEBSITES",
@@ -96,7 +110,7 @@ export const de: Translations = {
     newWaySubtitle: "100% offline, null Leerlauf-Overhead, in 1 Sekunde konvertiert.",
     newWayPoints: [
       "Rechtsklick im Dateimanager -> Zielformat wählen -> in 1 Sekunde lokal konvertiert",
-      "100% Offline: Ihre Daten verlassen niemals die SSD, null Telemetrie, null Server",
+      "100% Offline: Ihre Daten verlassen niemals die SSD, null Telemetrie, null Hintergrund-Uploads",
       "Hardwarebeschleunigte Rust-Engine: 0 MB RAM im Leerlauf, startet nur auf Abruf und beendet sich sofort",
       "Native System-Benachrichtigung: Neue Datei erscheint sofort neben dem Original",
     ],
@@ -136,20 +150,25 @@ export const de: Translations = {
       {
         value: "100%",
         label: "Lokal & Offline",
-        desc: "Keine Analysen, keine Netzwerkaufrufe. Ihre Daten bleiben sicher auf Ihrem Rechner. Funktioniert einwandfrei im Flugmodus.",
+        desc: "Keine Analysen, keine Telemetrie. Ihre Daten bleiben auf Ihrem Rechner; alle Konvertierungen laufen offline (Netzwerkzugriff nur bei manuellem --check-update).",
         tag: "Volle Privatsphäre",
       },
       {
         value: "Open Source",
         label: "GPL-3.0-or-later Lizenz",
-        desc: "Every single line is auditable and community-driven. Free from proprietary locks, telemetry, advertisements, and paywalls.",
+        desc: "Jede einzelne Zeile ist unabhängig prüfbar und gemeinschaftsorientiert. Frei von proprietären Sperren, Telemetrie, Werbung und Paywalls.",
         tag: "Unabhängig Prüfbar",
       },
+    ],
+    specs: [
+      "POSIX EXEC · KEIN DAEMON · 0 SYSTEMD-DIENSTE",
+      "OFFLINE-KONVERTIERUNG · NULL TELEMETRIE · AIR-GAP-FÄHIG",
+      "GPL-3.0-or-later · UNABHÄNGIG PRÜFBARER BUILD",
     ],
   },
   formats: {
     badge: "UNTERSTÜTZTE FORMATE & ENGINES",
-    title: "Über 50 Formate. Angetrieben von den CLI-Engines, denen Sie bereits vertrauen.",
+    title: "35+ Formate. Angetrieben von den CLI-Engines, denen Sie bereits vertrauen.",
     subtitle:
       "Optimierte Werkzeugkette für Bilder, Videos, Audio und Dokumente.",
     tabs: {
@@ -165,27 +184,33 @@ export const de: Translations = {
       audio: "Audiowiedergabe in Studioqualität, verlustfreie Formatkonvertierung und ID3-Tag-Erhalt.",
       doc: "Vektor-Schrifttreue, High-DPI-Rendering und direktes lokales Parsen von Dokumenten.",
     },
-    profilesTitle: "3 Intelligente Qualitätsprofile",
+    profilesTitle: "4 Intelligente Qualitätsprofile",
     profilesDesc:
       "Wählen Sie zwischen kleinsten Web-Dateigrößen und verlustfreier Archivqualität.",
     profiles: [
       {
         label: "FÜR DAS WEB OPTIMIERT",
-        name: "Intelligente Kompression",
-        desc: "Reduziert Dateigröße um bis zu 80% ohne sichtbaren Qualitätsverlust. Perfekt für Websites.",
+        name: "web (Intelligente Kompression)",
+        desc: "Qualität 80, CRF 28, 150 DPI für minimale Web-Dateien und schnelles Teilen ohne sichtbaren Verlust.",
       },
       {
-        label: "ORIGINALQUALITÄT",
-        name: "Ausgewogener Standard",
-        desc: "Bewahrt höchste Bild- und Klangtreue bei maximaler Kompatibilität mit allen Abspielgeräten.",
+        label: "STANDARD-BALANCE",
+        name: "balanced (Ausgewogener Standard)",
+        desc: "Qualität 85, CRF 23, 300 DPI für scharfe Details bei universeller Kompatibilität.",
+      },
+      {
+        label: "ARCHIVQUALITÄT",
+        name: "archive (Hohe Wiedergabetreue)",
+        desc: "Qualität 95, CRF 18, 600 DPI und 320k Audio für Druckvorstufen und langfristige Medienarchive.",
       },
       {
         label: "VERLUSTFREI",
-        name: "Archivierung & Druck",
-        desc: "Mathematisch exakte Speicherung ohne Datenverlust für Druckvorstufen und Medienarchive.",
+        name: "lossless (Bit-exakter Modus)",
+        desc: "Erzwingt verlustfreie Bild- und CRF-0-Videokodierung mit 320k Audio für mathematisch exakte Master.",
       },
     ],
     defaultRayon: "STANDARD: MEHRKERN-PARALLEL RAYON",
+    perPage: "/Seite",
     params: {
       losslessRgba: "Verlustfrei / RGBA",
       jxlNextGen: "Next-Gen JPEG XL / VarDCT",
@@ -238,7 +263,7 @@ export const de: Translations = {
     comingSoonBadge: "Demnächst",
     commands: {
       script: "curl -fsSL https://enesehs.dev/konvert/install.sh | bash",
-      arch: "paru -S konvert-bin\n# oder mit yay:\nyay -S konvert-bin",
+      arch: "paru -S konvert\n# oder mit yay:\nyay -S konvert",
       debian: "# Offizielles Debian / Ubuntu Repository in Vorbereitung (Demnächst)\n# In der Zwischenzeit via Skript installierbar:\ncurl -fsSL https://enesehs.dev/konvert/install.sh | bash",
       fedora: "# Offizielles Fedora COPR Repository in Vorbereitung (Demnächst)\n# In der Zwischenzeit via Skript installierbar:\ncurl -fsSL https://enesehs.dev/konvert/install.sh | bash",
       uninstall: "konvert --uninstall-all\n# oder via Remote-Skript:\ncurl -fsSL https://enesehs.dev/konvert/uninstall.sh | bash",
@@ -259,6 +284,10 @@ export const de: Translations = {
     licenseTag: "GPL-3.0-or-later",
     sourceContribDesc:
       "Der gesamte Quellcode, die ServiceMenu .desktop-Dateien und Rust-Binaries sind unabhängig überprüfbar und kompilierbar.",
+    copyCommandAria: "Befehl kopieren",
+    copyIntegrationAria: "Integrationsbefehl kopieren",
+    copiedShort: "Kopiert",
+    copyShort: "Kopieren",
   },
   faq: {
     badge: "HÄUFIG GESTELLTE FRAGEN",
@@ -271,7 +300,7 @@ export const de: Translations = {
       },
       {
         q: "Benötigt Konvert Internetzugang oder sammelt es Daten?",
-        a: "Niemals. Konvert arbeitet zu 100% lokal und offline. Es gibt keinerlei Analysen oder Serververbindungen. Auch im Flugmodus uneingeschränkt nutzbar.",
+        a: "Nein. Alle Dateikonvertierungen laufen zu 100% lokal und offline ohne Hintergrund-Telemetrie oder Analysen (ein Netzwerkaufruf erfolgt nur, wenn Sie manuell konvert --check-update ausführen).",
       },
       {
         q: "Verbraucht Konvert im Hintergrund Arbeitsspeicher?",

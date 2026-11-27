@@ -36,21 +36,21 @@ export function Formats() {
     {
       id: "image",
       icon: FileImage,
-      engineTitle: "Rust image-rs, libjxl & resvg",
+      engineTitle: "image-rs, ImageMagick & libjxl",
       engineDetails: t.formats.engineDetails.image,
       conversions: [
-        { from: "PNG", to: "JXL", engine: "libjxl", speed: "~24ms", param: t.formats.params.jxlNextGen },
-        { from: "JPG", to: "JXL", engine: "libjxl", speed: "~20ms", param: t.formats.params.jxlLossless },
+        { from: "PNG", to: "JXL", engine: "cjxl (libjxl)", speed: "~24ms", param: t.formats.params.jxlNextGen },
+        { from: "JPG", to: "JXL", engine: "cjxl (libjxl)", speed: "~20ms", param: t.formats.params.jxlLossless },
         { from: "JXL", to: "PNG", engine: "djxl / image-rs", speed: "~18ms", param: t.formats.params.losslessRgba },
-        { from: "JXL", to: "JPG", engine: "djxl / mozjpeg", speed: "~19ms", param: t.formats.params.exifStrip },
+        { from: "JXL", to: "JPG", engine: "djxl / image-rs", speed: "~19ms", param: t.formats.params.exifStrip },
         { from: "WEBP", to: "PNG", engine: "image-rs", speed: "~14ms", param: t.formats.params.losslessRgba },
-        { from: "PNG", to: "WEBP", engine: "libwebp", speed: "~22ms", param: t.formats.params.webOptimize },
-        { from: "JPG", to: "WEBP", engine: "libwebp", speed: "~18ms", param: t.formats.params.saving60 },
-        { from: "PNG", to: "JPG", engine: "mozjpeg", speed: "~16ms", param: t.formats.params.exifStrip },
-        { from: "SVG", to: "PNG", engine: "resvg", speed: "~11ms", param: t.formats.params.dpiRender },
-        { from: "HEIC", to: "JPG", engine: "libheif", speed: "~45ms", param: t.formats.params.appleDecode },
-        { from: "AVIF", to: "PNG", engine: "libdav1d", speed: "~38ms", param: t.formats.params.hdrDecode },
-        { from: "GIF", to: "WEBP", engine: "image-rs", speed: "~32ms", param: t.formats.params.animatedFrames },
+        { from: "PNG", to: "WEBP", engine: "ImageMagick", speed: "~22ms", param: t.formats.params.webOptimize },
+        { from: "JPG", to: "WEBP", engine: "ImageMagick", speed: "~18ms", param: t.formats.params.saving60 },
+        { from: "PNG", to: "JPG", engine: "image-rs JpegEncoder", speed: "~16ms", param: t.formats.params.exifStrip },
+        { from: "SVG", to: "PNG", engine: "ImageMagick / rsvg-convert", speed: "~15ms", param: t.formats.params.dpiRender },
+        { from: "HEIC", to: "JPG", engine: "ImageMagick (libheif)", speed: "~45ms", param: t.formats.params.appleDecode },
+        { from: "AVIF", to: "PNG", engine: "ImageMagick / ravif", speed: "~38ms", param: t.formats.params.hdrDecode },
+        { from: "GIF", to: "WEBP", engine: "ImageMagick", speed: "~32ms", param: t.formats.params.animatedFrames },
         { from: "ICO", to: "PNG", engine: "image-rs", speed: "~6ms", param: t.formats.params.extractMultiRes },
         { from: "BMP", to: "PNG", engine: "image-rs", speed: "~9ms", param: t.formats.params.losslessCompress },
       ],
@@ -58,23 +58,23 @@ export function Formats() {
     {
       id: "video",
       icon: FileVideo,
-      engineTitle: "FFmpeg & libavcodec",
+      engineTitle: "FFmpeg (CPU / VA-API / NVENC)",
       engineDetails: t.formats.engineDetails.video,
       conversions: [
-        { from: "MP4", to: "WEBM", engine: "libvpx-vp9", speed: "~1.2s", param: t.formats.params.crf30Html5 },
-        { from: "MKV", to: "MP4", engine: "remux / copy", speed: "~180ms", param: t.formats.params.losslessStreamCopy },
-        { from: "MOV", to: "MP4", engine: "libx264", speed: "~850ms", param: t.formats.params.universalH264 },
-        { from: "MP4", to: "GIF", engine: "palettegen", speed: "~620ms", param: t.formats.params.fpsLoop },
+        { from: "MP4", to: "WEBM", engine: "libvpx-vp9 / VA-API", speed: "~1.2s", param: t.formats.params.crf30Html5 },
+        { from: "MKV", to: "MP4", engine: "libx264 / NVENC", speed: "~850ms", param: t.formats.params.universalH264 },
+        { from: "MOV", to: "MP4", engine: "libx264 / VA-API", speed: "~850ms", param: t.formats.params.universalH264 },
+        { from: "MP4", to: "GIF", engine: "ffmpeg palettegen", speed: "~620ms", param: t.formats.params.fpsLoop },
         { from: "AVI", to: "MP4", engine: "libx264", speed: "~950ms", param: t.formats.params.modernMp4Container },
         { from: "WEBM", to: "MP4", engine: "libx264", speed: "~780ms", param: t.formats.params.h264Baseline },
         { from: "MP4", to: "MP3", engine: "libmp3lame", speed: "~95ms", param: t.formats.params.extractAudio320 },
-        { from: "MKV", to: "WEBM", engine: "librav1e", speed: "~1.8s", param: t.formats.params.av1Opus },
+        { from: "MKV", to: "AV1", engine: "libsvtav1 / NVENC", speed: "~1.8s", param: t.formats.params.av1Opus },
       ],
     },
     {
       id: "audio",
       icon: FileAudio,
-      engineTitle: "FFmpeg & libopus / LAME",
+      engineTitle: "FFmpeg (LAME / libopus / FLAC)",
       engineDetails: t.formats.engineDetails.audio,
       conversions: [
         { from: "MP4", to: "MP3", engine: "libmp3lame", speed: "~110ms", param: t.formats.params.cbr320 },
@@ -84,21 +84,21 @@ export function Formats() {
         { from: "M4A", to: "MP3", engine: "libmp3lame", speed: "~75ms", param: t.formats.params.aacToMp3 },
         { from: "OGG", to: "MP3", engine: "libmp3lame", speed: "~65ms", param: t.formats.params.universalPlayer },
         { from: "FLAC", to: "WAV", engine: "pcm_s16le", speed: "~45ms", param: t.formats.params.studioDaw },
-        { from: "MP3", to: "OGG", engine: "libopus", speed: "~55ms", param: t.formats.params.opusUltraClear },
+        { from: "MP3", to: "OPUS", engine: "libopus", speed: "~55ms", param: t.formats.params.opusUltraClear },
       ],
     },
     {
       id: "doc",
       icon: FileText,
-      engineTitle: "Poppler & Pandoc",
+      engineTitle: "Poppler, Ghostscript & LibreOffice",
       engineDetails: t.formats.engineDetails.doc,
       conversions: [
-        { from: "PDF", to: "PNG", engine: "pdftoppm", speed: "~65ms/sayfa", param: t.formats.params.antiAliased300 },
-        { from: "PDF", to: "JPG", engine: "pdftoppm", speed: "~50ms/sayfa", param: t.formats.params.pageByPage },
-        { from: "DOCX", to: "PDF", engine: "pandoc", speed: "~180ms", param: t.formats.params.layoutPreserve },
-        { from: "MD", to: "PDF", engine: "pandoc + wkhtml", speed: "~140ms", param: t.formats.params.githubCssTemplate },
-        { from: "UDF", to: "PDF", engine: "udf2pdf / poppler", speed: "~90ms", param: t.formats.params.udfToPdf },
-        { from: "PDF", to: "TXT", engine: "pdftotext", speed: "~15ms", param: t.formats.params.plainTextUtf8 },
+        { from: "PDF", to: "PNG", engine: "pdftoppm", speed: `~65ms${t.formats.perPage}`, param: t.formats.params.antiAliased300 },
+        { from: "PDF", to: "JPG", engine: "pdftoppm", speed: `~50ms${t.formats.perPage}`, param: t.formats.params.pageByPage },
+        { from: "DOCX", to: "PDF", engine: "LibreOffice soffice", speed: "~180ms", param: t.formats.params.layoutPreserve },
+        { from: "DOCX", to: "TXT", engine: "Native ZIP/XML", speed: "~5ms", param: t.formats.params.plainTextUtf8 },
+        { from: "UDF", to: "PDF", engine: "Native XML + soffice", speed: "~90ms", param: t.formats.params.udfToPdf },
+        { from: "UDF", to: "TXT", engine: "Native ZIP/XML", speed: "~5ms", param: t.formats.params.plainTextUtf8 },
       ],
     },
   ];
@@ -185,7 +185,7 @@ export function Formats() {
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {t.formats.profiles.map((profile) => (
               <div key={profile.name} className="flex flex-col justify-between rounded-[2px] border border-border bg-card p-5">
                 <div>

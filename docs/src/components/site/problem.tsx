@@ -188,7 +188,7 @@ function RightClickEmulation() {
 
                     <div className="flex h-[24px] items-center justify-between px-2 text-muted-foreground hover:bg-muted">
                       <span>WEBP</span>
-                      <span className="text-[10px] opacity-70">.jxl</span>
+                      <span className="text-[10px] opacity-70">.webp</span>
                     </div>
                     <div className="flex h-[24px] items-center justify-between px-2 text-muted-foreground hover:bg-muted">
                       <span>AVIF</span>

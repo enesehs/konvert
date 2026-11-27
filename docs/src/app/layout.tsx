@@ -26,7 +26,6 @@ export const metadata: Metadata = {
     "Nautilus",
     "Nemo",
     "Thunar",
-    "COSMIC",
     "context menu",
     "WebP",
     "AVIF",

@@ -30,6 +30,13 @@ export const en: Translations = {
     openMenu: "Open Menu",
     mobileMenu: "Mobile Menu",
     skipLink: "Skip to content",
+    mainNavAria: "Main navigation",
+    langSelectionAria: "Language selection",
+    langLabel: "LANG",
+    switchToLight: "Switch to light theme",
+    switchToDark: "Switch to dark theme",
+    starProject: "Star project",
+    supportProject: "Support project",
   },
   hero: {
     seoH1: "Native Right-Click File Converter for Linux",
@@ -76,6 +83,13 @@ export const en: Translations = {
     localDisk: "Local Disk",
     hint: "Select a target format from the menu below to test the live conversion:",
     interactiveHint: "INTERACTIVE DEMO: CLICK TO TEST",
+    itemCountSummary: "6 items (2 selected)",
+    processingLabel: "processing...",
+    doneSummaryTemplate: "2 files converted to {target} ({total}).",
+    footerIdle: "Ready — Choose a format from the menu to test live conversion",
+    footerConvertingTemplate: "Rust Rayon worker converting: {target}...",
+    footerDoneTemplate: "Completed: {saved}% disk space saved.",
+    resetShort: "Reset",
   },
   comparison: {
     badge: "NO MORE FFPEG FLAGS, NO MORE SKETCHY UPLOADS",
@@ -96,7 +110,7 @@ export const en: Translations = {
     newWaySubtitle: "100% offline, zero idle overhead, converted in 1 second.",
     newWayPoints: [
       "Right-click any file in your file manager -> pick target format -> converted in 1 second",
-      "100% Offline: Your files never leave your SSD, zero telemetry, zero external network requests",
+      "100% Offline: Your files never leave your SSD, zero telemetry, zero background uploads",
       "Hardware-accelerated Rust speed: 0 MB idle RAM, spawns on-demand and exits instantly",
       "Instant native desktop notification: Converted file appears right beside the original",
     ],
@@ -136,7 +150,7 @@ export const en: Translations = {
       {
         value: "100%",
         label: "Local & Offline",
-        desc: "Zero analytics, zero network requests. Your files never leave your computer. Fully functional in airplane mode or air-gapped systems.",
+        desc: "Zero analytics, zero telemetry. Your files never leave your computer; conversions run 100% offline (network access occurs only if you manually run --check-update).",
         tag: "Complete Privacy",
       },
       {
@@ -145,6 +159,11 @@ export const en: Translations = {
         desc: "Every single line is auditable and community-driven. Free from proprietary locks, telemetry, advertisements, and paywalls.",
         tag: "Independently Auditable",
       },
+    ],
+    specs: [
+      "POSIX EXEC · NO DAEMON · 0 SYSTEMD SERVICES",
+      "OFFLINE CONVERSIONS · ZERO TELEMETRY · AIR-GAP READY",
+      "GPL-3.0-or-later · INDEPENDENTLY AUDITABLE BUILD",
     ],
   },
   formats: {
@@ -165,27 +184,33 @@ export const en: Translations = {
       audio: "Studio-grade acoustic accuracy, lossless format conversion, and ID3 metadata preservation.",
       doc: "Vector font fidelity, high-DPI rendering, and direct local document extraction.",
     },
-    profilesTitle: "3 Intelligent Quality Profiles",
+    profilesTitle: "4 Intelligent Quality Profiles",
     profilesDesc:
       "Choose between minimal web payloads and lossless archival clarity.",
     profiles: [
       {
         label: "WEB OPTIMIZED",
-        name: "Smart Compression",
-        desc: "Reduces file size by up to 80% without perceptible visual loss. Ideal for websites and quick messaging.",
+        name: "web (Smart Compression)",
+        desc: "Quality 80, CRF 28, 150 DPI tuned for minimal web payloads and fast sharing without noticeable loss.",
       },
       {
-        label: "ORIGINAL QUALITY",
-        name: "Balanced Standard",
-        desc: "Preserves pixel and acoustic fidelity while generating universal, standard-compliant outputs.",
+        label: "DEFAULT BALANCE",
+        name: "balanced (Balanced Standard)",
+        desc: "Quality 85, CRF 23, 300 DPI preserving crisp detail with universal player and viewer compatibility.",
+      },
+      {
+        label: "ARCHIVAL QUALITY",
+        name: "archive (High Fidelity)",
+        desc: "Quality 95, CRF 18, 600 DPI, 320k audio crafted for studio printing and long-term archival.",
       },
       {
         label: "LOSSLESS",
-        name: "Archival & Print",
-        desc: "Zero-loss encoding ensuring 100% mathematical fidelity for studio printing and master preservation.",
+        name: "lossless (Bit-Exact Mode)",
+        desc: "Forces lossless image and CRF 0 video encoding with 320k audio for mathematically faithful masters.",
       },
     ],
     defaultRayon: "DEFAULT: MULTI-CORE PARALLEL RAYON",
+    perPage: "/page",
     params: {
       losslessRgba: "Lossless / RGBA",
       jxlNextGen: "Next-Gen JPEG XL / VarDCT",
@@ -238,7 +263,7 @@ export const en: Translations = {
     comingSoonBadge: "Coming Soon",
     commands: {
       script: "curl -fsSL https://enesehs.dev/konvert/install.sh | bash",
-      arch: "paru -S konvert-bin\n# or with yay:\nyay -S konvert-bin",
+      arch: "paru -S konvert\n# or with yay:\nyay -S konvert",
       debian: "# Official Debian / Ubuntu repository in preparation (Coming Soon)\n# In the meantime, install via standalone script:\ncurl -fsSL https://enesehs.dev/konvert/install.sh | bash",
       fedora: "# Official Fedora COPR repository in preparation (Coming Soon)\n# In the meantime, install via standalone script:\ncurl -fsSL https://enesehs.dev/konvert/install.sh | bash",
       uninstall: "konvert --uninstall-all\n# or via remote script:\ncurl -fsSL https://enesehs.dev/konvert/uninstall.sh | bash",
@@ -259,6 +284,10 @@ export const en: Translations = {
     licenseTag: "GPL-3.0-or-later",
     sourceContribDesc:
       "All source code, ServiceMenu .desktop definitions, and Rust binaries are independently auditable and buildable.",
+    copyCommandAria: "Copy command",
+    copyIntegrationAria: "Copy integration command",
+    copiedShort: "Copied",
+    copyShort: "Copy",
   },
   faq: {
     badge: "FREQUENTLY ASKED QUESTIONS",
@@ -271,7 +300,7 @@ export const en: Translations = {
       },
       {
         q: "Does Konvert require internet connectivity or collect telemetry?",
-        a: "Never. Konvert is 100% offline and local. There is zero telemetry, analytics, or external network activity. It functions without restrictions on air-gapped systems and airplane mode.",
+        a: "No. All file conversions are 100% local and offline with zero background telemetry or analytics (the network is accessed only if you explicitly run konvert --check-update).",
       },
       {
         q: "Does Konvert consume RAM or CPU in the background?",
@@ -287,7 +316,7 @@ export const en: Translations = {
       },
       {
         q: "Is there support for Windows or macOS?",
-        a: "Konvert is intentionally architected specifically for the Linux desktop (KDE ServiceMenus, Nautilus Python/scripts, Nemo actions). Our dedication is to provide a premier Linux experience.",
+        a: "Konvert is intentionally architected specifically for the Linux desktop (KDE ServiceMenus, Nautilus scripts, Nemo actions, Thunar UCA). Our dedication is to provide a premier Linux experience.",
       },
     ],
   },

@@ -12,7 +12,7 @@
 
   [![Web Sitesi](https://img.shields.io/badge/Web%20Sitesi-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.4.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/badge/Release-v0.5.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
   [![Lisans](https://img.shields.io/badge/Lisans-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>
@@ -67,7 +67,7 @@ konvert -s
 
 Gizli dosyalarınızı çevrimiçi dönüştürücü sitelerine yüklemekten, tarayıcı sekmeleriyle uğraşmaktan veya hantal Electron uygulamalarının açılmasını beklemekten sıkıldınız mı?
 
-* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Sıfır Telemetri & %100 Gizlilik:** Her bir bayt yalnızca yerel donanımınızda işlenir; sıfır ağ isteği ve sıfır arka plan takibi.
+* <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Sıfır Telemetri & %100 Gizlilik:** Her bir bayt yalnızca yerel donanımınızda işlenir; tüm dönüştürmeler sıfır telemetri ile %100 çevrimdışı çalışır (ağ bağlantısı yalnızca kullanıcı açıkça `--check-update` çalıştırırsa kurulur).
 * <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Yerel Sağ Tık Menüleri:** **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar** ve **GNOME Nautilus** üzerinde doğrudan sağ tıklayarak dönüştürün.
 * <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 & Rayon Paralelliği:** Sıfır GC duraklaması ve ~25 MB bellek kullanımıyla çok çekirdekli paralel toplu işleme.
 * <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Matematiksel Hedef Boyutlandırma:** Medyayı kesin boyut sınırlarına (Discord 8 MB, E-posta 25 MB) otomatik ayar arayışıyla sığdırın.
@@ -80,24 +80,24 @@ Gizli dosyalarınızı çevrimiçi dönüştürücü sitelerine yüklemekten, ta
 
 ## Performans ve Kıyaslama
 
-AMD Ryzen 7 (8 çekirdek / 16 iş parçacığı) üzerinde test edilmiştir.
+AMD Ryzen 7 7800X3D (8 çekirdek / 16 iş parçacığı) üzerinde [`scripts/benchmark.py`](scripts/benchmark.py) ile ölçülmüştür.
 
-### Paralel Toplu İşleme ve Hızlanma (19.4 MB 4K PNG)
+### Paralel Toplu İşleme ve Hızlanma (12.7 MB 4K `3840x2160` PNG)
 
 | İşlem | Kip / Ayar | Çıktı Boyutu | Disk Tasarrufu | Yalın Araç (Tek Dosya) | Konvert (Tek Dosya) | Konvert (Rayon `-j 8` ×50) |
 |---|---|---|---|---|---|---|
-| **JPEG XL (`.jxl`)** | `--lossless` | 1.5 MB | **-%92.2** | 515 ms (`cjxl`) | 517 ms | **3.8 sn** (Seri `cjxl`'e göre ~6.8×) |
-| **WebP (`.webp`)** | `-q 85` | 1.9 MB | **-%90.2** | 840 ms (`magick`) | 843 ms | **5.4 sn** (Seri `magick`'e göre ~7.8×) |
-| **JPEG (`.jpg`)** | `-q 90` | 4.1 MB | **-%78.8** | 225 ms (`magick`) | 228 ms | **1.6 sn** (Seri `magick`'e göre ~7.0×) |
-| **Unix Boru Hattı (`-`)** | Stdin -> Stdout | Akış | — | — | **37 ms** gecikme | — |
+| **JPEG XL (`.jxl`)** | `--lossless` | 12.4 MB | **-%2.4** | 1.02 sn (`cjxl`) | 1.02 sn | **43.89 sn** (Seri `cjxl`'e göre ~1.2×) |
+| **WebP (`.webp`)** | `-q 85` | 849.2 KB | **-%93.5** | 604 ms (`magick`) | 600 ms | **4.62 sn** (Seri `magick`'e göre ~6.5×) |
+| **JPEG (`.jpg`)** | `-q 90` | 2.2 MB | **-%82.3** | 194 ms (`magick`) | **187 ms** (`image-rs`) | **1.52 sn** (Seriye göre ~6.2×) |
+| **Unix Boru Hattı (`-`)** | Stdin -> Stdout (1080p) | Akış | — | — | **152 ms** gecikme | — |
 
-*Performans Modeli ve Ayrımı: Tekil dosya dönüştürmelerinde Konvert doğrudan optimize yerel araçları (`cjxl`, `magick`, `ffmpeg`) çağırır ve aracı gecikmesi ihmal edilebilir düzeydedir (~2–3 ms doğrudan POSIX exec yükü). Asıl performans kazanımı toplu işleme süreçlerinde ortaya çıkar: 50 dosyayı seri kabuk betikleriyle işlemek yerine (JXL için ~26 sn, WebP için ~42 sn), Konvert tüm CPU çekirdeklerini Rayon iş parçacığı havuzu (`-j 8`) ile paralel devreye sokarak kabuk yorumlayıcı masrafı olmadan 7 ila 8 kat hızlanma sağlar.*
+*Performans Modeli ve Ayrımı: Konvert JPEG çıktısı için harici süreç açmadan doğrudan bellekte yerel Rust `image-rs` (`JpegEncoder`) kullanır; WebP/JXL/video/belgelerde ise kabuk yorumlayıcı masrafı olmadan yerel araçları (`magick`, `cjxl`, `ffmpeg`) çağırır. Toplu işlemlerde Rayon iş parçacığı havuzu (`-j 8`) tek iş parçacıklı kodlayıcılarda (`magick`, `image-rs`) ~6.2–6.5× hızlanma sağlar. (`cjxl` dahili çoklu iş parçacığı kullandığı için çoklu örnek hızlanması çekirdek payına bağlıdır.)*
 
 *Sıfır Electron/JVM çalışma zamanı yükü. Taban bellek kullanımı (RSS): ~24–28 MB (Rust çekirdek süreci). Not: 4K video dönüştürme veya büyük PDF işlemlerinde tepe bellek kullanımı FFmpeg ve Ghostscript alt süreçleri tarafından belirlenir.*
 
 ### Kalite ve Sadakat Ölçümleri (PSNR, SSIM ve SNR)
 
-Yüksek kaliteli referans medyalarıyla `benchmark_quality.py` üzerinden ölçülmüştür:
+1080p referans medyalarıyla ölçülmüştür:
 
 #### Görsel Kalite Analizi (1080p Referans Kare)
 
@@ -120,7 +120,7 @@ Yüksek kaliteli referans medyalarıyla `benchmark_quality.py` üzerinden ölç�
 | **DOCX -> TXT** | `source_doc.docx` | 682 B | — | **%100 Kelime / Karakter Doğruluğu** |
 | **UDF (UYAP) -> TXT** | `source_court.udf` | 519 B | — | **%100 Kelime / Karakter Doğruluğu** |
 
-*Ölçümleri yerel ortamınızda dilediğiniz an `python3 ~/konvert-test/benchmark_quality.py` ile tekrarlayabilirsiniz.*
+*Hız ölçümlerini yerel ortamınızda dilediğiniz an `python3 scripts/benchmark.py` ile tekrarlayabilirsiniz.*
 
 ---
 
@@ -169,9 +169,9 @@ Yüksek kaliteli referans medyalarıyla `benchmark_quality.py` üzerinden ölç�
 | <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Hazır ve Özel Profiller** | Yerleşik profiller (`web`, `balanced`, `archive`, `lossless`) ve `config.toml` dosyasına kaydedilen özel profil yönetimi (`--save-profile <isim>`). |
 | <img src="assets/icons/konvert-terminal.svg" width="16" height="16" align="absmiddle" /> **Unix Boru Hattı Akışı (`-`)** | Kabuk boru hatları (pipeline) için otomatik sihirli bayt format tespiti ile doğrudan stdin/stdout akış desteği. |
 | <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Atomik Veri Güvenliği** | Geçici `.part` dosyaları ile atomik yazma, çakışma koruması (`_2`, `_3`) ve isteğe bağlı `.bak` yedekleme (`--backup`). |
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Yeni Nesil Görsel Formatları** | JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF desteği ve ImageMagick ile raster görselleri SVG içine gömme (Potrace ile vektörizasyon yol haritasında). |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Yeni Nesil Görsel Formatları** | JPEG XL (`.jxl`), AVIF, QOI, WebP, HEIC, ICO, BMP, TIFF, GIF desteği ve `potrace` ile SVG vektörel izleme (yoksa otomatik bitmap gömme yedeği). |
 | <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belge ve PDF Araçları** | Tablo ve başlıkları koruyan doğrudan UDF (UYAP) ve DOCX -> PDF/TXT dönüşümü ve çoklu görselden PDF birleştirme. |
-| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Çok Dilli (i18n) Destek** | Komut satırı ve arayüz 9 dilde yerelleştirildi (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA; çekirdek hata mesajları i18n taşınma sürecinde) ve Qt6 arayüzünde 5 dil. |
+| <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> **Çok Dilli (i18n) Destek** | Komut satırı, `--doctor` ve çekirdek hata mesajları 9 dilde yerelleştirilmiştir (`--lang <code>`: EN, TR, DE, FR, ES, IT, RU, ZH, JA); Qt6 Ayarlar arayüzü 5 dilde yerelleştirilmiş olup 9 dil seçimi sunar. |
 
 ---
 
@@ -274,12 +274,16 @@ konvert -t extract-audio video.mp4              # Ses akışını MP3 olarak dı
 konvert --extract-frames video.mp4              # Video karelerini klasöre PNG olarak çıkar
 konvert -t audio-to-video sarki.mp3             # Sesten dalga formu görselleştirmeli MP4 video üret
 
-# ── Toplu İşleme ve Güvenlik Kontrolleri ───────────────────────────────
+# ── Toplu İşleme, Tanılama ve Canlı İş Kontrolü ─────────────────────────
 konvert -t webp -j 4 *.png                     # 4 CPU çekirdeği ile paralel toplu dönüşüm
+konvert -t mp4 --hwaccel auto video.mkv        # GPU donanım hızlandırma (VA-API / NVENC)
 konvert -r -t webp ./fotograflar               # Klasörleri özyinelemeli tara ve dönüştür
 konvert --dry-run -t webp *.jpg                 # Çıktı yollarını ve çakışma planını önizle
 konvert --backup -f -t png foto.jpg            # Otomatik .bak yedeği ile güvenli üzerine yazma
+konvert --doctor                               # Araç zincirini, GPU kodlayıcılarını ve ortamı doğrula
 konvert --check-update                          # GitHub güncellemelerini denetle
+konvert --pause                                # Arka planda süren işlemi duraklat
+konvert --resume                               # Duraklatılan işlemi devam ettir
 konvert --cancel                                # Arka planda süren işlemi güvenle iptal et
 konvert -s                                      # Qt6 Ayarlar Arayüzünü Aç
 ```
@@ -290,10 +294,10 @@ konvert -s                                      # Qt6 Ayarlar Arayüzünü Aç
 
 | Kategori | Girdi Formatları | Hedef Formatlar | Motor Yetenekleri |
 |---|---|---|---|
-| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Otomatik Yönlendirme, EXIF Temizleme, %50 ve 1080p Yeniden Boyutlandırma, Çoklu Görselden PDF, SVG Görsel Gömme |
-| <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV | MP4, MKV, WebM, GIF | Discord 8 MB, E-posta 25 MB, Özel Hedef Boyutlandırma, Kare Çıkarma, Ses Çıkarma, İki Geçişli Paletli GIF |
-| <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Müzik / Ses** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Yapılandırılabilir Bit Hızı (`128k` - `320k`), Dalga Formu Videoları (MP4) Üretimi |
-| <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belgeler** | UDF (UYAP), DOCX, PDF, TXT | PDF, PNG, JPG, TXT | Çoklu DPI Sayfa Çizimi (36-1200 DPI), Ghostscript Optimizasyonu, DOCX/UDF Tablo ve Metin Çıkarımı |
+| <img src="assets/icons/konvert-image.svg" width="16" height="16" align="absmiddle" /> **Fotoğraflar** | PNG, JPG, JPEG, WebP, AVIF, JXL, SVG, BMP, ICO, TIFF, QOI, HEIC, HEIF, GIF | WebP, PNG, JPG, SVG, ICO, HEIC, BMP, AVIF, JXL, TIFF, QOI | EXIF Otomatik Yönlendirme, EXIF Temizleme, %50 ve 1080p Yeniden Boyutlandırma, Çoklu Görselden PDF, Potrace SVG Vektörleme |
+| <img src="assets/icons/konvert-video.svg" width="16" height="16" align="absmiddle" /> **Videolar** | MP4, MKV, WebM, AVI, MOV, FLV, TS, WMV, M4V | MP4, MKV, WebM, AV1, GIF | Discord 8 MB, E-posta 25 MB, Özel Hedef Boyutlandırma, Kayıpsız Metadata Temizleme, Kare/Ses Ayıklama, İki Geçişli GIF |
+| <img src="assets/icons/konvert-audio.svg" width="16" height="16" align="absmiddle" /> **Müzik / Ses** | MP3, WAV, FLAC, OGG, Opus, AAC, M4A, WMA, AIFF | MP3, WAV, FLAC, OGG, Opus, AAC, M4A | Yapılandırılabilir Bit Hızı (`128k` - `320k`), Kayıpsız Metadata Temizleme, Dalga Formu Videoları (MP4) Üretimi |
+| <img src="assets/icons/konvert-document.svg" width="16" height="16" align="absmiddle" /> **Belgeler** | UDF (UYAP), DOCX, PDF | PDF, PNG, JPG, TXT, HTML | Çoklu DPI Sayfa Çizimi (36-1200 DPI), Ghostscript Optimizasyonu, DOCX/UDF Tablo, Metin ve HTML Çıkarımı |
 
 ---
 
@@ -340,6 +344,6 @@ Bu proje **GNU Genel Kamu Lisansı v3.0 veya üstü (GPL-3.0-or-later)** ile lis
 
 <div align="center">
   <b>Geliştirici:</b> <a href="https://github.com/enesehs">enesehs</a> &bull;
-  <b>İletişim:</b> <a href="mailto:enesehs@protonmail.com">enesehs@protonmail.com</a><br>
+  <b>Web Sitesi:</b> <a href="https://enesehs.dev">https://enesehs.dev</a><br>
   <sub>Linux ve Açık Kaynak Topluluğu için tutkuyla geliştirildi.</sub>
 </div>

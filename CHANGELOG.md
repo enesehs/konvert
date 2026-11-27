@@ -5,6 +5,19 @@ All notable changes to **Konvert** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-11-27
+
+### Added
+- **Live Job Control (`--pause`, `--resume`, `--cancel`):** Process-group pause/resume/cancel via `JobControl` (`SIGSTOP`/`SIGCONT`/`SIGTERM`->`SIGKILL`), KDE Plasma 6 `JobViewV2` `suspendRequested`/`resumeRequested`/`cancelRequested` signals, and Qt6 Active Process Monitor controls.
+- **Single-Instance GUI Activation:** Launching `konvert -s` while running raises and focuses the existing Qt6 Settings window via `QLocalServer`/`QLocalSocket`.
+- **Expanded E2E & Unit Test Coverage:** Isolated test directories and added unit + end-to-end verification across images, videos, audios, and documents.
+
+### Changed
+- **Video Quality & Hardware Acceleration:** Fixed `vp9_vaapi`/`av1_vaapi` CQP mapping, SVT-AV1 numeric preset mapping, NVENC VBR (`-rc vbr -b:v 0`), `libvpx-vp9` row-MT tuning, and aspect-preserving 2-pass target sizing.
+- **Image & Document Reliability:** Added AVIF decoding via ImageMagick/avifdec, alpha-over-white RGB flattening, lossless video metadata stripping (`-map_metadata -1 -c copy`), and LibreOffice isolated temporary `--outdir` handling.
+- **Desktop Integrations & Packaging:** Preserved `konvert-compress` action icons on Compress Image/Video/PDF while keeping `konvert-symbolic` on submenus, hardened Thunar `uca.xml`/Dolphin `.desktop` quoting, unified `install.sh`/`uninstall.sh`, and updated `.deb`/CI validation.
+- **Full i18n Parity:** Extended `src/i18n.rs`, `doctor.rs`, `gui/src/translator.h`, and `mainwindow.cpp` to eliminate hardcoded UI language ternaries and support all 9 selector languages.
+
 ## [0.4.0] - 2026-11-19
 
 ### Added
@@ -35,7 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Accurate Batch Progress & ETA:** Dynamic time estimation (`ETA: Xs` / `Xm Ys`) and smooth single-task progression.
 - **AppImage Packaging & Update Checking:** Added `packaging/build-appimage.sh` for portable bundles and `--check-update` for online GitHub release checks.
 - **Data Safety Guarantees:** Atomic `.part` file creation, collision prevention (`_2`, `_3`), and optional `.bak` backups before overwriting (`--backup`).
-- **Expanded Format Ecosystem:** Native support for JPEG XL (`.jxl`), AVIF, QOI, HEIC, ICO, BMP, TIFF, and contour tracing to SVG via `potrace`.
+- **Expanded Format Ecosystem:** Native support for JPEG XL (`.jxl`), AVIF, QOI, HEIC, ICO, BMP, TIFF, and SVG output via ImageMagick (Potrace vector tracing added in 0.4.0).
 - **Document Enhancements:** Direct UDF (UYAP) and DOCX to PDF/TXT with structural extraction for tables, headers, footers, and 50MB DoS memory guards.
 - **Multi-Desktop Context Menus:** Native integration scripts for KDE Dolphin, Cinnamon Nemo, XFCE Thunar, and GNOME Nautilus with Lucide SVG action icons.
 - **Multi-Language (i18n):** Full support for 9 languages in CLI (`--lang <code>`) and 5 in the Qt6 Settings GUI.

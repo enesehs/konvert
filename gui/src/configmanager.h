@@ -1,14 +1,20 @@
 #pragma once
 
+#include <QByteArray>
 #include <QString>
 #include <QStringList>
+#include <functional>
+
+class QObject;
 
 class ConfigManager {
 public:
     ConfigManager();
 
+    void resetDefaults();
     bool load();
     bool save();
+    void saveAsync(QObject *context, std::function<void(bool)> callback);
     void syncContextMenu();
 
     // General
@@ -36,4 +42,10 @@ public:
     int pdfDpi = 300;
 
     static QString getConfigPath();
+    static QString findKonvertBinary();
+
+private:
+    QByteArray buildConfigJson() const;
+    bool applyFromJsonBytes(const QByteArray &jsonBytes);
+    bool saveFallback();
 };

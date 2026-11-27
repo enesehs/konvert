@@ -13,15 +13,37 @@ fn nemo_extensions(category: &str) -> &'static str {
         "music" => "mp3;wav;flac;ogg;m4a;aac;opus;wma;aiff;",
         "pdf" => "pdf;",
         "udf" => "udf;",
-        "word" => "docx;doc;",
-        "documents" => "pdf;udf;docx;doc;",
+        "word" => "docx;",
+        "documents" => "pdf;udf;docx;",
         _ => "any;",
+    }
+}
+
+fn quote_exec(exec: &str) -> String {
+    if exec.contains(' ') {
+        format!("\"{}\"", exec.replace('"', "\\\""))
+    } else {
+        exec.to_string()
     }
 }
 
 pub fn get_nemo_actions_dir() -> Result<PathBuf> {
     let base_dirs = BaseDirs::new().context("Kullanıcı ev dizini bulunamadı")?;
     Ok(base_dirs.data_local_dir().join("nemo").join("actions"))
+}
+
+pub fn is_nemo_installed() -> bool {
+    let Ok(dir) = get_nemo_actions_dir() else {
+        return false;
+    };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return false;
+    };
+    entries.flatten().any(|e| {
+        let name = e.file_name();
+        let s = name.to_string_lossy();
+        s.starts_with("konvert_") && s.ends_with(".nemo_action")
+    })
 }
 
 fn action_file_name(id: &str) -> String {
@@ -33,6 +55,15 @@ pub fn install_nemo_actions(custom_exec: Option<&str>) -> Result<PathBuf> {
 }
 
 pub fn install_nemo_actions_with_options(
+    custom_exec: Option<&str>,
+    target_dir: Option<PathBuf>,
+) -> Result<PathBuf> {
+    let cfg = crate::config::Config::load();
+    install_nemo_actions_with_actions(&cfg.context_menu.enabled_actions, custom_exec, target_dir)
+}
+
+pub fn install_nemo_actions_with_actions(
+    enabled_action_ids: &[String],
     custom_exec: Option<&str>,
     target_dir: Option<PathBuf>,
 ) -> Result<PathBuf> {
@@ -48,6 +79,7 @@ pub fn install_nemo_actions_with_options(
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| "konvert".to_string()),
     };
+    let quoted_exec = quote_exec(&exec);
 
     // Önce eski kayıtları temizle: action listesi/kurulum yolu değişmiş olabilir.
     if let Ok(entries) = fs::read_dir(&dir) {
@@ -60,18 +92,29 @@ pub fn install_nemo_actions_with_options(
     }
 
     for action in ALL_ACTIONS {
+        if !enabled_action_ids.iter().any(|id| id == action.id) {
+            continue;
+        }
         let content = format!(
             "[Nemo Action]\n\
-             Name={name}\n\
-             Comment=Konvert: {name}\n\
+             Name={name_en}\n\
+             Name[tr]={name_tr}\n\
+             Name[de]={name_de}\n\
+             Name[fr]={name_fr}\n\
+             Name[es]={name_es}\n\
+             Comment=Konvert: {name_en}\n\
              Exec={exec} {args}\n\
-             Icon-Name={icon}\n\
-             Selection=m\n\
+             Icon-Name=konvert-symbolic\n\
+             Selection=notnone\n\
+             Quote=double\n\
              Extensions={extensions}\n",
-            name = action.name_en,
-            exec = exec,
+            name_en = action.name_en,
+            name_tr = action.name_tr,
+            name_de = action.name_de,
+            name_fr = action.name_fr,
+            name_es = action.name_es,
+            exec = quoted_exec,
             args = action.cmd_args,
-            icon = action.icon,
             extensions = nemo_extensions(action.category),
         );
 
@@ -128,5 +171,32 @@ mod tests {
     #[test]
     fn test_action_file_name() {
         assert_eq!(action_file_name("to_webp"), "konvert_to_webp.nemo_action");
+    }
+
+    #[test]
+    fn test_nemo_actions_selection_quote_and_filtering() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("konvert_test_nemo_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&temp_dir);
+        let enabled = vec!["to_webp".to_string(), "strip_metadata_video".to_string()];
+        install_nemo_actions_with_actions(
+            &enabled,
+            Some("/opt/my apps/konvert"),
+            Some(temp_dir.clone()),
+        )
+        .expect("install nemo actions");
+
+        let webp_file = temp_dir.join("konvert_to_webp.nemo_action");
+        assert!(webp_file.exists());
+        assert!(!temp_dir.join("konvert_to_bmp.nemo_action").exists());
+
+        let content = fs::read_to_string(&webp_file).unwrap();
+        assert!(content.contains("Selection=notnone"));
+        assert!(content.contains("Quote=double"));
+        assert!(content.contains("Icon-Name=konvert-symbolic"));
+        assert!(content.contains("Exec=\"/opt/my apps/konvert\" -t webp %F"));
+        assert!(content.contains("Name[tr]="));
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

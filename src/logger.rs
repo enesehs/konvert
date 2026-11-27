@@ -37,6 +37,11 @@ pub fn log(level: &str, message: &str) {
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
+        const MAX_LOG_BYTES: u64 = 2 * 1024 * 1024;
+        if std::fs::metadata(&path).is_ok_and(|m| m.len() >= MAX_LOG_BYTES) {
+            let backup = path.with_extension("log.old");
+            let _ = std::fs::rename(&path, &backup);
+        }
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
             let _ = writeln!(file, "{}", line);
         }
