@@ -138,13 +138,14 @@ chmod -f 755 "${SERVICEMENU_DIR}"/konvert_*.desktop 2>/dev/null || true
 
 # Verify Qt6 runtime shared libraries for konvert-settings
 if [ -f "${INSTALL_DIR}/konvert-settings" ] && command -v ldd >/dev/null 2>&1; then
-  if ldd "${INSTALL_DIR}/konvert-settings" 2>/dev/null | grep -q "not found"; then
+  LDD_OUT="$(ldd "${INSTALL_DIR}/konvert-settings" 2>&1 || true)"
+  if echo "${LDD_OUT}" | grep -q "=> not found"; then
     echo ""
     echo "[WARN] Missing Qt6 runtime libraries detected for konvert-settings:"
-    ldd "${INSTALL_DIR}/konvert-settings" 2>/dev/null | grep "not found" || true
+    echo "${LDD_OUT}" | grep "=> not found" || true
     INSTALL_CMD=""
     if command -v apt-get >/dev/null 2>&1; then
-      if command -v apt-cache >/dev/null 2>&1 && apt-cache show libqt6widgets6t64 >/dev/null 2>&1; then
+      if command -v apt-cache >/dev/null 2>&1 && apt-cache show libqt6widgets6t64 2>/dev/null | grep -q '^Filename:'; then
         INSTALL_CMD="apt-get update && apt-get install -y libqt6widgets6t64 libqt6gui6t64 libqt6core6t64 libqt6network6t64 libqt6svg6"
       else
         INSTALL_CMD="apt-get update && apt-get install -y libqt6widgets6 libqt6gui6 libqt6core6 libqt6network6 libqt6svg6"
@@ -171,6 +172,11 @@ if [ -f "${INSTALL_DIR}/konvert-settings" ] && command -v ldd >/dev/null 2>&1; t
         echo "[WARN] To fix konvert-settings, run: sudo ${INSTALL_CMD}" >&2
       fi
     fi
+  elif echo "${LDD_OUT}" | grep -q "version .* not found"; then
+    echo ""
+    echo "[WARN] konvert-settings requires a newer system library version than installed on this host:"
+    echo "${LDD_OUT}" | grep "version .* not found" || true
+    echo "[WARN] Use the AppImage release or build the GUI locally against your system Qt6."
   fi
 fi
 

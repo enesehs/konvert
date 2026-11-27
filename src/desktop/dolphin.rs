@@ -701,6 +701,7 @@ pub fn install_dolphin_service_with_options(
             continue;
         }
 
+        let quoted_exec = quote_desktop_exec(&exec);
         let actions_keys = active_actions
             .iter()
             .map(|a| a.action_key)
@@ -712,13 +713,23 @@ pub fn install_dolphin_service_with_options(
 Type=Service
 X-KDE-ServiceTypes=KonqPopupMenu/Plugin
 MimeType={mime_types}
-Actions={actions_keys};
+Actions=00_openSettings;{actions_keys};
 X-KDE-Submenu=Konvert
 Icon=konvert-symbolic
+
+[Desktop Action 00_openSettings]
+Name=Konvert Settings
+Name[tr]=Konvert Ayarları
+Name[de]=Konvert-Einstellungen
+Name[fr]=Paramètres Konvert
+Name[es]=Ajustes de Konvert
+Icon=konvert-symbolic
+Exec={quoted_exec} -s
 
 "#,
             mime_types = cat.mime_types,
             actions_keys = actions_keys,
+            quoted_exec = quoted_exec,
         );
 
         for act in &active_actions {
@@ -740,7 +751,7 @@ Exec={exec} {cmd_args}
                 name_fr = act.name_fr,
                 name_es = act.name_es,
                 icon = act.icon,
-                exec = quote_desktop_exec(&exec),
+                exec = quoted_exec,
                 cmd_args = act.cmd_args
             ));
         }
@@ -837,8 +848,14 @@ mod tests {
             assert!(content.contains("X-KDE-ServiceTypes=KonqPopupMenu/Plugin"));
             let first_action_block = content.split("[Desktop Action ").nth(1).unwrap();
             assert!(
-                first_action_block.contains("Icon=konvert-compress"),
-                "{fname} first compress action must use konvert-compress"
+                first_action_block.starts_with("00_openSettings]")
+                    && first_action_block.contains("Icon=konvert-symbolic"),
+                "{fname} first action must be 00_openSettings with konvert-symbolic"
+            );
+            let second_action_block = content.split("[Desktop Action ").nth(2).unwrap();
+            assert!(
+                second_action_block.contains("Icon=konvert-compress"),
+                "{fname} compress action must use konvert-compress"
             );
         }
 

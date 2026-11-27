@@ -1,6 +1,6 @@
 # Maintainer: enesehs <enesehs@protonmail.com>
 pkgname=konvert
-pkgver=0.5.0
+pkgver=0.5.1
 pkgrel=1
 pkgdesc="Fast, lightweight, native right-click file converter and optimizer for Linux (Dolphin, Nautilus, Nemo, Thunar)"
 arch=('x86_64' 'aarch64')

@@ -61,6 +61,11 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.5.1" date="2026-11-28">
+      <description>
+        <p>Patch release 0.5.1 fixing KDE Plasma 6 Dolphin submenu parent icon resolution, enabling PIE for Qt6 Network binaries, pinning x86_64 CI builds to Ubuntu 24.04 for broader Qt 6.8 compatibility (Debian 13 Trixie), and improving install.sh Qt6 dependency detection.</p>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-11-27">
       <description>
         <p>Release 0.5.0 delivering live pause/resume/cancel job control across CLI, KDE JobViewV2, and Qt6 GUI, hardware-accelerated video encoder fixes (NVENC VBR, VA-API VP9/AV1, SVT-AV1 preset mapping, 2-pass target sizing), full CLI/doctor/GUI i18n parity, single-instance GUI activation, hardened desktop integrations, and expanded test coverage.</p>

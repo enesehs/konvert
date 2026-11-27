@@ -5,6 +5,13 @@ All notable changes to **Konvert** will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-11-28
+
+### Fixed
+- **KDE Plasma 6 Dolphin Submenu Icon:** Prepend `00_openSettings` (`Icon=konvert-symbolic`) as the first action in Dolphin ServiceMenus so Plasma 6 renders `konvert-symbolic` on the parent `Konvert` menu item while keeping per-action icons inside the submenu.
+- **Qt6 Network PIE Linking:** Enable `CMAKE_POSITION_INDEPENDENT_CODE ON` in `gui/CMakeLists.txt` to prevent `GNU_PROPERTY_1_NEEDED_INDIRECT_EXTERN_ACCESS` / copy relocation errors on `QLocalServer` against Qt 6.10.
+- **Debian 13 Trixie & Qt6 Runtime Compatibility:** Pin `x86_64` CI release builds to `ubuntu-24.04` (Qt 6.4/6.8 ABI compatibility) and update `install.sh` to detect `t64` package availability and version mismatches cleanly.
+
 ## [0.5.0] - 2026-11-27
 
 ### Added

@@ -12,7 +12,7 @@
 
   [![Web Sitesi](https://img.shields.io/badge/Web%20Sitesi-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.5.0-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/badge/Release-v0.5.1-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
   [![Lisans](https://img.shields.io/badge/Lisans-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>

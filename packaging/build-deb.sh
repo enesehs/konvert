@@ -11,7 +11,7 @@ BUILD_DIR="${ROOT_DIR}/build-deb-tmp"
 if [ -f "${ROOT_DIR}/VERSION" ]; then
     VERSION="$(tr -d 'v' < "${ROOT_DIR}/VERSION" | tr -d ' \n\r')"
 else
-    VERSION="0.5.0"
+    VERSION="0.5.1"
 fi
 PKG_NAME="konvert"
 ARCH="${DEB_ARCH:-$(dpkg --print-architecture 2>/dev/null || echo amd64)}"

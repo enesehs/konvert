@@ -71,7 +71,7 @@ function ThemeToggle() {
 }
 
 function useKonvertVersion() {
-  const [version, setVersion] = React.useState("v0.5.0");
+  const [version, setVersion] = React.useState("v0.5.1");
 
   React.useEffect(() => {
     let active = true;
