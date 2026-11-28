@@ -39,10 +39,6 @@
     <a href="#güvenlik">Güvenlik</a>
   </p>
 
-  <br>
-
-  <video src="https://github.com/user-attachments/assets/e7fbf3ad-e3cf-4256-a340-00aad7f257c6" width="90%" controls autoplay loop muted></video>
-
 </div>
 
 ---
@@ -355,13 +351,29 @@ Konvert, sıfır telemetri ve %100 çevrimdışı çalışma prensibiyle tasarla
 
 ---
 
-## Yol Haritası (Planlanan Özellikler)
+## Bilinen Sorunlar
 
-- **Görsel Döndürme ve Dönüşüm Eylemleri:** CLI ve sağ tık menülerinden doğrudan 90°/180°/270° döndürme, yatay/dikey çevirme ve oran koruyan dönüşümler.
-- **Hiyerarşik Sağ Tık Alt Menüleri:** Eylem sayısı arttıkça Dolphin, Nemo ve Thunar menülerinin düzenli kalması için katmanlı alt menü yapısı (`Dönüştür`, `Sıkıştır`, `Döndür / Düzenle`, `Ayıkla`).
-- **İlk Açılış Entegrasyon Sihirbazı:** Qt6 arayüzünde eksik dosya yöneticisi entegrasyonlarını otomatik algılayıp tek tıkla `--install-all` kurulumu sunma.
-- **PDF Sayfa Bölme ve Sıralama:** Belirli sayfa aralıklarını çıkarma, çok sayfalı PDF'leri bölme ve toplu sayfa düzenleme.
-- **İzlenen Klasörler (Watch Folders):** Seçilen bir hazır profille gelen dosyaları arka planda otomatik dönüştüren isteğe bağlı klasör izleme modu.
+- **Debian Qt6 Uyumsuzluğu (`Qt_6.10` ve `Qt 6.8`):** Debian depolarındaki en güncel Qt sürümü `6.8` olduğu için (Debian 13 Trixie dahil), `Qt 6.10` ile derlenmiş ikili dosyalar `konvert-settings` açılışında `Qt_6.10 not found` hatası verebilmektedir. *(Geçici çözüm: `./scripts/install.sh` ile yerelden derleyin veya Ubuntu 24.04 üzerinde derlenmiş paketi kullanın.)*
+- **GNOME Files (Nautilus) Sağ Tık Menü Hiyerarşisi:** GNOME Files üzerinde sağ tık betiklerinin alt menü hiyerarşisi ve gruplaması henüz istenilen yapıda değildir; yeniden düzenlenecektir.
+
+---
+
+## Yol Haritası
+
+### v0.5.2 (Sertleştirme ve Hata Düzeltmeleri)
+- [ ] `src/dispatcher.rs` içindeki tahmini/sahte ilerleme eğrisini (`15 + 6t`) belirsiz/tahmini gösterime çekmek ve tekli/birleştirme `recv_timeout` döngüsünü tek yardımcıya indirmek.
+- [ ] Kalan sabit metinleri (`dispatcher.rs`, `doctor.rs`, `main.rs`, `converter/mod.rs`) `i18n` kapsamına almak ve Rust (`src/i18n.rs`) + Qt6 (`gui/src/translator.h`) çeviri tablolarını tek kaynakta birleştirmek.
+- [ ] `FORCE_OVERWRITE` ve `CREATE_BACKUP` global static'lerini `ConvertOptions` yapısına taşıyarak `GLOBAL_FLAG_TEST_LOCK` bağımlılığını kaldırmak.
+- [ ] GNOME Files (Nautilus) sağ tık menü hiyerarşisini ve betik gruplamasını düzeltmek.
+- [ ] `scripts/` (`install.sh`, `uninstall.sh`) ve `docs/public/` kopyalarını tek kaynakta birleştirip CI senkronizasyon kontrolü eklemek.
+- [ ] Video ve ses için gerçek E2E dönüştürme testleri ile `magic-byte` ve XML ayrıştırıcıları için edge-case/fuzz testleri eklemek.
+- [ ] Büyüyen dosyaları (`gui/src/mainwindow.cpp`, `converter/mod.rs`, `video.rs`, `dispatcher.rs`) modülerleştirip kod yorumlarını İngilizce standardında toplanacak.
+
+### v0.6.0 (Özellikler)
+- [ ] CLI ve sağ tık menülerinde görsel döndürme ve çevirme eylemleri (`rotate` 90°/180°/270°, `flip`).
+- [ ] Dolphin, Nemo, Thunar ve Nautilus için hiyerarşik sağ tık alt menüleri (`Dönüştür`, `Sıkıştır`, `Döndür / Düzenle`, `Ayıkla`).
+- [ ] İlk GUI açılışında eksik masaüstü entegrasyonlarını algılayıp tek tıkla `--install-all` kurulumu sunmak.
+- [ ] PDF sayfa bölme/sıralama araçları ve isteğe bağlı izlenen klasör (watch folder) otomatik dönüştürme modu.
 
 ---
 

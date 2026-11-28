@@ -39,10 +39,6 @@
     <a href="#security">Security</a>
   </p>
 
-  <br>
-
-  <video src="https://github.com/user-attachments/assets/e7fbf3ad-e3cf-4256-a340-00aad7f257c6" width="90%" controls autoplay loop muted></video>
-
 </div>
 
 ---
@@ -355,13 +351,29 @@ Konvert is engineered around a zero-telemetry, 100% offline security posture. Be
 
 ---
 
-## Roadmap (Planned Features)
+## Known Issues
 
-- **Image Rotation & Transform Actions:** 90°/180°/270° rotation, horizontal/vertical flip, and aspect-preserving transforms directly from CLI and context menus.
-- **Hierarchical Context Submenus:** Organized nested submenus (`Convert`, `Compress`, `Transform`, `Extract`) for Dolphin, Nemo, and Thunar so right-click menus stay clean as action count grows.
-- **First-Launch Integration Wizard:** Automatic detection of missing desktop file manager integrations in the Qt6 GUI with one-click `--install-all` setup.
-- **PDF Split, Reorder & Watermark Tools:** Extract specific page ranges, split multi-page PDFs, and batch-apply lightweight overlays.
-- **Watch Folders:** Optional background directory monitoring to auto-convert incoming files using a chosen preset profile.
+- **Debian Qt6 ABI Mismatch (`Qt_6.10` vs `Qt 6.8`):** On Debian (including Debian 13 Trixie, where the latest packaged Qt is `6.8`), binaries compiled against `Qt 6.10` fail to open `konvert-settings` with a missing `Qt_6.10` version symbol error. *(Workaround: build locally via `./scripts/install.sh` or use a release built on Ubuntu 24.04.)*
+- **GNOME Files (Nautilus) Context Menu Hierarchy:** Right-click script grouping and submenu hierarchy in GNOME Files (Nautilus) is not yet structured as intended and is queued for redesign.
+
+---
+
+## Roadmap
+
+### v0.5.2 (Hardening & Bug Fixes)
+- [ ] Fix simulated progress (`15 + 6t`) in `src/dispatcher.rs` to use indeterminate/estimated reporting and deduplicate the single/merge `recv_timeout` loop.
+- [ ] Complete i18n coverage for remaining hardcoded strings (`dispatcher.rs`, `doctor.rs`, `main.rs`, `converter/mod.rs`) and unify Rust (`src/i18n.rs`) + Qt6 (`gui/src/translator.h`) translation tables to a single source.
+- [ ] Move `FORCE_OVERWRITE` and `CREATE_BACKUP` global atomics into `ConvertOptions` to eliminate global state and `GLOBAL_FLAG_TEST_LOCK`.
+- [ ] Fix GNOME Files (Nautilus) right-click context menu hierarchy and script grouping.
+- [ ] Unify `scripts/` (`install.sh`, `uninstall.sh`) and `docs/public/` copies under a single source of truth with CI sync validation.
+- [ ] Add real E2E video/audio transcode tests and fuzz/edge-case tests for magic-byte and XML parsers.
+- [ ] Modularize large source files (`gui/src/mainwindow.cpp`, `converter/mod.rs`, `video.rs`, `dispatcher.rs`) and standardize code comments in English.
+
+### v0.6.0 (Features)
+- [ ] Image rotation and transform actions (`rotate` 90°/180°/270°, `flip`) in CLI and context menus.
+- [ ] Hierarchical right-click submenus (`Convert`, `Compress`, `Transform`, `Extract`) for Dolphin, Nemo, Thunar, and Nautilus.
+- [ ] First-launch missing desktop integration detection in Qt6 GUI with one-click `--install-all` setup.
+- [ ] PDF page split/reorder tools and optional watch-folder background auto-conversion mode.
 
 ---
 
