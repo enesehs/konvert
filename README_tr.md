@@ -1,29 +1,30 @@
 <div align="center">
 
   <a href="https://enesehs.dev/konvert">
-    <img src="assets/hero.png" alt="Konvert Banner" width="100%" />
+    <img src="assets/hero_compressed.webp" alt="Konvert Banner" width="100%" />
+  </a>
+
+  <h1>Konvert</h1>
+
+  <p>
+    <b>Linux için hızlı, çevrimdışı, sağ tık dosya dönüştürücü ve optimize edici.</b><br>
+    Dolphin, Nemo, Thunar, Nautilus ve terminal üzerinden çalışır.
+  </p>
+
+  <a href="https://enesehs.dev/konvert">
+    <img src="https://img.shields.io/badge/Etkileşimli_Demo_ve_SSS-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=1a1a2e" alt="Etkileşimli Demo ve SSS" />
   </a>
 
   <br><br>
 
-  [English](README.md) • **Türkçe**
-
-  <br>
-
-  [![Web Sitesi](https://img.shields.io/badge/Web%20Sitesi-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.5.1-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/github/v/release/enesehs/konvert?style=for-the-badge&logo=github&color=3daee9)](https://github.com/enesehs/konvert/releases)
+  [![AUR](https://img.shields.io/aur/version/konvert-bin?style=for-the-badge&logo=archlinux&color=1793d1)](https://aur.archlinux.org/packages/konvert-bin)
   [![Lisans](https://img.shields.io/badge/Lisans-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>
 
-  <p align="center">
-    <b>Linux ve tüm büyük masaüstü dosya yöneticileri için hızlı, hafif, %100 çevrimdışı yerel sağ tık dosya dönüştürücüsü ve optimize edicisi.</b>
-  </p>
-
-  <p align="center">
-    <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> <b>Etkileşimli Canlı Demo ve SSS:</b> <a href="https://enesehs.dev/konvert"><b>enesehs.dev/konvert</b></a>
-  </p>
+  [English](README.md) • **Türkçe**
 
   <p align="center">
     <a href="#hızlı-başlangıç">Hızlı Başlangıç</a> •
@@ -33,14 +34,14 @@
     <a href="#özellikler">Özellikler</a> •
     <a href="#kurulum">Kurulum</a> •
     <a href="#cli-kullanımı">CLI Kullanımı</a> •
-    <a href="#mimari">Mimari</a>
+    <a href="#desteklenen-formatlar">Formatlar</a> •
+    <a href="#mimari">Mimari</a> •
+    <a href="#güvenlik">Güvenlik</a>
   </p>
 
   <br>
 
-<div align="center">
   <video src="https://github.com/user-attachments/assets/e7fbf3ad-e3cf-4256-a340-00aad7f257c6" width="90%" controls autoplay loop muted></video>
-</div>
 
 </div>
 
@@ -51,14 +52,17 @@
 Saniyeler içinde kullanmaya başlayın:
 
 ```bash
-# 1. Evrensel kurulum betiği ile kurun (veya kaynaktan derleyin)
+# 1. Evrensel kurulum betiği ile kurun
 curl -sSL https://enesehs.dev/konvert/install.sh | bash
+
+# Veya AUR üzerinden kurun (Arch Linux)
+yay -S konvert-bin
 
 # 2. Herhangi bir dosyayı anında dönüştürün veya optimize edin (CLI veya sağ tık ile)
 konvert -t webp gorsel.png
 
 # 3. Yerel Qt6 ve Breeze ayarlar panelini açın
-konvert -s
+konvert
 ```
 
 ---
@@ -86,37 +90,34 @@ AMD Ryzen 7 7800X3D (8 çekirdek / 16 iş parçacığı) üzerinde [`scripts/ben
 
 | İşlem | Kip / Ayar | Çıktı Boyutu | Disk Tasarrufu | Yalın Araç (Tek Dosya) | Konvert (Tek Dosya) | Konvert (Rayon `-j 8` ×50) |
 |---|---|---|---|---|---|---|
-| **JPEG XL (`.jxl`)** | `--lossless` | 12.4 MB | **-%2.4** | 1.02 sn (`cjxl`) | 1.02 sn | **43.89 sn** (Seri `cjxl`'e göre ~1.2×) |
-| **WebP (`.webp`)** | `-q 85` | 849.2 KB | **-%93.5** | 604 ms (`magick`) | 600 ms | **4.62 sn** (Seri `magick`'e göre ~6.5×) |
-| **JPEG (`.jpg`)** | `-q 90` | 2.2 MB | **-%82.3** | 194 ms (`magick`) | **187 ms** (`image-rs`) | **1.52 sn** (Seriye göre ~6.2×) |
+| **JPEG XL (`.jxl`)** | `--lossless` | 12.4 MB | **%2.4** | 1.02 sn (`cjxl`) | 1.02 sn | **43.89 sn** (Seri `cjxl`'e göre ~1.2×) |
+| **WebP (`.webp`)** | `-q 85` | 849.2 KB | **%93.5** | 604 ms (`magick`) | 600 ms | **4.62 sn** (Seri `magick`'e göre ~6.5×) |
+| **JPEG (`.jpg`)** | `-q 90` | 2.2 MB | **%82.3** | 194 ms (`magick`) | **187 ms** (`image-rs`) | **1.52 sn** (Seriye göre ~6.2×) |
 | **Unix Boru Hattı (`-`)** | Stdin -> Stdout (1080p) | Akış | — | — | **152 ms** gecikme | — |
 
-*Performans Modeli ve Ayrımı: Konvert JPEG çıktısı için harici süreç açmadan doğrudan bellekte yerel Rust `image-rs` (`JpegEncoder`) kullanır; WebP/JXL/video/belgelerde ise kabuk yorumlayıcı masrafı olmadan yerel araçları (`magick`, `cjxl`, `ffmpeg`) çağırır. Toplu işlemlerde Rayon iş parçacığı havuzu (`-j 8`) tek iş parçacıklı kodlayıcılarda (`magick`, `image-rs`) ~6.2–6.5× hızlanma sağlar. (`cjxl` dahili çoklu iş parçacığı kullandığı için çoklu örnek hızlanması çekirdek payına bağlıdır.)*
+- **Sıfır Ara Katman Yükü:** JPEG çıktıları harici süreç açmadan bellekte Rust `image-rs` (`JpegEncoder`) ile işlenir. WebP, JXL, video ve belgelerde kabuk masrafı olmadan yerel araçlar (`magick`, `cjxl`, `ffmpeg`) çağrılır. 50 dosyada Rayon (`-j 8`), tek iş parçacıklı kodlayıcılarda ~6.2–6.5× hızlanma sağlar (`cjxl` dahili çoklu iş parçacığı kullanır).
+- **Düşük Bellek İzi:** Rust çekirdek süreci için ~24–28 MB taban RSS (Electron/JVM yok). 4K video veya büyük PDF işlemlerindeki tepe bellek kullanımını FFmpeg ve Ghostscript alt süreçleri belirler.
 
-*Sıfır Electron/JVM çalışma zamanı yükü. Taban bellek kullanımı (RSS): ~24–28 MB (Rust çekirdek süreci). Not: 4K video dönüştürme veya büyük PDF işlemlerinde tepe bellek kullanımı FFmpeg ve Ghostscript alt süreçleri tarafından belirlenir.*
+### Kalite ve Sadakat (1080p Referans Medya)
 
-### Kalite ve Sadakat Ölçümleri (PSNR, SSIM ve SNR)
+#### Görsel Kalite
 
-1080p referans medyalarıyla ölçülmüştür:
-
-#### Görsel Kalite Analizi (1080p Referans Kare)
-
-| Format / Profil | Çıktı Boyutu | Disk Tasarrufu | Süre | PSNR (dB) | SSIM (Yapısal Benzerlik) |
+| Format / Profil | Çıktı Boyutu | Disk Tasarrufu | Süre | PSNR (dB) | SSIM |
 |---|---|---|---|---|---|
-| **WebP (`-q 85`)** | 70.6 KB | **-%97.3** | 128.8 ms | 37.67 dB | **0.9985** |
-| **JPEG XL (`.jxl`)** | 72.7 KB | **-%97.3** | 140.8 ms | 40.14 dB | **0.9984** |
-| **AVIF (`-q 80`)** | 35.4 KB | **-%98.7** | 1106.6 ms | 42.31 dB | **0.9983** |
-| **JPEG (`-q 90`)** | 212.2 KB | **-%92.0** | 54.9 ms | 42.67 dB | **0.9989** |
-| **WebP (`--lossless`)** | 820.5 KB | **-%69.1** | 49.7 ms | 61.59 dB | **1.0000** |
+| **WebP (`-q 85`)** | 70.6 KB | **%97.3** | 128.8 ms | 37.67 dB | **0.9985** |
+| **JPEG XL (`.jxl`)** | 72.7 KB | **%97.3** | 140.8 ms | 40.14 dB | **0.9984** |
+| **AVIF (`-q 80`)** | 35.4 KB | **%98.7** | 1106.6 ms | 42.31 dB | **0.9983** |
+| **JPEG (`-q 90`)** | 212.2 KB | **%92.0** | 54.9 ms | 42.67 dB | **0.9989** |
+| **WebP (`--lossless`)** | 820.5 KB | **%69.1** | 49.7 ms | 61.59 dB | **1.0000** |
 
 #### Video, Ses ve Belge Sadakati
 
 | Hedef / Profil | Referans | Çıktı Boyutu | Disk Tasarrufu | Kalite Metriği |
 |---|---|---|---|---|
-| **Discord 8MB Profili** | 1080p MP4 (20.6 MB) | 6.98 MB | **-%66.1** | **40.05 dB PSNR** / **0.9906 SSIM** |
-| **MP3 (320 kbps)** | 48 kHz WAV (375 KB) | 158.5 KB | **-%57.7** | **74.18 dB SNR** |
-| **MP3 (192 kbps)** | 48 kHz WAV (375 KB) | 95.1 KB | **-%74.6** | **30.46 dB SNR** |
-| **FLAC Ses** | 48 kHz WAV (375 KB) | 97.2 KB | **-%74.1** | **Kayıpsız (Tam Eşleşme)** |
+| **Discord 8MB Profili** | 1080p MP4 (20.6 MB) | 6.98 MB | **%66.1** | **40.05 dB PSNR** / **0.9906 SSIM** |
+| **MP3 (320 kbps)** | 48 kHz WAV (375 KB) | 158.5 KB | **%57.7** | **74.18 dB SNR** |
+| **MP3 (192 kbps)** | 48 kHz WAV (375 KB) | 95.1 KB | **%74.6** | **30.46 dB SNR** |
+| **FLAC Ses** | 48 kHz WAV (375 KB) | 97.2 KB | **%74.1** | **Kayıpsız (Tam Eşleşme)** |
 | **DOCX -> TXT** | `source_doc.docx` | 682 B | — | **%100 Kelime / Karakter Doğruluğu** |
 | **UDF (UYAP) -> TXT** | `source_court.udf` | 519 B | — | **%100 Kelime / Karakter Doğruluğu** |
 
@@ -128,8 +129,8 @@ AMD Ryzen 7 7800X3D (8 çekirdek / 16 iş parçacığı) üzerinde [`scripts/ben
 
 <div align="center">
   <sub><b>Masaüstü Sağ Tık Bağlam Menüsü Entegrasyonu</b></sub><br>
-  <a href="assets/screenshots/screenshot_context_menu.png">
-    <img src="assets/screenshots/screenshot_context_menu.png" alt="Masaüstü Sağ Tık Bağlam Menüsü Entegrasyonu" width="90%" />
+  <a href="assets/screenshots/screenshot_context_menu_compressed.webp">
+    <img src="assets/screenshots/screenshot_context_menu_compressed.webp" alt="Masaüstü Sağ Tık Bağlam Menüsü Entegrasyonu" width="90%" />
   </a>
 </div>
 
@@ -138,21 +139,38 @@ AMD Ryzen 7 7800X3D (8 çekirdek / 16 iş parçacığı) üzerinde [`scripts/ben
 <table align="center" width="100%">
   <tr>
     <td width="33.3%" align="center" valign="top">
-      <sub><b>Qt6 & Breeze Ayarlar Arayüzü</b></sub><br>
-      <a href="assets/screenshots/screenshot_convert.png">
-        <img src="assets/screenshots/screenshot_convert.png" alt="Ayarlar Arayüzü" width="100%" />
+      <sub><b>Görsel Dönüştürme ve Profiller</b></sub><br>
+      <a href="assets/screenshots/screenshot_conver_image_compressed.webp">
+        <img src="assets/screenshots/screenshot_conver_image_compressed.webp" alt="Görsel Dönüştürme Arayüzü" width="100%" />
       </a>
     </td>
     <td width="33.3%" align="center" valign="top">
+      <sub><b>Video Dönüştürme ve Hazır Ayarlar</b></sub><br>
+      <a href="assets/screenshots/screenshot_convert_video_compressed.webp">
+        <img src="assets/screenshots/screenshot_convert_video_compressed.webp" alt="Video Dönüştürme Arayüzü" width="100%" />
+      </a>
+    </td>
+    <td width="33.3%" align="center" valign="top">
+      <sub><b>Qt6 & Breeze Ayarlar</b></sub><br>
+      <a href="assets/screenshots/screenshot_settings_compressed.webp">
+        <img src="assets/screenshots/screenshot_settings_compressed.webp" alt="Ayarlar Arayüzü" width="100%" />
+      </a>
+    </td>
+  </tr>
+</table>
+
+<table align="center" width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
       <sub><b>Dönüşüm Geçmişi ve Tasarruf Paneli</b></sub><br>
-      <a href="assets/screenshots/screenshot_history.png">
-        <img src="assets/screenshots/screenshot_history.png" alt="Geçmiş Paneli" width="100%" />
+      <a href="assets/screenshots/screenshot_history_compressed.webp">
+        <img src="assets/screenshots/screenshot_history_compressed.webp" alt="Geçmiş Paneli" width="100%" />
       </a>
     </td>
-    <td width="33.3%" align="center" valign="top">
+    <td width="50%" align="center" valign="top">
       <sub><b>KDE Geliştirici Hakkında İletişim Kutusu</b></sub><br>
-      <a href="assets/screenshots/screenshot_about.png">
-        <img src="assets/screenshots/screenshot_about.png" alt="Hakkında Penceresi" width="100%" />
+      <a href="assets/screenshots/screenshot_about_compressed.webp">
+        <img src="assets/screenshots/screenshot_about_compressed.webp" alt="Hakkında Penceresi" width="100%" />
       </a>
     </td>
   </tr>
@@ -199,25 +217,39 @@ curl -sSL https://enesehs.dev/konvert/install.sh | bash
 [GitHub Releases](https://github.com/enesehs/konvert/releases) sayfasından `.deb` paketini indirin veya yerel olarak derleyin:
 
 ```bash
-# Paketi kurun:
-sudo dpkg -i packaging/konvert_*.deb
+# İndirilen paketi kurun:
+sudo dpkg -i konvert_*.deb
 sudo apt-get install -f
 
 # Veya depodan derleyin:
 ./packaging/build-deb.sh
 ```
 
-### Yöntem 3: Arch Linux / AUR (PKGBUILD)
+### Yöntem 3: Arch Linux / AUR
 
 ```bash
+# Hazır derlenmiş ikili paket (en hızlı)
+yay -S konvert-bin
+
+# Veya kaynaktan derleyin
+yay -S konvert
+
+# (paru da aynı şekilde çalışır: paru -S konvert-bin)
+
+# Veya PKGBUILD ile yerelden derleyin:
 cd packaging
 makepkg -si
 ```
 
 ### Yöntem 4: Bağımsız AppImage
 
+[Releases sayfasından](https://github.com/enesehs/konvert/releases/latest) en güncel `.AppImage` dosyasını indirin, çalıştırma izni verin ve başlatın:
+
 ```bash
-# AppImage paketini derleyin:
+chmod +x Konvert-*.AppImage
+./Konvert-*.AppImage
+
+# Veya AppImage paketini kendiniz derleyin:
 ./packaging/build-appimage.sh
 ```
 
@@ -285,7 +317,7 @@ konvert --check-update                          # GitHub güncellemelerini denet
 konvert --pause                                # Arka planda süren işlemi duraklat
 konvert --resume                               # Duraklatılan işlemi devam ettir
 konvert --cancel                                # Arka planda süren işlemi güvenle iptal et
-konvert -s                                      # Qt6 Ayarlar Arayüzünü Aç
+konvert                                        # Qt6 Ayarlar Arayüzünü Aç
 ```
 
 ---
@@ -306,13 +338,13 @@ konvert -s                                      # Qt6 Ayarlar Arayüzünü Aç
 ```mermaid
 flowchart TD
     FM["Masaüstü Dosya Yöneticileri ve Kabuk Boru Hatları<br><b>(KDE Dolphin • Cinnamon Nemo • XFCE Thunar • GNOME Nautilus)</b>"] --> CORE["<b>Rust 2024 Çekirdek Motoru (konvert)</b><br>• Rayon Paralel Toplu İş Parçacığı Havuzu (--jobs)<br>• FFmpeg, ImageMagick ve Ghostscript İşlem Boruları<br>• D-Bus Dinamik Bildirim ve İlerleme Entegrasyonu<br>• Atomik G/Ç ve Güvenli Yedekleme (.part / .bak)"]
-    FM -.->|"konvert -s"| GUI["<b>Qt6 & Breeze Ayarlar Arayüzü</b><br>• Kalite, Profil ve Format Yapılandırması<br>• Toplam Disk Tasarrufu ve Görsel Geçmiş<br>• Özel Profil Düzenleyici"]
+    FM -.->|"konvert"| GUI["<b>Qt6 & Breeze Ayarlar Arayüzü</b><br>• Kalite, Profil ve Format Yapılandırması<br>• Toplam Disk Tasarrufu ve Görsel Geçmiş<br>• Özel Profil Düzenleyici"]
     CORE <--> GUI
 ```
 
 ---
 
-## Güvenlik ve Tehdit Modeli
+## Güvenlik
 
 Konvert, sıfır telemetri ve %100 çevrimdışı çalışma prensibiyle tasarlanmıştır. Bununla birlikte, belirli dosya türlerinde sistemdeki harici araçlar delegatör olarak kullanıldığından, kullanıcıların ve sistem yöneticilerinin aşağıdaki güvenlik hususlarını dikkate alması önerilir:
 
@@ -323,16 +355,37 @@ Konvert, sıfır telemetri ve %100 çevrimdışı çalışma prensibiyle tasarla
 
 ---
 
+## Yol Haritası (Planlanan Özellikler)
+
+- **Görsel Döndürme ve Dönüşüm Eylemleri:** CLI ve sağ tık menülerinden doğrudan 90°/180°/270° döndürme, yatay/dikey çevirme ve oran koruyan dönüşümler.
+- **Hiyerarşik Sağ Tık Alt Menüleri:** Eylem sayısı arttıkça Dolphin, Nemo ve Thunar menülerinin düzenli kalması için katmanlı alt menü yapısı (`Dönüştür`, `Sıkıştır`, `Döndür / Düzenle`, `Ayıkla`).
+- **İlk Açılış Entegrasyon Sihirbazı:** Qt6 arayüzünde eksik dosya yöneticisi entegrasyonlarını otomatik algılayıp tek tıkla `--install-all` kurulumu sunma.
+- **PDF Sayfa Bölme ve Sıralama:** Belirli sayfa aralıklarını çıkarma, çok sayfalı PDF'leri bölme ve toplu sayfa düzenleme.
+- **İzlenen Klasörler (Watch Folders):** Seçilen bir hazır profille gelen dosyaları arka planda otomatik dönüştüren isteğe bağlı klasör izleme modu.
+
+---
+
 ## Katkıda Bulunma
 
-Katkılarınız memnuniyetle karşılanır! Katkıda bulunmak için:
+Katkılarınız memnuniyetle karşılanır! Değişiklik göndermeden önce [`CONTRIBUTING.md`](CONTRIBUTING.md) ve [`todo.md`](todo.md) dosyalarına göz atın.
+
+### Katkı Kuralları
+
+- **Hata Yönetimi ve Güvenlik:** Üretim Rust kodunda `.unwrap()` / `.expect()` kullanmayın; dış komutları asla `sh -c` ile çağırmayın (doğrudan `Command` argüman dizisi kullanın); tüm dosya yazımlarını atomik tutun (`.part` / `.bak`).
+- **Çevrimdışı İlkesi:** Sıfır telemetri; tüm dönüştürmeler %100 çevrimdışı kalmalıdır.
+- **Kalite Kontrolleri:** Tüm Pull Request'ler aşağıdaki kontrolleri uyarısız geçmelidir:
+  - `cargo fmt -- --check`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo test`
+  - Qt6 arayüz değişiklikleri `cmake -B gui/build -S gui -DCMAKE_BUILD_TYPE=Release && cmake --build gui/build` ile hatasız derlenmelidir.
+
+### İş Akışı
 
 1. Depoyu forklayın.
-2. Özellik dalınızı oluşturun (`git checkout -b feature/harika-ozellik`).
-3. Değişikliklerinizi işleyin (`git commit -m 'feat: harika ozellik ekle'`).
-4. Test ve lint kontrollerini çalıştırın (`cargo test && cargo clippy --all-targets -- -D warnings`).
-5. Dalınıza gönderin (`git push origin feature/harika-ozellik`).
-6. Bir **Pull Request** açın.
+2. Özellik dalınızı oluşturun (`git checkout -b feat/harika-ozellik`).
+3. Değişikliklerinizi Conventional Commits biçiminde işleyin (`git commit -m 'feat: harika ozellik ekle'`).
+4. Yukarıdaki kontrolleri çalıştırıp her şeyin geçtiğinden emin olun.
+5. Dalınıza gönderin (`git push origin feat/harika-ozellik`) ve bir **Pull Request** açın.
 
 ---
 

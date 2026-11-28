@@ -28,7 +28,6 @@ docs/out
 docs/*.tsbuildinfo
 todo.md
 /tests/
-scripts/*.py
 *.log
 *.tmp
 *.bak

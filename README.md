@@ -1,29 +1,30 @@
 <div align="center">
 
   <a href="https://enesehs.dev/konvert">
-    <img src="assets/hero.png" alt="Konvert Banner" width="100%" />
+    <img src="assets/hero_compressed.webp" alt="Konvert Banner" width="100%" />
+  </a>
+
+  <h1>Konvert</h1>
+
+  <p>
+    <b>A fast, offline, right-click file converter and optimizer for Linux.</b><br>
+    Works in Dolphin, Nemo, Thunar and Nautilus, and from the terminal.
+  </p>
+
+  <a href="https://enesehs.dev/konvert">
+    <img src="https://img.shields.io/badge/Try_the_Interactive_Demo_%26_FAQ-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=googlechrome&logoColor=white&labelColor=1a1a2e" alt="Interactive demo and FAQ" />
   </a>
 
   <br><br>
 
-  **English** • [Türkçe](README_tr.md)
-
-  <br>
-
-  [![Website](https://img.shields.io/badge/Website-enesehs.dev%2Fkonvert-007ebf?style=for-the-badge&logo=google-chrome&logoColor=white)](https://enesehs.dev/konvert)
   [![CI](https://img.shields.io/github/actions/workflow/status/enesehs/konvert/build.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/enesehs/konvert/actions/workflows/build.yml)
-  [![GitHub Release](https://img.shields.io/badge/Release-v0.5.1-3daee9?style=for-the-badge&logo=github)](https://github.com/enesehs/konvert/releases)
+  [![GitHub Release](https://img.shields.io/github/v/release/enesehs/konvert?style=for-the-badge&logo=github&color=3daee9)](https://github.com/enesehs/konvert/releases)
+  [![AUR](https://img.shields.io/aur/version/konvert-bin?style=for-the-badge&logo=archlinux&color=1793d1)](https://aur.archlinux.org/packages/konvert-bin)
   [![License](https://img.shields.io/badge/License-GPL--3.0--or--later-2ecc71?style=for-the-badge)](https://www.gnu.org/licenses/gpl-3.0.html)
 
   <br>
 
-  <p align="center">
-    <b>Fast, lightweight, 100% offline native right-click file converter & optimizer for Linux and all major desktop file managers.</b>
-  </p>
-
-  <p align="center">
-    <img src="assets/icons/konvert-globe.svg" width="16" height="16" align="absmiddle" /> <b>Interactive Web Demo & FAQ:</b> <a href="https://enesehs.dev/konvert"><b>enesehs.dev/konvert</b></a>
-  </p>
+  **English** • [Türkçe](README_tr.md)
 
   <p align="center">
     <a href="#quick-start">Quick Start</a> •
@@ -33,14 +34,14 @@
     <a href="#features">Features</a> •
     <a href="#installation">Installation</a> •
     <a href="#cli-usage">CLI Usage</a> •
-    <a href="#architecture">Architecture</a>
+    <a href="#supported-formats">Formats</a> •
+    <a href="#architecture">Architecture</a> •
+    <a href="#security">Security</a>
   </p>
 
   <br>
 
-<div align="center">
   <video src="https://github.com/user-attachments/assets/e7fbf3ad-e3cf-4256-a340-00aad7f257c6" width="90%" controls autoplay loop muted></video>
-</div>
 
 </div>
 
@@ -51,14 +52,17 @@
 Get up and running in seconds:
 
 ```bash
-# 1. Install via universal script (or build from source)
+# 1. Install via universal script
 curl -sSL https://enesehs.dev/konvert/install.sh | bash
+
+# Or install from AUR (Arch Linux)
+yay -S konvert-bin
 
 # 2. Convert or optimize any file instantly (CLI or right-click in file manager)
 konvert -t webp photo.png
 
 # 3. Open the native Qt6 & Breeze settings panel
-konvert -s
+konvert
 ```
 
 ---
@@ -69,7 +73,7 @@ Tired of uploading private files to online converter sites, switching to browser
 
 * <img src="assets/icons/konvert-shield.svg" width="16" height="16" align="absmiddle" /> **Zero Telemetry & 100% Privacy:** Every single byte stays on your local hardware; conversions run 100% offline with zero telemetry (network access occurs only if you explicitly run `--check-update`).
 * <img src="assets/icons/konvert-layers.svg" width="16" height="16" align="absmiddle" /> **Native Right-Click Menus:** Instant right-click integration for **KDE Dolphin**, **Cinnamon Nemo**, **XFCE Thunar**, and **GNOME Nautilus**.
-* <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 & Rayon Parallelism:** Multi-threaded parallel batch execution with zero GC pauses and ~25 MB peak memory footprint.
+* <img src="assets/icons/konvert-zap.svg" width="16" height="16" align="absmiddle" /> **Rust 2024 & Rayon Parallelism:** Multi-threaded parallel batch execution with zero GC pauses and ~25 MB base RSS footprint.
 * <img src="assets/icons/konvert-compress.svg" width="16" height="16" align="absmiddle" /> **Mathematical Target Sizing:** Compress videos and images to strict limits (Discord 8 MB, Email 25 MB) with automated ladder search.
 * <img src="assets/icons/konvert-monitor.svg" width="16" height="16" align="absmiddle" /> **Live In-Place Plasma Notifications:** Dynamic animated progress bars and live ETA updates in your desktop notification center.
 * <img src="assets/icons/konvert-scaling.svg" width="16" height="16" align="absmiddle" /> **Audit History & Savings:** Track cumulative disk space savings, preview 80×80 thumbnails, and reveal files in one click.
@@ -86,37 +90,34 @@ Measured on AMD Ryzen 7 7800X3D (8 cores / 16 threads) with [`scripts/benchmark.
 
 | Operation | Mode | Output Size | Disk Saved | Bare Tool (Single) | Konvert (Single) | Konvert (Rayon `-j 8` ×50) |
 |---|---|---|---|---|---|---|
-| **JPEG XL (`.jxl`)** | `--lossless` | 12.4 MB | **-2.4%** | 1.02 s (`cjxl`) | 1.02 s | **43.89 s** (~1.2× vs serial `cjxl`) |
-| **WebP (`.webp`)** | `-q 85` | 849.2 KB | **-93.5%** | 604 ms (`magick`) | 600 ms | **4.62 s** (~6.5× vs serial `magick`) |
-| **JPEG (`.jpg`)** | `-q 90` | 2.2 MB | **-82.3%** | 194 ms (`magick`) | **187 ms** (`image-rs`) | **1.52 s** (~6.2× vs serial) |
+| **JPEG XL (`.jxl`)** | `--lossless` | 12.4 MB | **2.4%** | 1.02 s (`cjxl`) | 1.02 s | **43.89 s** (~1.2× vs serial `cjxl`) |
+| **WebP (`.webp`)** | `-q 85` | 849.2 KB | **93.5%** | 604 ms (`magick`) | 600 ms | **4.62 s** (~6.5× vs serial `magick`) |
+| **JPEG (`.jpg`)** | `-q 90` | 2.2 MB | **82.3%** | 194 ms (`magick`) | **187 ms** (`image-rs`) | **1.52 s** (~6.2× vs serial) |
 | **Unix Pipe (`-`)** | Stdin -> Stdout (1080p) | Stream | — | — | **152 ms** latency | — |
 
-*Performance Model Breakdown: For JPEG output, Konvert uses Rust's native `image-rs` (`JpegEncoder`) directly in-memory without spawning external processes; for WebP/JXL/video/documents it invokes native tools (`magick`, `cjxl`, `ffmpeg`) directly with zero shell wrapper overhead. In batch mode, Konvert schedules work across a Rayon work-stealing thread pool (`-j 8`), yielding ~6.2–6.5× batch throughput speedups on single-threaded encoders (`magick`, `image-rs`). (`cjxl` already parallelizes internally, so multi-instance speedup depends on core headroom.)*
+- **Zero Wrapper Overhead:** JPEG encoding runs in-memory via Rust's `image-rs` (`JpegEncoder`). WebP, JXL, video, and documents invoke native tools directly (`magick`, `cjxl`, `ffmpeg`) without shell overhead. Across 50 files, Rayon (`-j 8`) delivers ~6.2–6.5× throughput on single-threaded encoders (`cjxl` already parallelizes internally).
+- **Low Footprint:** ~24–28 MB base RSS for the Rust core (zero Electron/JVM). Peak memory during 4K video transcoding or heavy PDF jobs is governed by FFmpeg and Ghostscript subprocesses.
 
-*Zero Electron/JVM runtime overhead. Base resident memory (RSS): ~24–28 MB (Rust core process). Note: Peak memory usage during 4K video transcoding or heavy PDF processing is governed by FFmpeg and Ghostscript subprocesses.*
+### Quality & Fidelity (1080p Reference Media)
 
-### Quality & Fidelity Assessment (PSNR, SSIM & SNR)
+#### Image Quality
 
-Evaluated against 1080p reference media:
-
-#### Image Quality (1080p Reference Frame)
-
-| Format / Profile | Output Size | Disk Saved | Latency | PSNR (dB) | SSIM (Structural Similarity) |
+| Format / Profile | Output Size | Disk Saved | Latency | PSNR (dB) | SSIM |
 |---|---|---|---|---|---|
-| **WebP (`-q 85`)** | 70.6 KB | **-97.3%** | 128.8 ms | 37.67 dB | **0.9985** |
-| **JPEG XL (`.jxl`)** | 72.7 KB | **-97.3%** | 140.8 ms | 40.14 dB | **0.9984** |
-| **AVIF (`-q 80`)** | 35.4 KB | **-98.7%** | 1106.6 ms | 42.31 dB | **0.9983** |
-| **JPEG (`-q 90`)** | 212.2 KB | **-92.0%** | 54.9 ms | 42.67 dB | **0.9989** |
-| **WebP (`--lossless`)** | 820.5 KB | **-69.1%** | 49.7 ms | 61.59 dB | **1.0000** |
+| **WebP (`-q 85`)** | 70.6 KB | **97.3%** | 128.8 ms | 37.67 dB | **0.9985** |
+| **JPEG XL (`.jxl`)** | 72.7 KB | **97.3%** | 140.8 ms | 40.14 dB | **0.9984** |
+| **AVIF (`-q 80`)** | 35.4 KB | **98.7%** | 1106.6 ms | 42.31 dB | **0.9983** |
+| **JPEG (`-q 90`)** | 212.2 KB | **92.0%** | 54.9 ms | 42.67 dB | **0.9989** |
+| **WebP (`--lossless`)** | 820.5 KB | **69.1%** | 49.7 ms | 61.59 dB | **1.0000** |
 
 #### Video, Audio & Document Fidelity
 
 | Target / Preset | Reference | Output Size | Disk Saved | Quality Metric |
 |---|---|---|---|---|
-| **Discord 8MB Profile** | 1080p MP4 (20.6 MB) | 6.98 MB | **-66.1%** | **40.05 dB PSNR** / **0.9906 SSIM** |
-| **MP3 (320 kbps)** | 48 kHz WAV (375 KB) | 158.5 KB | **-57.7%** | **74.18 dB SNR** |
-| **MP3 (192 kbps)** | 48 kHz WAV (375 KB) | 95.1 KB | **-74.6%** | **30.46 dB SNR** |
-| **FLAC Audio** | 48 kHz WAV (375 KB) | 97.2 KB | **-74.1%** | **Lossless (Exact Match)** |
+| **Discord 8MB Profile** | 1080p MP4 (20.6 MB) | 6.98 MB | **66.1%** | **40.05 dB PSNR** / **0.9906 SSIM** |
+| **MP3 (320 kbps)** | 48 kHz WAV (375 KB) | 158.5 KB | **57.7%** | **74.18 dB SNR** |
+| **MP3 (192 kbps)** | 48 kHz WAV (375 KB) | 95.1 KB | **74.6%** | **30.46 dB SNR** |
+| **FLAC Audio** | 48 kHz WAV (375 KB) | 97.2 KB | **74.1%** | **Lossless (Exact Match)** |
 | **DOCX -> TXT** | `source_doc.docx` | 682 B | — | **100% Word & Character Recall** |
 | **UDF (UYAP) -> TXT** | `source_court.udf` | 519 B | — | **100% Word & Character Recall** |
 
@@ -128,8 +129,8 @@ Evaluated against 1080p reference media:
 
 <div align="center">
   <sub><b>Desktop Right-Click Context Menu Integration</b></sub><br>
-  <a href="assets/screenshots/screenshot_context_menu.png">
-    <img src="assets/screenshots/screenshot_context_menu.png" alt="Desktop Context Menu Integration" width="90%" />
+  <a href="assets/screenshots/screenshot_context_menu_compressed.webp">
+    <img src="assets/screenshots/screenshot_context_menu_compressed.webp" alt="Desktop Context Menu Integration" width="90%" />
   </a>
 </div>
 
@@ -138,21 +139,38 @@ Evaluated against 1080p reference media:
 <table align="center" width="100%">
   <tr>
     <td width="33.3%" align="center" valign="top">
-      <sub><b>Qt6 & Breeze Settings GUI</b></sub><br>
-      <a href="assets/screenshots/screenshot_convert.png">
-        <img src="assets/screenshots/screenshot_convert.png" alt="Settings UI" width="100%" />
+      <sub><b>Image Conversion & Profiles</b></sub><br>
+      <a href="assets/screenshots/screenshot_conver_image_compressed.webp">
+        <img src="assets/screenshots/screenshot_conver_image_compressed.webp" alt="Image Conversion UI" width="100%" />
       </a>
     </td>
     <td width="33.3%" align="center" valign="top">
+      <sub><b>Video Conversion & Presets</b></sub><br>
+      <a href="assets/screenshots/screenshot_convert_video_compressed.webp">
+        <img src="assets/screenshots/screenshot_convert_video_compressed.webp" alt="Video Conversion UI" width="100%" />
+      </a>
+    </td>
+    <td width="33.3%" align="center" valign="top">
+      <sub><b>Qt6 & Breeze Settings</b></sub><br>
+      <a href="assets/screenshots/screenshot_settings_compressed.webp">
+        <img src="assets/screenshots/screenshot_settings_compressed.webp" alt="Settings UI" width="100%" />
+      </a>
+    </td>
+  </tr>
+</table>
+
+<table align="center" width="100%">
+  <tr>
+    <td width="50%" align="center" valign="top">
       <sub><b>Conversion History & Disk Savings</b></sub><br>
-      <a href="assets/screenshots/screenshot_history.png">
-        <img src="assets/screenshots/screenshot_history.png" alt="History & Previews" width="100%" />
+      <a href="assets/screenshots/screenshot_history_compressed.webp">
+        <img src="assets/screenshots/screenshot_history_compressed.webp" alt="History & Previews" width="100%" />
       </a>
     </td>
-    <td width="33.3%" align="center" valign="top">
+    <td width="50%" align="center" valign="top">
       <sub><b>KDE Developer About Dialog</b></sub><br>
-      <a href="assets/screenshots/screenshot_about.png">
-        <img src="assets/screenshots/screenshot_about.png" alt="About Dialog" width="100%" />
+      <a href="assets/screenshots/screenshot_about_compressed.webp">
+        <img src="assets/screenshots/screenshot_about_compressed.webp" alt="About Dialog" width="100%" />
       </a>
     </td>
   </tr>
@@ -199,25 +217,39 @@ curl -sSL https://enesehs.dev/konvert/install.sh | bash
 Download the `.deb` release package from [GitHub Releases](https://github.com/enesehs/konvert/releases) or build it locally:
 
 ```bash
-# Install package:
-sudo dpkg -i packaging/konvert_*.deb
+# Install downloaded package:
+sudo dpkg -i konvert_*.deb
 sudo apt-get install -f
 
 # Or build from repository:
 ./packaging/build-deb.sh
 ```
 
-### Method 3: Arch Linux / AUR (PKGBUILD)
+### Method 3: Arch Linux / AUR
 
 ```bash
+# Prebuilt binary (fastest)
+yay -S konvert-bin
+
+# Or build from source
+yay -S konvert
+
+# (paru works the same way: paru -S konvert-bin)
+
+# Or build locally from PKGBUILD:
 cd packaging
 makepkg -si
 ```
 
 ### Method 4: Portable AppImage
 
+Download the latest `.AppImage` from the [Releases page](https://github.com/enesehs/konvert/releases/latest), then make it executable and run it:
+
 ```bash
-# Build standalone AppImage bundle:
+chmod +x Konvert-*.AppImage
+./Konvert-*.AppImage
+
+# Or build the AppImage yourself:
 ./packaging/build-appimage.sh
 ```
 
@@ -285,7 +317,7 @@ konvert --check-update                         # Check GitHub releases for softw
 konvert --pause                                # Pause ongoing background conversion
 konvert --resume                               # Resume paused background conversion
 konvert --cancel                               # Safely cancel ongoing background conversion
-konvert -s                                     # Open Qt6 Settings GUI
+konvert                                        # Open Qt6 Settings GUI
 ```
 
 ---
@@ -306,13 +338,13 @@ konvert -s                                     # Open Qt6 Settings GUI
 ```mermaid
 flowchart TD
     FM["Desktop File Managers & Shell Pipelines<br><b>(KDE Dolphin • Cinnamon Nemo • XFCE Thunar • GNOME Nautilus)</b>"] --> CORE["<b>Rust 2024 Core Engine (konvert)</b><br>• Rayon Parallel Batch Thread Pool (--jobs)<br>• FFmpeg, ImageMagick & Ghostscript Pipelines<br>• D-Bus In-Place Progress Notifications<br>• Atomic I/O & Backup Safety (.part / .bak)"]
-    FM -.->|"konvert -s"| GUI["<b>Qt6 & Breeze Settings GUI</b><br>• Quality, Profile & Format Config<br>• Cumulative History & Disk Savings<br>• Custom Profile Editor"]
+    FM -.->|"konvert"| GUI["<b>Qt6 & Breeze Settings GUI</b><br>• Quality, Profile & Format Config<br>• Cumulative History & Disk Savings<br>• Custom Profile Editor"]
     CORE <--> GUI
 ```
 
 ---
 
-## Security & Threat Model
+## Security
 
 Konvert is engineered around a zero-telemetry, 100% offline security posture. Because conversions delegate to system-level external tools for specific formats, users and system administrators should be aware of the following security considerations:
 
@@ -323,16 +355,37 @@ Konvert is engineered around a zero-telemetry, 100% offline security posture. Be
 
 ---
 
+## Roadmap (Planned Features)
+
+- **Image Rotation & Transform Actions:** 90°/180°/270° rotation, horizontal/vertical flip, and aspect-preserving transforms directly from CLI and context menus.
+- **Hierarchical Context Submenus:** Organized nested submenus (`Convert`, `Compress`, `Transform`, `Extract`) for Dolphin, Nemo, and Thunar so right-click menus stay clean as action count grows.
+- **First-Launch Integration Wizard:** Automatic detection of missing desktop file manager integrations in the Qt6 GUI with one-click `--install-all` setup.
+- **PDF Split, Reorder & Watermark Tools:** Extract specific page ranges, split multi-page PDFs, and batch-apply lightweight overlays.
+- **Watch Folders:** Optional background directory monitoring to auto-convert incoming files using a chosen preset profile.
+
+---
+
 ## Contributing
 
-Contributions are welcome and appreciated! To contribute:
+Contributions are welcome and appreciated! Please read [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`todo.md`](todo.md) before submitting changes.
+
+### Contribution Rules
+
+- **Error Handling & Safety:** No `.unwrap()` or `.expect()` in production Rust code; no `sh -c` shell execution (use direct `Command` arg arrays); keep all file writes atomic (`.part` / `.bak`).
+- **Offline Guarantee:** Zero telemetry; conversions must stay 100% offline.
+- **Quality Gates:** All PRs must pass formatting, lints, and tests with zero warnings:
+  - `cargo fmt -- --check`
+  - `cargo clippy --all-targets -- -D warnings`
+  - `cargo test`
+  - Qt6 GUI changes must also build cleanly via `cmake -B gui/build -S gui -DCMAKE_BUILD_TYPE=Release && cmake --build gui/build`.
+
+### Workflow
 
 1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/amazing-feature`).
-3. Commit your changes (`git commit -m 'feat: add amazing feature'`).
-4. Ensure tests and lints pass (`cargo test && cargo clippy --all-targets -- -D warnings`).
-5. Push to your branch (`git push origin feature/amazing-feature`).
-6. Open a **Pull Request**.
+2. Create your feature branch (`git checkout -b feat/amazing-feature`).
+3. Commit your changes using Conventional Commits (`git commit -m 'feat: add amazing feature'`).
+4. Run the checks above and ensure everything passes.
+5. Push to your branch (`git push origin feat/amazing-feature`) and open a **Pull Request**.
 
 ---
 
